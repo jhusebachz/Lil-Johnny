@@ -124,6 +124,16 @@ export default function Settings() {
             }}
             colors={colors}
           />
+          <SettingToggle
+            label="Private reminder notifications"
+            description="Hide reminder topic text in alerts and use generic notification copy instead."
+            enabled={preferences.privateNotifications}
+            onPress={async () => {
+              await triggerHaptic();
+              updatePreferences({ privateNotifications: !preferences.privateNotifications });
+            }}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Games Tab" emoji={'\uD83C\uDFAE'} colors={colors}>
@@ -226,7 +236,8 @@ export default function Settings() {
           </Text>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Notifications: {preferences.notificationsEnabled ? 'Enabled' : 'Disabled'} | Haptics:{' '}
-            {preferences.hapticsEnabled ? 'Enabled' : 'Disabled'}
+            {preferences.hapticsEnabled ? 'Enabled' : 'Disabled'} | Privacy:{' '}
+            {preferences.privateNotifications ? 'Private alerts' : 'Full alerts'}
           </Text>
         </SectionCard>
       </ScrollView>

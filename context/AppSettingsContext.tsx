@@ -17,6 +17,7 @@ export type ReminderItem = {
 
 export type AppPreferences = {
   notificationsEnabled: boolean;
+  privateNotifications: boolean;
   hapticsEnabled: boolean;
   autoRefreshGamingNews: boolean;
   defaultGamesView: DefaultGamesView;
@@ -55,6 +56,7 @@ const initialReminders: ReminderItem[] = [
 
 const initialPreferences: AppPreferences = {
   notificationsEnabled: true,
+  privateNotifications: false,
   hapticsEnabled: true,
   autoRefreshGamingNews: true,
   defaultGamesView: 'gaming',
@@ -183,7 +185,8 @@ async function ensureAndroidChannel() {
 
 async function syncNativeReminderNotifications(
   reminders: ReminderItem[],
-  notificationsEnabled: boolean
+  notificationsEnabled: boolean,
+  privateNotifications: boolean
 ) {
   if (Platform.OS === 'web') {
     return;
@@ -221,8 +224,8 @@ async function syncNativeReminderNotifications(
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: reminder.topic,
-        body: `Lil Johnny reminder for ${reminder.time}`,
+        title: privateNotifications ? 'Lil Johnny reminder' : reminder.topic,
+        body: privateNotifications ? `Scheduled for ${reminder.time}` : `Lil Johnny reminder for ${reminder.time}`,
         sound: true,
       },
       trigger: {
@@ -286,8 +289,12 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       return;
     }
 
-    void syncNativeReminderNotifications(reminders, preferences.notificationsEnabled);
-  }, [hasHydrated, preferences.notificationsEnabled, reminders]);
+    void syncNativeReminderNotifications(
+      reminders,
+      preferences.notificationsEnabled,
+      preferences.privateNotifications
+    );
+  }, [hasHydrated, preferences.notificationsEnabled, preferences.privateNotifications, reminders]);
 
   useEffect(() => {
     if (!hasHydrated || Platform.OS !== 'web') {
@@ -324,14 +331,16 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
         }
 
         webFiredKeysRef.current[reminderKey] = true;
-        new Notification(reminder.topic, {
-          body: `Lil Johnny reminder for ${reminder.time}`,
+        new Notification(preferences.privateNotifications ? 'Lil Johnny reminder' : reminder.topic, {
+          body: preferences.privateNotifications
+            ? `Scheduled for ${reminder.time}`
+            : `Lil Johnny reminder for ${reminder.time}`,
         });
       });
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [hasHydrated, notificationAccess, preferences.notificationsEnabled, reminders]);
+  }, [hasHydrated, notificationAccess, preferences.notificationsEnabled, preferences.privateNotifications, reminders]);
 
   const updateReminder = (id: string, updates: Partial<ReminderItem>) => {
     setReminders((current) =>
@@ -389,7 +398,11 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     setNotificationAccess(access);
 
     if (access === 'granted') {
-      await syncNativeReminderNotifications(reminders, preferences.notificationsEnabled);
+      await syncNativeReminderNotifications(
+        reminders,
+        preferences.notificationsEnabled,
+        preferences.privateNotifications
+      );
       return true;
     }
 
