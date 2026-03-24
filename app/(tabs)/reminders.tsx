@@ -1,218 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReminderCard from '../../components/reminders/ReminderCard';
+import ReminderTimeWheel from '../../components/reminders/ReminderTimeWheel';
 import SectionCard from '../../components/SectionCard';
 import { useAppSettings } from '../../context/AppSettingsContext';
+import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
-  formatReminderTime,
   formatUpcomingReminder,
+  getReminderCompletionStreak,
+  getTodayReminderSummary,
   getNextReminder,
-  parseReminderTime,
+  isReminderCompleteOnDate,
 } from '../../data/reminders';
 import { getThemeColors } from '../../data/theme';
-
-const hourOptions = Array.from({ length: 12 }, (_, index) => String(index + 1));
-const minuteOptions = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
-const meridiemOptions = ['AM', 'PM'] as const;
-const WHEEL_ITEM_HEIGHT = 40;
-const WHEEL_HEIGHT = WHEEL_ITEM_HEIGHT * 5;
-
-function ReminderToggle({
-  enabled,
-  onPress,
-  colors,
-}: {
-  enabled: boolean;
-  onPress: () => void;
-  colors: ReturnType<typeof getThemeColors>;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        width: 52,
-        height: 30,
-        backgroundColor: enabled ? colors.success : colors.inputBorder,
-        borderRadius: 999,
-        padding: 3,
-        justifyContent: 'center',
-      }}
-    >
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 999,
-          backgroundColor: 'white',
-          alignSelf: enabled ? 'flex-end' : 'flex-start',
-        }}
-      />
-    </Pressable>
-  );
-}
-
-function TimeWheelColumn({
-  values,
-  selectedValue,
-  onChange,
-  colors,
-}: {
-  values: string[];
-  selectedValue: string;
-  onChange: (value: string) => void;
-  colors: ReturnType<typeof getThemeColors>;
-}) {
-  const scrollRef = useRef<ScrollView>(null);
-  const wheelPadding = (WHEEL_HEIGHT - WHEEL_ITEM_HEIGHT) / 2;
-
-  useEffect(() => {
-    const selectedIndex = Math.max(values.indexOf(selectedValue), 0);
-
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        y: selectedIndex * WHEEL_ITEM_HEIGHT,
-        animated: false,
-      });
-    });
-  }, [selectedValue, values]);
-
-  const snapToValue = (offsetY: number) => {
-    const rawIndex = Math.round(offsetY / WHEEL_ITEM_HEIGHT);
-    const index = Math.max(0, Math.min(values.length - 1, rawIndex));
-    const nextValue = values[index];
-
-    scrollRef.current?.scrollTo({
-      y: index * WHEEL_ITEM_HEIGHT,
-      animated: true,
-    });
-
-    if (nextValue !== selectedValue) {
-      onChange(nextValue);
-    }
-  };
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        height: WHEEL_HEIGHT,
-        borderRadius: 10,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.inputBorder,
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: wheelPadding,
-          height: WHEEL_ITEM_HEIGHT,
-          borderTopWidth: 1,
-          borderBottomWidth: 1,
-          borderColor: colors.accent,
-          backgroundColor: colors.accentSoft,
-          zIndex: 0,
-        }}
-      />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={WHEEL_ITEM_HEIGHT}
-        decelerationRate="fast"
-        nestedScrollEnabled
-        contentContainerStyle={{ paddingVertical: wheelPadding }}
-        style={{ zIndex: 1 }}
-        onMomentumScrollEnd={(event) => snapToValue(event.nativeEvent.contentOffset.y)}
-      >
-        {values.map((value) => {
-          const selected = value === selectedValue;
-
-          return (
-            <View
-              key={value}
-              style={{
-                height: WHEEL_ITEM_HEIGHT,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  color: selected ? colors.heroText : colors.subtext,
-                  fontSize: selected ? 18 : 15,
-                  fontWeight: selected ? '800' : '500',
-                }}
-              >
-                {value}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-function ReminderTimeWheel({
-  time,
-  onChange,
-  colors,
-}: {
-  time: string;
-  onChange: (value: string) => void;
-  colors: ReturnType<typeof getThemeColors>;
-}) {
-  const timeParts = parseReminderTime(time) ?? { hour: 6, minute: '00', meridiem: 'PM' as const };
-
-  return (
-    <View
-      style={{
-        backgroundColor: colors.inputBackground,
-        borderWidth: 1,
-        borderColor: colors.inputBorder,
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 10,
-      }}
-    >
-      <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800', marginBottom: 10 }}>{time}</Text>
-
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <TimeWheelColumn
-          values={hourOptions}
-          selectedValue={String(timeParts.hour)}
-          onChange={(hour) => onChange(formatReminderTime(Number(hour), timeParts.minute, timeParts.meridiem))}
-          colors={colors}
-        />
-        <TimeWheelColumn
-          values={minuteOptions}
-          selectedValue={timeParts.minute}
-          onChange={(minute) => onChange(formatReminderTime(timeParts.hour, minute, timeParts.meridiem))}
-          colors={colors}
-        />
-        <TimeWheelColumn
-          values={[...meridiemOptions]}
-          selectedValue={timeParts.meridiem}
-          onChange={(meridiem) =>
-            onChange(formatReminderTime(timeParts.hour, timeParts.minute, meridiem as 'AM' | 'PM'))
-          }
-          colors={colors}
-        />
-      </View>
-    </View>
-  );
-}
 
 export default function Reminders() {
   const {
     reminders,
     addReminder,
     updateReminder,
+    toggleReminderCompletion,
     theme,
     preferences,
     notificationAccess,
@@ -220,10 +37,12 @@ export default function Reminders() {
     triggerHaptic,
   } = useAppSettings();
   const colors = getThemeColors(theme);
-  const enabledReminders = reminders.filter((reminder) => reminder.enabled);
   const nextReminderEntry = getNextReminder(reminders);
+  const todaySummary = getTodayReminderSummary(reminders);
+  const reminderStreak = getReminderCompletionStreak(reminders);
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null);
   const [draftReminderTime, setDraftReminderTime] = useState<string | null>(null);
+  const { refreshing, triggerRefresh } = useTimedRefresh();
   const expandedReminder = reminders.find((reminder) => reminder.id === expandedReminderId) ?? null;
   const nextReminderLabel = nextReminderEntry
     ? formatUpcomingReminder(nextReminderEntry.occurrence)
@@ -244,6 +63,10 @@ export default function Reminders() {
     setDraftReminderTime(null);
   };
 
+  const refreshReminders = () => {
+    triggerRefresh();
+  };
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
@@ -252,6 +75,15 @@ export default function Reminders() {
         keyboardVerticalOffset={16}
       >
       <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refreshReminders}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+            progressBackgroundColor={colors.card}
+          />
+        }
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
@@ -272,7 +104,7 @@ export default function Reminders() {
               marginBottom: 6,
             }}
           >
-            Reminder Center
+            {preferences.customTabLabels.reminders}
           </Text>
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
             Let&apos;s keep you on track
@@ -292,7 +124,7 @@ export default function Reminders() {
             >
               <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Active now</Text>
               <Text style={{ color: colors.heroText, fontSize: 16, fontWeight: '800' }}>
-                {enabledReminders.length}/{reminders.length}
+                {todaySummary.completed}/{Math.max(todaySummary.scheduled, 1)}
               </Text>
             </View>
             <View
@@ -319,6 +151,9 @@ export default function Reminders() {
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
             Alert access: {notificationAccess}
           </Text>
+          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
+            Today: {todaySummary.completed} complete, {todaySummary.remaining} left
+          </Text>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Next tracked reminder:{' '}
             {nextReminderEntry
@@ -327,6 +162,9 @@ export default function Reminders() {
           </Text>
           <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 10, lineHeight: 18 }}>
             Phone alerts are scheduled directly on-device. Browser alerts work while the app stays open in the tab.
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
+            Reminder streak: {reminderStreak} {reminderStreak === 1 ? 'day' : 'days'}
           </Text>
           {notificationAccess !== 'granted' ? (
             <Pressable
@@ -368,76 +206,29 @@ export default function Reminders() {
           </Pressable>
 
           {reminders.map((reminder) => (
-            <View
+            <ReminderCard
               key={reminder.id}
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: 12,
-                padding: 14,
-                marginBottom: 12,
-                borderWidth: 1,
-                borderColor: colors.cardBorder,
+              reminder={reminder}
+              colors={colors}
+              onTopicChange={(text) => updateReminder(reminder.id, { topic: text })}
+              onNotesChange={(text) => updateReminder(reminder.id, { notes: text })}
+              onTimePress={async () => {
+                await openReminderTimePicker(reminder.id, reminder.time);
               }}
-            >
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Topic</Text>
-              <TextInput
-                value={reminder.topic}
-                onChangeText={(text) => updateReminder(reminder.id, { topic: text })}
-                placeholder="Reminder topic"
-                placeholderTextColor={colors.subtext}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 10,
-                  paddingVertical: 10,
-                  fontSize: 14,
-                  color: colors.text,
-                  marginBottom: 10,
-                  backgroundColor: colors.inputBackground,
-                }}
-              />
-
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Time</Text>
-              <Pressable
-                onPress={async () => {
-                  await openReminderTimePicker(reminder.id, reminder.time);
-                }}
-                style={{
-                  backgroundColor: colors.inputBackground,
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800' }}>{reminder.time}</Text>
-              </Pressable>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: 2,
-                }}
-              >
-                <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700' }}>
-                  {reminder.enabled ? 'Enabled' : 'Disabled'}
-                </Text>
-                <View style={{ marginLeft: 10 }}>
-                  <ReminderToggle
-                    enabled={reminder.enabled}
-                    onPress={async () => {
-                      await triggerHaptic();
-                      updateReminder(reminder.id, { enabled: !reminder.enabled });
-                    }}
-                    colors={colors}
-                  />
-                </View>
-              </View>
-            </View>
+              onToggle={async () => {
+                await triggerHaptic();
+                updateReminder(reminder.id, { enabled: !reminder.enabled });
+              }}
+              onRecurrenceChange={async (recurrence) => {
+                await triggerHaptic();
+                updateReminder(reminder.id, { recurrence });
+              }}
+              onCompleteToggle={async () => {
+                await triggerHaptic();
+                toggleReminderCompletion(reminder.id);
+              }}
+              completedToday={isReminderCompleteOnDate(reminder, new Date())}
+            />
           ))}
         </SectionCard>
       </ScrollView>

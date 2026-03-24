@@ -1,18 +1,29 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { getNotificationsModule, isExpoGo } from '../utils/notifications';
+import { readPersistedSettings, writePersistedSettings } from './appSettingsStorage';
+import {
+  createWebReminderPoller,
+  getCurrentNotificationAccess,
+  requestNotificationAccess as requestReminderNotificationAccess,
+  syncNativeReminderNotifications,
+} from './reminderNotifications';
 
-export type ThemeMode = 'light' | 'dark' | 'gangsta-green';
+export type ThemeMode = 'light' | 'dark' | 'gangsta-green' | 'silver-black';
 export type DefaultGamesView = 'gaming' | 'pokopia' | 'runescape';
 export type NotificationAccess = 'granted' | 'denied' | 'undetermined' | 'unsupported';
+export type ReminderRecurrence = 'daily' | 'weekdays' | 'weekends';
+export type FavoriteFocus = 'cyber' | 'gym' | 'reminders';
+export type AppTabKey = 'dashboard' | 'cyber' | 'gym' | 'games' | 'reminders' | 'settings';
 
 export type ReminderItem = {
   id: string;
   topic: string;
   time: string;
   enabled: boolean;
+  notes: string;
+  recurrence: ReminderRecurrence;
+  completedDates: string[];
 };
 
 export type AppPreferences = {
@@ -21,12 +32,31 @@ export type AppPreferences = {
   hapticsEnabled: boolean;
   autoRefreshGamingNews: boolean;
   defaultGamesView: DefaultGamesView;
+  favoriteFocus: FavoriteFocus;
+  profileName: string;
+  preferredWorkoutSplit: string;
+  scheduleWindow: string;
+  customTabLabels: Record<AppTabKey, string>;
+  gamesFeeds: {
+    pokopiaQuery: string;
+    switchQuery: string;
+    steamQuery: string;
+  };
+  usageCounts: Record<AppTabKey, number>;
 };
 
-type PersistedSettings = {
+export type PersistedSettings = {
   theme: ThemeMode;
   reminders: ReminderItem[];
   preferences: AppPreferences;
+};
+
+export type AppPreferencesUpdate = Partial<
+  Omit<AppPreferences, 'customTabLabels' | 'gamesFeeds' | 'usageCounts'>
+> & {
+  customTabLabels?: Partial<Record<AppTabKey, string>>;
+  gamesFeeds?: Partial<AppPreferences['gamesFeeds']>;
+  usageCounts?: Partial<Record<AppTabKey, number>>;
 };
 
 type AppSettingsContextType = {
@@ -35,23 +65,46 @@ type AppSettingsContextType = {
   reminders: ReminderItem[];
   addReminder: () => ReminderItem;
   updateReminder: (id: string, updates: Partial<ReminderItem>) => void;
+  toggleReminderCompletion: (id: string, dateKey?: string) => void;
   preferences: AppPreferences;
-  updatePreferences: (updates: Partial<AppPreferences>) => void;
+  updatePreferences: (updates: AppPreferencesUpdate) => void;
   notificationAccess: NotificationAccess;
   requestNotificationAccess: () => Promise<boolean>;
   triggerHaptic: (force?: boolean) => Promise<void>;
   triggerTabHaptic: () => Promise<void>;
+  trackTabVisit: (tab: AppTabKey) => void;
 };
-
-const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-settings.json`;
-const WEB_STORAGE_KEY = 'lil-johnny-settings';
 
 const AppSettingsContext = createContext<AppSettingsContextType | undefined>(undefined);
 
 const initialReminders: ReminderItem[] = [
-  { id: '1', topic: 'Linux+ Study', time: '6:00 PM', enabled: true },
-  { id: '2', topic: 'Cyber Threat Intel Review', time: '8:45 AM', enabled: true },
-  { id: '3', topic: 'Games Check-in', time: '7:30 PM', enabled: false },
+  {
+    id: '1',
+    topic: 'Linux+ Study',
+    time: '6:00 PM',
+    enabled: true,
+    notes: 'Focus on one practice block or one lab objective.',
+    recurrence: 'weekdays',
+    completedDates: [],
+  },
+  {
+    id: '2',
+    topic: 'Cyber Threat Intel Review',
+    time: '8:45 AM',
+    enabled: true,
+    notes: 'Use this as the first clean threat read for the day.',
+    recurrence: 'daily',
+    completedDates: [],
+  },
+  {
+    id: '3',
+    topic: 'Games Check-in',
+    time: '7:30 PM',
+    enabled: false,
+    notes: 'Use this only when you actually want a games window later in the day.',
+    recurrence: 'weekends',
+    completedDates: [],
+  },
 ];
 
 const initialPreferences: AppPreferences = {
@@ -60,6 +113,31 @@ const initialPreferences: AppPreferences = {
   hapticsEnabled: true,
   autoRefreshGamingNews: true,
   defaultGamesView: 'gaming',
+  favoriteFocus: 'cyber',
+  profileName: 'John',
+  preferredWorkoutSplit: 'Push / Pull / Legs',
+  scheduleWindow: 'Early focus block',
+  customTabLabels: {
+    dashboard: 'Dashboard',
+    cyber: 'Cyber',
+    gym: 'Gym',
+    games: 'Games',
+    reminders: 'Reminders',
+    settings: 'Settings',
+  },
+  gamesFeeds: {
+    pokopiaQuery: 'Pokopia',
+    switchQuery: '"Nintendo Switch 2"',
+    steamQuery: 'Steam PC gaming',
+  },
+  usageCounts: {
+    dashboard: 0,
+    cyber: 0,
+    gym: 0,
+    games: 0,
+    reminders: 0,
+    settings: 0,
+  },
 };
 
 const defaultSettings: PersistedSettings = {
@@ -68,174 +146,41 @@ const defaultSettings: PersistedSettings = {
   preferences: initialPreferences,
 };
 
-function parseReminderTime(time: string): { hour: number; minute: number } | null {
-  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-
-  if (!match) {
-    return null;
-  }
-
-  const hourValue = Number(match[1]);
-  const minute = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-
-  if (hourValue < 1 || hourValue > 12 || minute < 0 || minute > 59) {
-    return null;
-  }
-
-  let hour = hourValue % 12;
-
-  if (meridiem === 'PM') {
-    hour += 12;
-  }
-
-  return { hour, minute };
+function mergeReminder(reminder?: Partial<ReminderItem>, fallback?: ReminderItem): ReminderItem {
+  return {
+    id: reminder?.id ?? fallback?.id ?? `${Date.now()}`,
+    topic: reminder?.topic ?? fallback?.topic ?? 'New Reminder',
+    time: reminder?.time ?? fallback?.time ?? '9:00 AM',
+    enabled: reminder?.enabled ?? fallback?.enabled ?? true,
+    notes: reminder?.notes ?? fallback?.notes ?? '',
+    recurrence: reminder?.recurrence ?? fallback?.recurrence ?? 'daily',
+    completedDates: reminder?.completedDates ?? fallback?.completedDates ?? [],
+  };
 }
 
-async function readPersistedSettings(): Promise<PersistedSettings | null> {
-  if (Platform.OS === 'web') {
-    if (typeof localStorage === 'undefined') {
-      return null;
-    }
-
-    const raw = localStorage.getItem(WEB_STORAGE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    return JSON.parse(raw) as PersistedSettings;
-  }
-
-  const fileInfo = await FileSystem.getInfoAsync(STORAGE_FILE);
-
-  if (!fileInfo.exists) {
-    return null;
-  }
-
-  const raw = await FileSystem.readAsStringAsync(STORAGE_FILE);
-  return JSON.parse(raw) as PersistedSettings;
-}
-
-async function writePersistedSettings(settings: PersistedSettings) {
-  const raw = JSON.stringify(settings);
-
-  if (Platform.OS === 'web') {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(WEB_STORAGE_KEY, raw);
-    }
-
-    return;
-  }
-
-  await FileSystem.writeAsStringAsync(STORAGE_FILE, raw);
-}
-
-function mapNotificationPermission(status: string): NotificationAccess {
-  if (status === 'granted') {
-    return 'granted';
-  }
-
-  if (status === 'denied') {
-    return 'denied';
-  }
-
-  if (status === 'undetermined') {
-    return 'undetermined';
-  }
-
-  return 'unsupported';
-}
-
-async function getCurrentNotificationAccess(): Promise<NotificationAccess> {
-  if (Platform.OS === 'web') {
-    if (typeof Notification === 'undefined') {
-      return 'unsupported';
-    }
-
-    return mapNotificationPermission(Notification.permission);
-  }
-
-  const Notifications = getNotificationsModule();
-
-  if (!Notifications) {
-    return 'unsupported';
-  }
-
-  const permission = await Notifications.getPermissionsAsync();
-  return mapNotificationPermission(permission.status);
-}
-
-async function ensureAndroidChannel() {
-  if (Platform.OS !== 'android') {
-    return;
-  }
-
-  const Notifications = getNotificationsModule();
-
-  if (!Notifications) {
-    return;
-  }
-
-  await Notifications.setNotificationChannelAsync('reminders', {
-    name: 'Reminders',
-    importance: Notifications.AndroidImportance.DEFAULT,
-  });
-}
-
-async function syncNativeReminderNotifications(
-  reminders: ReminderItem[],
-  notificationsEnabled: boolean,
-  privateNotifications: boolean
-) {
-  if (Platform.OS === 'web') {
-    return;
-  }
-
-  const Notifications = getNotificationsModule();
-
-  if (!Notifications) {
-    return;
-  }
-
-  await ensureAndroidChannel();
-  await Notifications.cancelAllScheduledNotificationsAsync();
-
-  if (!notificationsEnabled) {
-    return;
-  }
-
-  const permission = await Notifications.getPermissionsAsync();
-
-  if (permission.status !== 'granted') {
-    return;
-  }
-
-  for (const reminder of reminders) {
-    if (!reminder.enabled) {
-      continue;
-    }
-
-    const parsedTime = parseReminderTime(reminder.time);
-
-    if (!parsedTime) {
-      continue;
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: privateNotifications ? 'Lil Johnny reminder' : reminder.topic,
-        body: privateNotifications ? `Scheduled for ${reminder.time}` : `Lil Johnny reminder for ${reminder.time}`,
-        sound: true,
+function normalizePersistedSettings(persisted: PersistedSettings): PersistedSettings {
+  return {
+    theme: persisted.theme ?? defaultSettings.theme,
+    reminders: (persisted.reminders ?? defaultSettings.reminders).map((reminder, index) =>
+      mergeReminder(reminder, defaultSettings.reminders[index])
+    ),
+    preferences: {
+      ...defaultSettings.preferences,
+      ...persisted.preferences,
+      customTabLabels: {
+        ...defaultSettings.preferences.customTabLabels,
+        ...persisted.preferences?.customTabLabels,
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: parsedTime.hour,
-        minute: parsedTime.minute,
-        channelId: 'reminders',
+      gamesFeeds: {
+        ...defaultSettings.preferences.gamesFeeds,
+        ...persisted.preferences?.gamesFeeds,
       },
-    });
-  }
+      usageCounts: {
+        ...defaultSettings.preferences.usageCounts,
+        ...persisted.preferences?.usageCounts,
+      },
+    },
+  };
 }
 
 export function AppSettingsProvider({ children }: { children: React.ReactNode }) {
@@ -254,9 +199,10 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
         const persisted = await readPersistedSettings();
 
         if (persisted && mounted) {
-          setTheme(persisted.theme ?? defaultSettings.theme);
-          setReminders(persisted.reminders ?? defaultSettings.reminders);
-          setPreferences(persisted.preferences ?? defaultSettings.preferences);
+          const normalized = normalizePersistedSettings(persisted);
+          setTheme(normalized.theme);
+          setReminders(normalized.reminders);
+          setPreferences(normalized.preferences);
         }
       } catch {
         // Ignore corrupt local state and keep defaults.
@@ -305,41 +251,18 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       return;
     }
 
-    const interval = setInterval(() => {
-      const now = new Date();
-      const dateKey = now.toISOString().slice(0, 10);
+    const interval = createWebReminderPoller(
+      reminders,
+      preferences,
+      notificationAccess,
+      webFiredKeysRef
+    );
 
-      reminders.forEach((reminder) => {
-        if (!reminder.enabled) {
-          return;
-        }
-
-        const parsedTime = parseReminderTime(reminder.time);
-
-        if (!parsedTime) {
-          return;
-        }
-
-        if (parsedTime.hour !== now.getHours() || parsedTime.minute !== now.getMinutes()) {
-          return;
-        }
-
-        const reminderKey = `${reminder.id}-${dateKey}-${parsedTime.hour}-${parsedTime.minute}`;
-
-        if (webFiredKeysRef.current[reminderKey]) {
-          return;
-        }
-
-        webFiredKeysRef.current[reminderKey] = true;
-        new Notification(preferences.privateNotifications ? 'Lil Johnny reminder' : reminder.topic, {
-          body: preferences.privateNotifications
-            ? `Scheduled for ${reminder.time}`
-            : `Lil Johnny reminder for ${reminder.time}`,
-        });
-      });
-    }, 30000);
-
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [hasHydrated, notificationAccess, preferences.notificationsEnabled, preferences.privateNotifications, reminders]);
 
   const updateReminder = (id: string, updates: Partial<ReminderItem>) => {
@@ -354,60 +277,48 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       topic: 'New Reminder',
       time: '9:00 AM',
       enabled: true,
+      notes: '',
+      recurrence: 'daily',
+      completedDates: [],
     };
 
     setReminders((current) => [...current, nextReminder]);
     return nextReminder;
   };
 
-  const updatePreferences = (updates: Partial<AppPreferences>) => {
-    setPreferences((current) => ({ ...current, ...updates }));
+  const toggleReminderCompletion = (id: string, dateKey = new Date().toISOString().slice(0, 10)) => {
+    setReminders((current) =>
+      current.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        const alreadyComplete = item.completedDates.includes(dateKey);
+
+        return {
+          ...item,
+          completedDates: alreadyComplete
+            ? item.completedDates.filter((entry) => entry !== dateKey)
+            : [...item.completedDates, dateKey].sort(),
+        };
+      })
+    );
   };
 
-  const requestNotificationAccess = async () => {
-    if (Platform.OS === 'web') {
-      if (typeof Notification === 'undefined') {
-        setNotificationAccess('unsupported');
-        return false;
-      }
-
-      const result = await Notification.requestPermission();
-      const access = mapNotificationPermission(result);
-      setNotificationAccess(access);
-      return access === 'granted';
-    }
-
-    const Notifications = getNotificationsModule();
-
-    if (!Notifications || isExpoGo) {
-      setNotificationAccess('unsupported');
-      return false;
-    }
-
-    await ensureAndroidChannel();
-
-    const current = await Notifications.getPermissionsAsync();
-    let nextStatus = current.status;
-
-    if (nextStatus !== 'granted') {
-      const requested = await Notifications.requestPermissionsAsync();
-      nextStatus = requested.status;
-    }
-
-    const access = mapNotificationPermission(nextStatus);
-    setNotificationAccess(access);
-
-    if (access === 'granted') {
-      await syncNativeReminderNotifications(
-        reminders,
-        preferences.notificationsEnabled,
-        preferences.privateNotifications
-      );
-      return true;
-    }
-
-    return false;
+  const updatePreferences = (updates: AppPreferencesUpdate) => {
+    setPreferences((current) => ({
+      ...current,
+      ...updates,
+      customTabLabels: updates.customTabLabels
+        ? { ...current.customTabLabels, ...updates.customTabLabels }
+        : current.customTabLabels,
+      gamesFeeds: updates.gamesFeeds ? { ...current.gamesFeeds, ...updates.gamesFeeds } : current.gamesFeeds,
+      usageCounts: updates.usageCounts ? { ...current.usageCounts, ...updates.usageCounts } : current.usageCounts,
+    }));
   };
+
+  const requestNotificationAccess = async () =>
+    requestReminderNotificationAccess(reminders, preferences, setNotificationAccess);
 
   const triggerHaptic = async (force = false) => {
     if (Platform.OS === 'web') {
@@ -429,6 +340,16 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     await Haptics.selectionAsync();
   };
 
+  const trackTabVisit = (tab: AppTabKey) => {
+    setPreferences((current) => ({
+      ...current,
+      usageCounts: {
+        ...current.usageCounts,
+        [tab]: (current.usageCounts[tab] ?? 0) + 1,
+      },
+    }));
+  };
+
   const value = useMemo(
     () => ({
       theme,
@@ -436,12 +357,14 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       reminders,
       addReminder,
       updateReminder,
+      toggleReminderCompletion,
       preferences,
       updatePreferences,
       notificationAccess,
       requestNotificationAccess,
       triggerHaptic,
       triggerTabHaptic,
+      trackTabVisit,
     }),
     [notificationAccess, preferences, reminders, theme]
   );

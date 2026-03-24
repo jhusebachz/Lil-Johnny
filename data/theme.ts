@@ -17,6 +17,7 @@ export type ThemeColors = {
   hero: string;
   heroText: string;
   heroSubtext: string;
+  metallicGlint: boolean;
 };
 
 export function getThemeColors(theme: ThemeMode): ThemeColors {
@@ -38,6 +39,7 @@ export function getThemeColors(theme: ThemeMode): ThemeColors {
       hero: '#1e1b4b',
       heroText: '#ffffff',
       heroSubtext: 'rgba(255,255,255,0.78)',
+      metallicGlint: false,
     };
   }
 
@@ -59,6 +61,29 @@ export function getThemeColors(theme: ThemeMode): ThemeColors {
       hero: '#14532d',
       heroText: '#f0fdf4',
       heroSubtext: 'rgba(240,253,244,0.82)',
+      metallicGlint: false,
+    };
+  }
+
+  if (theme === 'silver-black') {
+    return {
+      background: '#050505',
+      card: '#111111',
+      cardBorder: '#3b3b3b',
+      text: '#f3f4f6',
+      subtext: '#c4c4c4',
+      accent: '#bcc3c7',
+      accentSoft: '#3a4148',
+      inputBackground: '#0b0b0b',
+      inputBorder: '#4b5563',
+      success: '#9ca3af',
+      warning: '#d1d5db',
+      danger: '#ef4444',
+      tabInactive: '#9ca3af',
+      hero: '#17191c',
+      heroText: '#f9fafb',
+      heroSubtext: 'rgba(229,231,235,0.84)',
+      metallicGlint: true,
     };
   }
 
@@ -79,5 +104,6 @@ export function getThemeColors(theme: ThemeMode): ThemeColors {
     hero: '#111827',
     heroText: '#ffffff',
     heroSubtext: '#cbd5e1',
+    metallicGlint: false,
   };
 }

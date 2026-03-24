@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
-import { InteractionManager, ScrollView, Text, View } from 'react-native';
+import { InteractionManager, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Pill from '../../components/Pill';
@@ -8,118 +8,117 @@ import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
 
 import { useAppSettings } from '../../context/AppSettingsContext';
-import { cyberMockData, IntelItem } from '../../data/mockCyber';
+import { CyberBriefEntry, getCyberBriefMeta, getCyberBriefStreak, readCyberBriefs, writeCyberBriefs } from '../../data/cyberBriefs';
+import {
+  ActionItem,
+  cyberDefaults,
+  fetchCyberIntel,
+  fetchKnownExploitedVulnerabilities,
+  formatThreatLevel,
+  getFallbackIntel,
+  getFallbackVulnerabilities,
+  IntelItem,
+  VulnerabilityItem,
+} from '../../data/cyberData';
 import { getThemeColors } from '../../data/theme';
 
-type RedditChild = {
-  data: {
-    id: string;
-    title: string;
-    subreddit: string;
-    permalink: string;
-    selftext?: string;
-  };
-};
-
-type RedditResponse = {
-  data?: {
-    children?: RedditChild[];
-  };
-};
-
-async function fetchCyberIntel(): Promise<IntelItem[]> {
-  const queries = ['cybersecurity phishing banking CVE', '"German banking" cybersecurity'];
-  const results = await Promise.all(
-    queries.map(async (query) => {
-      const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&t=day&limit=4`;
-      const response = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'johnny-app/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Cyber intel request failed: ${response.status}`);
-      }
-
-      const json = (await response.json()) as RedditResponse;
-      return json.data?.children ?? [];
-    })
-  );
-
-  const seen = new Set<string>();
-
-  return results
-    .flat()
-    .map((child) => {
-      const item = child.data;
-      const body = item.selftext?.trim() ?? '';
-      const lower = `${item.title} ${body}`.toLowerCase();
-
-      let priority: IntelItem['priority'] = 'Low';
-
-      if (/(critical|ransomware|phishing|breach|zero[- ]day|actively exploited|bank)/.test(lower)) {
-        priority = 'High';
-      } else if (/(cve|malware|credential|fraud|vulnerability|exploit)/.test(lower)) {
-        priority = 'Medium';
-      }
-
-      const tags = [
-        lower.includes('phishing') ? 'Phishing' : null,
-        lower.includes('bank') ? 'Banking' : null,
-        lower.includes('credential') ? 'Credentials' : null,
-        lower.includes('cve') || lower.includes('vulnerability') ? 'Vulnerability' : null,
-        lower.includes('ransomware') ? 'Ransomware' : null,
-      ].filter((tag): tag is string => Boolean(tag));
-
-      return {
-        id: item.id,
-        title: item.title,
-        source: `r/${item.subreddit}`,
-        summary:
-          body.length > 0
-            ? `${body.slice(0, 160)}${body.length > 160 ? '...' : ''}`
-            : 'Fresh cyber discussion surfaced from the latest feed.',
-        priority,
-        tags: tags.length > 0 ? tags : ['Cyber'],
-      };
-    })
-    .filter((item) => {
-      if (seen.has(item.id)) {
-        return false;
-      }
-
-      seen.add(item.id);
-      return true;
-    })
-    .slice(0, 5)
-    .map(({ id: _id, ...item }) => item);
-}
-
-function formatThreatLevel(items: IntelItem[]) {
-  const highCount = items.filter((item) => item.priority === 'High').length;
-
-  if (highCount >= 3) {
-    return 'High';
-  }
-
-  if (highCount >= 1) {
-    return 'Elevated';
-  }
-
-  return 'Guarded';
-}
-
 export default function Cyber() {
-  const { vulnerabilities, keyTakeaways, actions, regionFocus, headlineSummary } = cyberMockData;
-  const { theme } = useAppSettings();
+  const { theme, preferences, triggerHaptic } = useAppSettings();
   const colors = getThemeColors(theme);
   const isFocused = useIsFocused();
-  const [topIntel, setTopIntel] = useState<IntelItem[]>(cyberMockData.topIntel);
+  const [topIntel, setTopIntel] = useState<IntelItem[]>(getFallbackIntel());
+  const [vulnerabilities, setVulnerabilities] = useState<VulnerabilityItem[]>(getFallbackVulnerabilities());
   const [intelLoading, setIntelLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [intelError, setIntelError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>('Using fallback cyber intel');
+  const [kevError, setKevError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string>('Refreshing cyber sources...');
+  const [briefEntries, setBriefEntries] = useState<CyberBriefEntry[]>([]);
+  const [draftBrief, setDraftBrief] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    void readCyberBriefs().then((entries) => {
+      if (!mounted) {
+        return;
+      }
+
+      setBriefEntries(entries);
+      const todayMeta = getCyberBriefMeta();
+      const todayEntry = entries.find((entry) => entry.dateKey === todayMeta.dateKey);
+      setDraftBrief(todayEntry?.note ?? '');
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const refreshIntel = async (options?: { pullToRefresh?: boolean }) => {
+    if (options?.pullToRefresh) {
+      setRefreshing(true);
+    } else {
+      setIntelLoading(true);
+    }
+    setIntelError(null);
+    setKevError(null);
+
+    try {
+      const [intelResult, kevResult] = await Promise.allSettled([
+        fetchCyberIntel(),
+        fetchKnownExploitedVulnerabilities(),
+      ]);
+
+      const intelOk = intelResult.status === 'fulfilled' && intelResult.value.length > 0;
+      const kevOk = kevResult.status === 'fulfilled' && kevResult.value.length > 0;
+
+      if (intelOk) {
+        setTopIntel(intelResult.value);
+      } else {
+        setTopIntel(getFallbackIntel());
+      }
+
+      if (kevOk) {
+        setVulnerabilities(kevResult.value);
+      } else {
+        setVulnerabilities(getFallbackVulnerabilities());
+      }
+
+      setIntelError(
+        intelResult.status === 'rejected'
+          ? intelResult.reason instanceof Error
+            ? intelResult.reason.message
+            : 'Unable to refresh cyber intel.'
+          : null
+      );
+      setKevError(
+        kevResult.status === 'rejected'
+          ? kevResult.reason instanceof Error
+            ? kevResult.reason.message
+            : 'Unable to refresh KEV data.'
+          : null
+      );
+
+      setLastUpdated(
+        !intelOk && !kevOk
+          ? 'Using fallback cyber guidance'
+          : !intelOk
+            ? 'Live KEV loaded | Intel feed unavailable'
+            : !kevOk
+              ? 'Live intel loaded | KEV feed unavailable'
+              : new Intl.DateTimeFormat('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                }).format(new Date())
+      );
+    } finally {
+      setIntelLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isFocused) {
@@ -127,36 +126,6 @@ export default function Cyber() {
     }
 
     const interaction = InteractionManager.runAfterInteractions(() => {
-      const refreshIntel = async () => {
-        setIntelLoading(true);
-        setIntelError(null);
-
-        try {
-          const liveIntel = await fetchCyberIntel();
-
-          if (liveIntel.length > 0) {
-            setTopIntel(liveIntel);
-          } else {
-            setTopIntel(cyberMockData.topIntel);
-          }
-
-          setLastUpdated(
-            new Intl.DateTimeFormat('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            }).format(new Date())
-          );
-        } catch (error) {
-          setTopIntel(cyberMockData.topIntel);
-          setIntelError(error instanceof Error ? error.message : 'Unable to refresh cyber intel.');
-          setLastUpdated('Using fallback cyber intel');
-        } finally {
-          setIntelLoading(false);
-        }
-      };
-
       void refreshIntel();
     });
 
@@ -180,10 +149,60 @@ export default function Cyber() {
       : threatLevel === 'Elevated'
         ? colors.warning
         : colors.accent;
+  const statusSuffix =
+    intelError && kevError
+      ? ' | Both live sources are unavailable.'
+      : intelError
+        ? ' | Intel feed unavailable.'
+        : '';
+  const kevIssueMessage = kevError
+    ? kevError.includes('403')
+      ? 'CISA blocked the app from reaching the KEV list right now.'
+      : kevError.includes('404')
+        ? 'The KEV link did not return the list.'
+        : kevError.includes('Network request failed')
+          ? 'The app could not reach the KEV site from this device.'
+          : kevError.includes('timed out')
+            ? 'The KEV site took too long to respond.'
+            : 'The app could not load the KEV list right now.'
+    : null;
+  const briefStreak = getCyberBriefStreak(briefEntries);
+  const latestBriefs = [...briefEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey)).slice(0, 4);
+  const cyberTabLabel = preferences.customTabLabels.cyber || 'Cyber';
+
+  const saveBrief = async () => {
+    const meta = getCyberBriefMeta();
+    const trimmed = draftBrief.trim();
+    await triggerHaptic();
+    setBriefEntries((current) => {
+      const nextEntries = current.filter((entry) => entry.dateKey !== meta.dateKey);
+      const merged = trimmed ? [{ dateKey: meta.dateKey, label: meta.label, note: trimmed }, ...nextEntries] : nextEntries;
+      void writeCyberBriefs(merged);
+      return merged;
+    });
+  };
+  const headerStatusText = intelLoading
+    ? 'Refreshing cyber intel...'
+    : kevIssueMessage && !intelError
+      ? `Live intel loaded | ${kevIssueMessage}`
+      : `${lastUpdated}${statusSuffix}`;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void refreshIntel({ pullToRefresh: true });
+            }}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+            progressBackgroundColor={colors.card}
+          />
+        }
+        contentContainerStyle={{ padding: 16 }}
+      >
         <View
           style={{
             backgroundColor: colors.hero,
@@ -201,7 +220,7 @@ export default function Cyber() {
               marginBottom: 6,
             }}
           >
-            Cyber Center
+            {cyberTabLabel}
           </Text>
 
           <Text style={{ color: colors.heroText, fontSize: 26, fontWeight: '800', marginBottom: 10 }}>
@@ -212,24 +231,24 @@ export default function Cyber() {
             Keep the threat picture tight, track the most relevant intel, and move quickly on what matters.
           </Text>
 
-          <Text style={{ color: colors.heroSubtext, fontSize: 12, marginBottom: 12 }}>
-            {intelLoading ? 'Refreshing cyber intel...' : lastUpdated}
-            {intelError ? ' | Live refresh failed, showing fallback intel.' : ''}
-          </Text>
+          <Text style={{ color: colors.heroSubtext, fontSize: 12, marginBottom: 12 }}>{headerStatusText}</Text>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Pill text={regionFocus} color={colors.accent} />
+            <Pill text={cyberDefaults.regionFocus} color={colors.accent} />
             <Pill text={`Threat Level: ${threatLevel}`} color={threatColor} />
             <Pill text={today} color={colors.accentSoft} />
           </View>
         </View>
 
         <SectionCard title="Operational Snapshot" emoji={'\uD83D\uDCCD'} colors={colors}>
-          <StatRow label="Primary focus" value={regionFocus} colors={colors} />
+          <StatRow label="Primary focus" value={cyberDefaults.regionFocus} colors={colors} />
           <StatRow label="Threat level" value={threatLevel} colors={colors} />
           <StatRow label="Top priority" value="Identity & phishing" colors={colors} />
           <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginTop: 12 }}>
-            {headlineSummary}
+            {cyberDefaults.headlineSummary}
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 10 }}>
+            Threat brief streak: {briefStreak} {briefStreak === 1 ? 'day' : 'days'}
           </Text>
         </SectionCard>
 
@@ -273,7 +292,12 @@ export default function Cyber() {
           ))}
         </SectionCard>
 
-        <SectionCard title="Vulnerabilities to Watch" emoji={'\uD83D\uDEE1'} colors={colors}>
+        <SectionCard title="Known Exploited Vulnerabilities" emoji={'\uD83D\uDEE1'} colors={colors}>
+          {kevIssueMessage ? (
+            <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 12 }}>
+              {kevIssueMessage}
+            </Text>
+          ) : null}
           {vulnerabilities.map((item) => (
             <View
               key={item.cve}
@@ -291,12 +315,17 @@ export default function Cyber() {
                 {item.product} | {item.severity}
               </Text>
               <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20 }}>{item.note}</Text>
+              {item.dueDate ? (
+                <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 6 }}>
+                  CISA due date: {item.dueDate}
+                </Text>
+              ) : null}
             </View>
           ))}
         </SectionCard>
 
         <SectionCard title="Key Takeaways" emoji={'\uD83E\uDDE0'} colors={colors}>
-          {keyTakeaways.map((item, index) => (
+          {cyberDefaults.keyTakeaways.map((item, index) => (
             <Text
               key={`${index}-${item}`}
               style={{ fontSize: 13, color: colors.text, lineHeight: 22, marginBottom: 8 }}
@@ -307,7 +336,7 @@ export default function Cyber() {
         </SectionCard>
 
         <SectionCard title="Recommended Actions" emoji={'\u2705'} colors={colors}>
-          {actions.map((item) => (
+          {cyberDefaults.actions.map((item: ActionItem) => (
             <View
               key={item.title}
               style={{
@@ -323,6 +352,63 @@ export default function Cyber() {
               <Text style={{ fontSize: 12, color: colors.subtext }}>
                 Owner: {item.owner} | Due: {item.due}
               </Text>
+            </View>
+          ))}
+        </SectionCard>
+
+        <SectionCard title="Threat Brief Log" emoji={'\u270D'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            Save one short readout for the day so you can look back at how the threat picture shifted over time.
+          </Text>
+          <TextInput
+            value={draftBrief}
+            onChangeText={setDraftBrief}
+            placeholder="Write today's cyber readout"
+            placeholderTextColor={colors.subtext}
+            multiline
+            style={{
+              backgroundColor: colors.inputBackground,
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 12,
+              minHeight: 96,
+              color: colors.text,
+              textAlignVertical: 'top',
+              marginBottom: 12,
+            }}
+          />
+          <Pressable
+            onPress={() => {
+              void saveBrief();
+            }}
+            style={{
+              alignSelf: 'flex-start',
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              backgroundColor: colors.accent,
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ color: 'white', fontWeight: '800' }}>Save today&apos;s brief</Text>
+          </Pressable>
+
+          {latestBriefs.map((entry) => (
+            <View
+              key={entry.dateKey}
+              style={{
+                backgroundColor: colors.inputBackground,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: colors.cardBorder,
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800', marginBottom: 4 }}>{entry.label}</Text>
+              <Text style={{ color: colors.subtext, fontSize: 13, lineHeight: 20 }}>{entry.note}</Text>
             </View>
           ))}
         </SectionCard>

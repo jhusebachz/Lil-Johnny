@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -11,25 +12,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import WorkoutExerciseCard from '../../components/gym/WorkoutExerciseCard';
 import SectionCard from '../../components/SectionCard';
 import { useAppSettings } from '../../context/AppSettingsContext';
+import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
   ExerciseProgressPoint,
+  ExerciseLog,
   GymDay,
+  GymExerciseHistory,
   GymView,
-  gymMockData,
-  gymProgressMockData,
-} from '../../data/mockGym';
+  createEmptyGymProgressHistory,
+  gymWorkoutTemplates,
+  readPersistedGymData,
+  writePersistedGymData,
+} from '../../data/gymData';
 import { getThemeColors } from '../../data/theme';
 
 const gymDays: GymDay[] = ['Push', 'Pull', 'Legs'];
 const gymViews: GymView[] = ['Workout', 'Progress'];
-
-type ExerciseLog = {
-  sets: string;
-  reps: string;
-  weight: string;
-};
 
 function parseNumber(value: string) {
   const cleaned = value.trim();
@@ -44,6 +45,10 @@ function parseNumber(value: string) {
 
 function formatWeight(weight: number) {
   return Number.isInteger(weight) ? String(weight) : weight.toFixed(1);
+}
+
+function estimateOneRepMax(weight: number, reps: number) {
+  return weight * (1 + reps / 30);
 }
 
 function getTodayEntryMeta() {
@@ -76,21 +81,22 @@ function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
 }
 
 export default function Gym() {
-  const { theme, triggerHaptic } = useAppSettings();
+  const { theme, triggerHaptic, preferences } = useAppSettings();
   const colors = getThemeColors(theme);
   const [selectedDay, setSelectedDay] = useState<GymDay>('Push');
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
   const [exerciseLogs, setExerciseLogs] = useState<Record<string, ExerciseLog>>({});
-  const [exerciseHistory, setExerciseHistory] =
-    useState<Record<GymDay, Record<string, ExerciseProgressPoint[]>>>(gymProgressMockData);
+  const [exerciseHistory, setExerciseHistory] = useState<GymExerciseHistory>(createEmptyGymProgressHistory());
+  const { refreshing, triggerRefresh } = useTimedRefresh();
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [activeExerciseKey, setActiveExerciseKey] = useState<string | null>(null);
-  const [draftLog, setDraftLog] = useState<ExerciseLog>({ sets: '', reps: '', weight: '' });
+  const [draftLog, setDraftLog] = useState<ExerciseLog>({ sets: '', reps: '', weight: '', note: '' });
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<Record<GymDay, string>>({
-    Push: gymMockData.Push.exercises[0].name,
-    Pull: gymMockData.Pull.exercises[0].name,
-    Legs: gymMockData.Legs.exercises[0].name,
+    Push: gymWorkoutTemplates.Push.exercises[0].name,
+    Pull: gymWorkoutTemplates.Pull.exercises[0].name,
+    Legs: gymWorkoutTemplates.Legs.exercises[0].name,
   });
-  const workout = gymMockData[selectedDay];
+  const workout = gymWorkoutTemplates[selectedDay];
   const progressExerciseName = selectedProgressExercise[selectedDay];
   const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
   const progressPoints = [...rawProgressPoints]
@@ -98,17 +104,95 @@ export default function Gym() {
     .slice(-10);
   const qualifyingProgressPoints = progressPoints.filter((point) => point.reps >= 6);
   const maxReps = Math.max(...progressPoints.map((point) => point.reps), 1);
+  const bestAtTopWeight = progressPoints.length > 0 ? getBestAtTopWeight(progressPoints) : null;
+  const estimatedOneRepMax =
+    bestAtTopWeight && bestAtTopWeight.bestReps >= 1
+      ? estimateOneRepMax(bestAtTopWeight.topWeight, bestAtTopWeight.bestReps)
+      : null;
+  const oneRepMaxTrend =
+    qualifyingProgressPoints.length >= 2
+      ? estimateOneRepMax(
+          qualifyingProgressPoints.at(-1)?.weight ?? 0,
+          qualifyingProgressPoints.at(-1)?.reps ?? 0
+        ) -
+        estimateOneRepMax(
+          qualifyingProgressPoints.at(-2)?.weight ?? 0,
+          qualifyingProgressPoints.at(-2)?.reps ?? 0
+        )
+      : null;
+  const gymStreak = useMemo(() => {
+    const dateKeys = new Set<string>();
+
+    Object.values(exerciseHistory).forEach((dayHistory) => {
+      Object.values(dayHistory).forEach((points) => {
+        points.forEach((point) => dateKeys.add(point.dateKey));
+      });
+    });
+
+    const sortedDates = [...dateKeys].sort().reverse();
+    let streak = 0;
+
+    for (let index = 0; index < sortedDates.length; index += 1) {
+      const expected = new Date();
+      expected.setDate(expected.getDate() - index);
+      const expectedKey = expected.toISOString().slice(0, 10);
+
+      if (sortedDates[index] !== expectedKey) {
+        break;
+      }
+
+      streak += 1;
+    }
+
+    return streak;
+  }, [exerciseHistory]);
   const todayEntry = getTodayEntryMeta();
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
   );
-  const bestAtTopWeight = progressPoints.length > 0 ? getBestAtTopWeight(progressPoints) : null;
+
+  useEffect(() => {
+    let mounted = true;
+
+    const hydrateGymData = async () => {
+      try {
+        const persisted = await readPersistedGymData();
+
+        if (!persisted || !mounted) {
+          return;
+        }
+
+        setExerciseLogs(persisted.exerciseLogs ?? {});
+        setExerciseHistory(persisted.exerciseHistory ?? createEmptyGymProgressHistory());
+      } catch {
+        // Keep defaults if local gym data is unavailable.
+      } finally {
+        if (mounted) {
+          setHasHydrated(true);
+        }
+      }
+    };
+
+    hydrateGymData();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated) {
+      return;
+    }
+
+    void writePersistedGymData({ exerciseLogs, exerciseHistory });
+  }, [exerciseHistory, exerciseLogs, hasHydrated]);
 
   const openExerciseLogger = async (exerciseName: string) => {
     const nextKey = `${selectedDay}-${exerciseName}`;
     await triggerHaptic();
-    setDraftLog(exerciseLogs[nextKey] ?? { sets: '', reps: '', weight: '' });
+    setDraftLog(exerciseLogs[nextKey] ?? { sets: '', reps: '', weight: '', note: '' });
     setActiveExerciseKey(nextKey);
   };
 
@@ -142,6 +226,7 @@ export default function Gym() {
           sets: parsedSets,
           reps: parsedReps,
           weight: parsedWeight,
+          note: draftLog.note?.trim() ? draftLog.note.trim() : undefined,
         };
         const existingIndex = existingPoints.findIndex((point) => point.dateKey === todayEntry.dateKey);
         const nextPoints =
@@ -162,9 +247,24 @@ export default function Gym() {
     closeExerciseLogger();
   };
 
+  const refreshGym = () => {
+    triggerRefresh();
+  };
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refreshGym}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+            progressBackgroundColor={colors.card}
+          />
+        }
+        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+      >
         <View
           style={{
             backgroundColor: colors.hero,
@@ -182,13 +282,17 @@ export default function Gym() {
               marginBottom: 6,
             }}
           >
-            Training Center
+            {preferences.customTabLabels.gym}
           </Text>
           <Text style={{ color: colors.heroText, fontSize: 26, fontWeight: '800', marginBottom: 10 }}>
             Train with intent
           </Text>
           <Text style={{ color: colors.heroSubtext, fontSize: 15, lineHeight: 22 }}>
             Pick the block for today and keep the workout structure clean, simple, and easy to update.
+          </Text>
+          <Text style={{ color: colors.heroSubtext, fontSize: 12, marginTop: 10 }}>
+            Preferred split: {preferences.preferredWorkoutSplit} | Gym streak: {gymStreak}{' '}
+            {gymStreak === 1 ? 'day' : 'days'}
           </Text>
         </View>
 
@@ -288,60 +392,18 @@ export default function Gym() {
                 const exerciseLog = exerciseLogs[exerciseKey];
 
                 return (
-                  <Pressable
+                  <WorkoutExerciseCard
                     key={exerciseKey}
                     onPress={() => {
                       void openExerciseLogger(exercise.name);
                     }}
-                    style={{
-                      marginBottom: 12,
-                      padding: 14,
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: colors.cardBorder,
-                      backgroundColor: colors.inputBackground,
-                    }}
-                  >
-                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: '800', marginBottom: 4 }}>
-                      {exercise.name}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 4 }}>
-                      {exercise.sets} sets x {exercise.reps}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: colors.text, marginBottom: 12 }}>{exercise.note}</Text>
-                    {exerciseLog ? (
-                      <View
-                        style={{
-                          backgroundColor: colors.card,
-                          borderRadius: 12,
-                          padding: 10,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <Text
-                          style={{ fontSize: 11, color: colors.subtext, textTransform: 'uppercase', marginBottom: 4 }}
-                        >
-                          Logged for today
-                        </Text>
-                        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700' }}>
-                          {exerciseLog.sets} sets | {exerciseLog.reps} reps | {exerciseLog.weight} lb
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View
-                      style={{
-                        alignSelf: 'flex-start',
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        borderRadius: 10,
-                        backgroundColor: colors.accent,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, color: 'white', fontWeight: '800' }}>
-                        {exerciseLog ? 'Update today' : 'Log today'}
-                      </Text>
-                    </View>
-                  </Pressable>
+                    name={exercise.name}
+                    sets={exercise.sets}
+                    reps={exercise.reps}
+                    note={exercise.note}
+                    exerciseLog={exerciseLog}
+                    colors={colors}
+                  />
                 );
               })}
             </SectionCard>
@@ -407,9 +469,50 @@ export default function Gym() {
                 </Text>
               ) : (
                 <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 16 }}>
-                  No qualifying sets at 6+ reps logged yet.
+                  No qualifying sets at 6+ reps logged yet. Start logging your current day to build the chart.
                 </Text>
               )}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: 10,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.inputBackground,
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: colors.cardBorder,
+                  }}
+                >
+                  <Text style={{ color: colors.subtext, fontSize: 11, marginBottom: 4 }}>Estimated 1RM</Text>
+                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>
+                    {estimatedOneRepMax ? `${formatWeight(estimatedOneRepMax)} lb` : 'No estimate yet'}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.inputBackground,
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: colors.cardBorder,
+                  }}
+                >
+                  <Text style={{ color: colors.subtext, fontSize: 11, marginBottom: 4 }}>PR trend</Text>
+                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>
+                    {oneRepMaxTrend === null
+                      ? 'Need 2 entries'
+                      : `${oneRepMaxTrend >= 0 ? '+' : ''}${formatWeight(oneRepMaxTrend)} lb`}
+                  </Text>
+                </View>
+              </View>
 
               <View
                 style={{
@@ -448,6 +551,12 @@ export default function Gym() {
                   );
                 })}
               </View>
+              {progressPoints.length === 0 ? (
+                <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 14 }}>
+                  No entries logged yet for this exercise. Save today&apos;s sets, reps, and weight to start the
+                  trend line.
+                </Text>
+              ) : null}
             </SectionCard>
 
             <SectionCard title="Recent Entries" emoji={'\uD83D\uDD0D'} colors={colors}>
@@ -473,6 +582,9 @@ export default function Gym() {
                     Weight: {formatWeight(point.weight)} lb
                   </Text>
                   <Text style={{ color: colors.subtext, fontSize: 13 }}>Sets logged: {point.sets}</Text>
+                  {point.note ? (
+                    <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 4 }}>{point.note}</Text>
+                  ) : null}
                 </View>
               ))}
               {qualifyingProgressPoints.length === 0 ? (
@@ -576,6 +688,28 @@ export default function Gym() {
                     color: colors.text,
                     backgroundColor: colors.inputBackground,
                     marginBottom: 16,
+                  }}
+                />
+
+                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Notes</Text>
+                <TextInput
+                  value={draftLog.note ?? ''}
+                  onChangeText={(text) => setDraftLog((current) => ({ ...current, note: text }))}
+                  placeholder="How did it feel today?"
+                  placeholderTextColor={colors.subtext}
+                  multiline
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.inputBorder,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 15,
+                    color: colors.text,
+                    backgroundColor: colors.inputBackground,
+                    marginBottom: 16,
+                    minHeight: 76,
+                    textAlignVertical: 'top',
                   }}
                 />
 

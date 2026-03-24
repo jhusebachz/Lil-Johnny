@@ -1,4 +1,4 @@
-import type { ReminderItem } from '../context/AppSettingsContext';
+import type { ReminderItem, ReminderRecurrence } from '../context/AppSettingsContext';
 
 export function parseReminderTime(time: string) {
   const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -49,17 +49,126 @@ export function getNextReminderOccurrence(time: string, now = new Date()) {
   return occurrence;
 }
 
+export function getReminderOccurrenceForDate(time: string, date: Date) {
+  const parts = parseReminderTime(time);
+
+  if (!parts) {
+    return null;
+  }
+
+  const occurrence = new Date(date);
+  let hour = parts.hour % 12;
+
+  if (parts.meridiem === 'PM') {
+    hour += 12;
+  }
+
+  occurrence.setHours(hour, Number(parts.minute), 0, 0);
+  return occurrence;
+}
+
+export function getDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function getReminderRecurrenceLabel(recurrence: ReminderRecurrence) {
+  if (recurrence === 'weekdays') {
+    return 'Weekdays';
+  }
+
+  if (recurrence === 'weekends') {
+    return 'Weekends';
+  }
+
+  return 'Daily';
+}
+
+export function isReminderScheduledOnDate(reminder: ReminderItem, date: Date) {
+  const day = date.getDay();
+
+  if (reminder.recurrence === 'weekdays') {
+    return day >= 1 && day <= 5;
+  }
+
+  if (reminder.recurrence === 'weekends') {
+    return day === 0 || day === 6;
+  }
+
+  return true;
+}
+
+export function isReminderCompleteOnDate(reminder: ReminderItem, date: Date) {
+  return reminder.completedDates.includes(getDateKey(date));
+}
+
 export function getNextReminder(reminders: ReminderItem[], now = new Date()) {
-  return reminders
-    .filter((reminder) => reminder.enabled)
-    .map((reminder) => ({
-      reminder,
-      occurrence: getNextReminderOccurrence(reminder.time, now),
-    }))
-    .filter(
-      (entry): entry is { reminder: ReminderItem; occurrence: Date } => entry.occurrence instanceof Date
-    )
-    .sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0] ?? null;
+  const candidates = reminders.flatMap((reminder) => {
+    if (!reminder.enabled) {
+      return [];
+    }
+
+    for (let offset = 0; offset < 8; offset += 1) {
+      const candidateDate = new Date(now);
+      candidateDate.setDate(now.getDate() + offset);
+
+      if (!isReminderScheduledOnDate(reminder, candidateDate) || isReminderCompleteOnDate(reminder, candidateDate)) {
+        continue;
+      }
+
+      const occurrence = getReminderOccurrenceForDate(reminder.time, candidateDate);
+
+      if (!occurrence) {
+        continue;
+      }
+
+      if (offset === 0 && occurrence <= now) {
+        continue;
+      }
+
+      return [{ reminder, occurrence }];
+    }
+
+    return [];
+  });
+
+  return candidates.sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0] ?? null;
+}
+
+export function getTodayReminderSummary(reminders: ReminderItem[], now = new Date()) {
+  const todayReminders = reminders.filter(
+    (reminder) => reminder.enabled && isReminderScheduledOnDate(reminder, now)
+  );
+  const completed = todayReminders.filter((reminder) => isReminderCompleteOnDate(reminder, now)).length;
+
+  return {
+    scheduled: todayReminders.length,
+    completed,
+    remaining: Math.max(todayReminders.length - completed, 0),
+  };
+}
+
+export function getReminderCompletionStreak(reminders: ReminderItem[], now = new Date()) {
+  let streak = 0;
+
+  for (let offset = 0; offset < 60; offset += 1) {
+    const date = new Date(now);
+    date.setDate(now.getDate() - offset);
+    const scheduled = reminders.filter((reminder) => reminder.enabled && isReminderScheduledOnDate(reminder, date));
+
+    if (scheduled.length === 0) {
+      continue;
+    }
+
+    const allCompleted = scheduled.every((reminder) => isReminderCompleteOnDate(reminder, date));
+
+    if (!allCompleted) {
+      break;
+    }
+
+    streak += 1;
+  }
+
+  return streak;
 }
 
 export function formatUpcomingReminder(occurrence: Date, now = new Date()) {

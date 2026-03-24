@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { runescapeMockData } from './mockRunescape';
 
 const TRACKER_URL =
   'https://raw.githubusercontent.com/jhusebachz/OSRS-Daily-Tracker/main/data/last_stats.json';
@@ -101,6 +100,11 @@ export type LiveRunescapeTracker = {
     xpPerHour: number;
     hoursLeft: number | null;
     mode: string;
+  }[];
+  milestoneAlerts: {
+    skill: string;
+    target: string;
+    remainingXp: number;
   }[];
   coachingText: string;
 };
@@ -244,22 +248,38 @@ function findPreviousSnapshotKey(store: SnapshotStore, currentKey: string) {
 function fallbackTracker(): LiveRunescapeTracker {
   return {
     mode: 'snapshot',
-    snapshotDateLabel: 'Fallback snapshot',
-    totalXp: runescapeMockData.yourTotalXp,
-    totalLevel: runescapeMockData.totalLevelCurrent,
-    topSkills: runescapeMockData.topGains,
-    friends: runescapeMockData.friends.map((friend) => ({
-      name: friend.name,
-      overallXp: friend.xpToday,
-      diff: friend.diff,
-      topSkills: friend.topGains,
-    })),
-    base90Remaining: runescapeMockData.base90Remaining,
-    maxClosest: runescapeMockData.maxClosest,
-    maxedSkills: runescapeMockData.maxedSkills,
+    snapshotDateLabel: 'No snapshot yet',
+    totalXp: 0,
+    totalLevel: 0,
+    topSkills: [],
+    friends: [],
+    base90Remaining: [],
+    maxClosest: [],
+    maxedSkills: [],
     hoursToNextLevel: [],
-    coachingText: runescapeMockData.coachingText,
+    milestoneAlerts: [],
+    coachingText:
+      'No live or cached OSRS tracker data is available yet. Once the feed is reachable, this view will build from real snapshots instead of placeholder stats.',
   };
+}
+
+async function buildTrackerFromLatestStoredSnapshot(store?: SnapshotStore) {
+  const resolvedStore = store ?? (await readSnapshotStore());
+  const latestSnapshotKey = findLatestSnapshotKey(resolvedStore);
+
+  if (!latestSnapshotKey) {
+    return fallbackTracker();
+  }
+
+  const latestData = resolvedStore.snapshots[latestSnapshotKey];
+  const previousKey = findPreviousSnapshotKey(resolvedStore, latestSnapshotKey);
+
+  return buildLiveRunescapeTracker(
+    latestData,
+    previousKey ? resolvedStore.snapshots[previousKey] : undefined,
+    'jhusebachz',
+    latestSnapshotKey
+  );
 }
 
 function getSkillDelta(
@@ -427,6 +447,29 @@ export function buildLiveRunescapeTracker(
     : mostUrgent
       ? `${mostUrgent.skill} is the biggest push to shore up right now, with ${mostUrgent.remainingXp.toLocaleString()} xp left to 90.`
       : 'Most skills are already in a strong place. Keep momentum on the closest 99 targets.';
+  const milestoneAlerts = [...skills]
+    .map((skill) => {
+      const targetLevel = skill.level < 90 ? 90 : skill.level < 99 ? 99 : null;
+
+      if (!targetLevel) {
+        return null;
+      }
+
+      const remainingXp = Math.max(xpForLevel(targetLevel) - skill.experience, 0);
+
+      if (remainingXp <= 0 || remainingXp > 150000) {
+        return null;
+      }
+
+      return {
+        skill: formatSkillName(skill.skill),
+        target: `Lv${targetLevel}`,
+        remainingXp,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => left.remainingXp - right.remainingXp)
+    .slice(0, 5);
 
   return {
     mode: hasDelta ? 'delta' : 'snapshot',
@@ -441,20 +484,29 @@ export function buildLiveRunescapeTracker(
     maxClosest,
     maxedSkills,
     hoursToNextLevel,
+    milestoneAlerts,
     coachingText,
   };
 }
 
 export async function fetchRunescapeTrackerSnapshot() {
-  const liveData = await fetchRawRunescapeData();
-  const todayKey = getTodaySnapshotKey();
   let store: SnapshotStore = { snapshots: {} };
 
   try {
     store = await readSnapshotStore();
   } catch {
-    return buildLiveRunescapeTracker(liveData, undefined, 'jhusebachz');
+    store = { snapshots: {} };
   }
+
+  let liveData: OsrsApiResponse;
+
+  try {
+    liveData = await fetchRawRunescapeData();
+  } catch {
+    return buildTrackerFromLatestStoredSnapshot(store);
+  }
+
+  const todayKey = getTodaySnapshotKey();
 
   if (hasReachedDailySnapshotTime() && !store.snapshots[todayKey]) {
     store.snapshots[todayKey] = liveData;
