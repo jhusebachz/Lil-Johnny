@@ -1,5 +1,7 @@
 # Lil Johnny
 
+[![Lint](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml/badge.svg)](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml)
+
 Lil Johnny is a personalized mobile dashboard built with Expo and React Native. It pulls together reminders, cyber intel, gym tracking, gaming feeds, and live OSRS progression into one app that is meant to feel more like a daily operating system than a generic utility bundle.
 
 ## Highlights
