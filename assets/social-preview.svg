@@ -1,0 +1,51 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="640" fill="#0B1220"/>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1090" cy="108" r="184" fill="#8B5CF6" fill-opacity="0.18"/>
+  <circle cx="124" cy="560" r="220" fill="#22C55E" fill-opacity="0.12"/>
+  <circle cx="1010" cy="524" r="120" fill="#BCC3C7" fill-opacity="0.08"/>
+
+  <rect x="72" y="72" width="1136" height="496" rx="36" fill="#111827" fill-opacity="0.82" stroke="#334155"/>
+
+  <text x="112" y="154" fill="#CBD5E1" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="4">
+    LIL JOHNNY
+  </text>
+  <text x="112" y="254" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="72" font-weight="800">
+    Personal daily dashboard
+  </text>
+  <text x="112" y="320" fill="#CBD5E1" font-family="Segoe UI, Arial, sans-serif" font-size="30">
+    Reminders, cyber intel, gym tracking, gaming feeds, and OSRS progress
+  </text>
+
+  <rect x="112" y="390" width="220" height="58" rx="18" fill="#1E1B4B" stroke="#8B5CF6"/>
+  <text x="144" y="427" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">
+    Expo + React Native
+  </text>
+
+  <rect x="352" y="390" width="148" height="58" rx="18" fill="#14532D" stroke="#22C55E"/>
+  <text x="394" y="427" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">
+    Android
+  </text>
+
+  <rect x="520" y="390" width="162" height="58" rx="18" fill="#1F2937" stroke="#BCC3C7"/>
+  <text x="560" y="427" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">
+    Version 1.1
+  </text>
+
+  <rect x="840" y="156" width="280" height="280" rx="36" fill="#0F172A" stroke="#334155"/>
+  <circle cx="980" cy="296" r="102" fill="#1E1B4B"/>
+  <circle cx="980" cy="296" r="92" fill="#111827"/>
+  <image href="./images/Huse%20Logo.png" x="900" y="216" width="160" height="160" preserveAspectRatio="xMidYMid meet"/>
+
+  <text x="840" y="490" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="24">
+    Built to feel like a personal command center
+  </text>
+
+  <defs>
+    <linearGradient id="bg" x1="110" y1="38" x2="1172" y2="612" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E1B4B"/>
+      <stop offset="0.5" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#14532D"/>
+    </linearGradient>
+  </defs>
+</svg>
