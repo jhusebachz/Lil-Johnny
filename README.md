@@ -15,7 +15,7 @@ Lil Johnny is a personalized mobile dashboard built with Expo and React Native. 
 
 Repo social preview art:
 
-![Lil Johnny social preview](./assets/social-preview.svg)
+![Lil Johnny social preview](./assets/social-preview-v2.svg)
 
 ## Tech Stack
 
