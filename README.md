@@ -11,6 +11,12 @@ Lil Johnny is a personalized mobile dashboard built with Expo and React Native. 
 - Games tab with Reddit-fed gaming news, Pokopia coverage, and a robust OSRS tracker section
 - Theme system with `Dark`, `Light`, `Gangsta Green`, and `Silver & Black`
 
+## Preview
+
+Repo social preview art:
+
+![Lil Johnny social preview](./assets/social-preview.svg)
+
 ## Tech Stack
 
 - Expo
