@@ -1,0 +1,11 @@
+.git
+.expo
+.vscode
+node_modules
+.npm-cache
+.npm-cache2
+dist
+android
+README.md
+*.log
+*.tmp
