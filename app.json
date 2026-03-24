@@ -8,6 +8,11 @@
     "scheme": "liljohnny",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-huse.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1220"
+    },
     "runtimeVersion": {
       "policy": "appVersion"
     },

@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
@@ -9,6 +10,8 @@ import { getThemeColors } from '../data/theme';
 import { getNotificationsModule } from '../utils/notifications';
 
 const Notifications = getNotificationsModule();
+
+void SplashScreen.preventAutoHideAsync();
 
 if (Notifications) {
   Notifications.setNotificationHandler({
@@ -41,6 +44,10 @@ function AppShell() {
 
     rotation.start();
 
+    const hideSplash = setTimeout(() => {
+      void SplashScreen.hideAsync();
+    }, 120);
+
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -55,6 +62,7 @@ function AppShell() {
     }, 2600);
 
     return () => {
+      clearTimeout(hideSplash);
       clearTimeout(timer);
       rotation.stop();
     };
