@@ -231,6 +231,21 @@ function getGoalStatus(hoursPerDay: number | null, unestimatedSkills: string[]) 
   return 'Off track' as const;
 }
 
+function describeGoalStatus(status: GoalProjection['status']) {
+  switch (status) {
+    case 'On track':
+      return 'is on track';
+    case 'Tight':
+      return 'looks tight';
+    case 'Off track':
+      return 'looks off track';
+    case 'Needs manual lane':
+      return 'needs a manual estimate';
+    default:
+      return 'needs review';
+  }
+}
+
 function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
@@ -763,9 +778,9 @@ export function buildLiveRunescapeTracker(
     ),
   };
   const coachingParts = [
-    `${goalProjections.base90.label}: technically ${goalProjections.base90.status.toLowerCase()}${goalProjections.base90.hoursPerDay !== null ? ` at ${goalProjections.base90.hoursPerDay.toFixed(2)}h/day` : ''}.`,
-    `${goalProjections.runefest.label}: technically ${goalProjections.runefest.status.toLowerCase()}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)}h/day` : ''}.`,
-    `${goalProjections.maxCape.label}: technically ${goalProjections.maxCape.status.toLowerCase()}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)}h/day` : ''}.`,
+    `${goalProjections.base90.label} ${describeGoalStatus(goalProjections.base90.status)}${goalProjections.base90.hoursPerDay !== null ? ` at ${goalProjections.base90.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
+    `${goalProjections.runefest.label} ${describeGoalStatus(goalProjections.runefest.status)}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
+    `${goalProjections.maxCape.label} ${describeGoalStatus(goalProjections.maxCape.status)}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
   ];
   const manualLaneSkills = [
     ...new Set([
