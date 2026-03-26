@@ -246,6 +246,10 @@ function describeGoalStatus(status: GoalProjection['status']) {
   }
 }
 
+function isSlayerTrackedSkill(skill: string) {
+  return GOAL_TRAINING_PLANS[skill as SkillName]?.mode === 'trained via Slayer';
+}
+
 function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
@@ -741,10 +745,12 @@ export function buildLiveRunescapeTracker(
 
   const base90Hours = base90Remaining.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
   const base90Unestimated = base90Remaining
-    .filter((item) => item.hoursLeft === null)
+    .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
     .map((item) => item.skill);
   const maxHours = maxClosest.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
-  const maxUnestimated = maxClosest.filter((item) => item.hoursLeft === null).map((item) => item.skill);
+  const maxUnestimated = maxClosest
+    .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
+    .map((item) => item.skill);
   const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
   const runefestProjectionPlan = buildRuneFestProjection(skills, totalLevelsNeeded);
   const base90ProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'base90');

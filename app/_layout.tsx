@@ -4,7 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, View } from 'react-native';
+import { Animated, Easing, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppSettingsProvider, useAppSettings } from '../context/AppSettingsContext';
 import { getThemeColors } from '../data/theme';
@@ -30,7 +30,6 @@ function AppShell() {
   const colors = getThemeColors(theme);
   const statusBarStyle = theme === 'light' ? 'dark' : 'light';
   const [showIntro, setShowIntro] = useState(true);
-  const [introStatus, setIntroStatus] = useState('Starting Lil Johnny...');
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -74,11 +73,9 @@ function AppShell() {
       }
 
       try {
-        setIntroStatus('Checking for updates...');
         const update = await Updates.checkForUpdateAsync();
 
         if (update.isAvailable) {
-          setIntroStatus('Updating Lil Johnny...');
           await Updates.fetchUpdateAsync();
           await Updates.reloadAsync();
           return;
@@ -87,9 +84,6 @@ function AppShell() {
         // If the update service is unavailable, continue normal startup.
       }
 
-      if (mounted) {
-        setIntroStatus('Starting Lil Johnny...');
-      }
       finishIntro();
     };
 
@@ -174,16 +168,6 @@ function AppShell() {
               style={{ width: 220, height: 220 }}
               contentFit="contain"
             />
-            <Text
-              style={{
-                marginTop: 18,
-                color: colors.heroSubtext,
-                fontSize: 15,
-                fontWeight: '700',
-              }}
-            >
-              {introStatus}
-            </Text>
           </View>
         </Animated.View>
       ) : null}
