@@ -11,6 +11,7 @@ Lil Johnny is a personalized mobile dashboard built with Expo and React Native. 
 - Cyber tab with live Reddit intel, CISA KEV fallback handling, and a saved daily threat brief log
 - Gym tab with workout logging, progress charts, PR trend snapshots, and estimated 1RM tracking
 - Games tab with Reddit-fed gaming news, Pokopia coverage, and a robust OSRS tracker section
+- OSRS goal tracking with hourly-rate projections, pace bars, and coaching tied to real progress since March 25, 2026
 - Theme system with `Dark`, `Light`, `Gangsta Green`, and `Silver & Black`
 
 ## Tech Stack
@@ -74,6 +75,8 @@ Lil Johnny is a personalized mobile dashboard built with Expo and React Native. 
 - Nintendo Switch 2 and Steam / PC news
 - Pokopia tracking
 - embedded OSRS stats and goals
+- pace-check bars for Base 90, RuneFest 2250, and Max Cape
+- goal coaching based on estimated grind hours per day
 - customizable query defaults from Settings
 
 ## Local Development
@@ -149,6 +152,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup-daily-push.ps1 -Time "1
 ## Notes
 
 - This repo is configured for EAS builds and updates.
+- OTA app changes require `eas update`; GitHub pushes alone do not update the installed phone app.
 - Local caches and generated folders are ignored in Git.
 - Some content and branding are intentionally personal.
 - The OSRS tracker data source is maintained separately in the OSRS-Daily-Tracker repo.
