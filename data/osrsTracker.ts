@@ -144,7 +144,7 @@ const GOAL_TRAINING_PLANS: Partial<Record<SkillName, GoalTrainingPlan>> = {
   woodcutting: { xpPerHour: 70000, mode: 'afk' },
   fishing: { xpPerHour: 40000, mode: 'afk' },
   mining: { xpPerHour: 40000, mode: 'afk' },
-  hunter: { xpPerHour: 130000, mode: 'active' },
+  hunter: { xpPerHour: 70000, mode: 'afk' },
   thieving: { xpPerHour: 180000, mode: 'active' },
   sailing: { xpPerHour: 60000, mode: 'afk' },
 };
