@@ -659,10 +659,9 @@ export function buildLiveRunescapeTracker(
           : null,
     }));
 
-  const maxClosest = [...skills]
+  const maxRemainingAll = [...skills]
     .filter((skill) => skill.level < 99)
     .sort((left, right) => xpForLevel(99) - left.experience - (xpForLevel(99) - right.experience))
-    .slice(0, 5)
     .map((skill) => ({
       skill: formatSkillName(skill.skill),
       level: skill.level,
@@ -674,6 +673,7 @@ export function buildLiveRunescapeTracker(
           ? Math.max(xpForLevel(99) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
           : null,
     }));
+  const maxClosest = maxRemainingAll.slice(0, 5);
 
   const maxedSkills = skills
     .filter((skill) => skill.level >= 99)
@@ -751,8 +751,8 @@ export function buildLiveRunescapeTracker(
   const base90Unestimated = base90Remaining
     .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
     .map((item) => item.skill);
-  const maxHours = maxClosest.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
-  const maxUnestimated = maxClosest
+  const maxHours = maxRemainingAll.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
+  const maxUnestimated = maxRemainingAll
     .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
     .map((item) => item.skill);
   const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
