@@ -187,7 +187,6 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
-        {renderPaceCheck(goal1Projection, colors.accent)}
 
         <Text
           style={{
@@ -224,6 +223,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
             <ProgressBar pct={item.pct} color={item.pct >= 80 ? colors.warning : colors.accent} colors={colors} />
           </View>
         ))}
+        {renderPaceCheck(goal1Projection, colors.accent)}
       </SectionCard>
 
       <SectionCard title="Goal 2 - Total Level 2250 by RuneFest" emoji={'\u26F5'} colors={colors}>
@@ -256,7 +256,6 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
-        {renderPaceCheck(goal2Projection, colors.accent)}
 
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
@@ -268,6 +267,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
             ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day`
             : ''}
         </Text>
+        {renderPaceCheck(goal2Projection, colors.accent)}
       </SectionCard>
 
       <SectionCard title="Goal 3 - Max Cape by 33rd Birthday" emoji={'\uD83C\uDF82'} colors={colors}>
@@ -295,7 +295,6 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
-        {renderPaceCheck(goal3Projection, '#ec4899')}
         <ProgressBar pct={(tracker.maxedSkills.length / 24) * 100} color="#ec4899" colors={colors} />
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }}>
@@ -328,6 +327,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
             <ProgressBar pct={item.pct} color="#ec4899" colors={colors} />
           </View>
         ))}
+        {renderPaceCheck(goal3Projection, '#ec4899')}
       </SectionCard>
 
       <SectionCard title="Hours Left Until Next Level" emoji={'\u23F3'} colors={colors}>
