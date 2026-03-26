@@ -56,6 +56,9 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - tracker.totalLevel, 0);
   const totalLevelPct = (tracker.totalLevel / totalLevelTarget) * 100;
+  const goal1Projection = tracker.goalProjections.base90;
+  const goal2Projection = tracker.goalProjections.runefest;
+  const goal3Projection = tracker.goalProjections.maxCape;
 
   return (
     <>
@@ -148,8 +151,26 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
       </SectionCard>
 
       <SectionCard title="Goal 1 - Base 90 All Skills" emoji={'\uD83C\uDFAF'} colors={colors}>
-        <StatRow label="Deadline" value="2026-05-22 (66 days left)" colors={colors} />
+        <StatRow label="Deadline" value={`2026-05-22 (${goal1Projection.daysLeft} days left)`} colors={colors} />
         <StatRow label="Skills at 90+" value={`${24 - tracker.base90Remaining.length}/24`} colors={colors} />
+        <StatRow
+          label="Estimated grind"
+          value={
+            goal1Projection.hoursLeft !== null
+              ? `${goal1Projection.hoursLeft.toFixed(1)} hours`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
+        <StatRow
+          label="Required pace"
+          value={
+            goal1Projection.hoursPerDay !== null
+              ? `${goal1Projection.hoursPerDay.toFixed(2)} h/day`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
 
         <Text
           style={{
@@ -168,12 +189,20 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
         {tracker.base90Remaining.map((item) => (
           <View key={item.skill} style={{ marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 12, color: colors.text }}>
+              <Text style={{ fontSize: 12, color: colors.text, flex: 1 }}>
                 <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.subtext }}>
-                {item.pct.toFixed(1)}% - {item.remainingXp.toLocaleString()} xp left
-              </Text>
+              <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>{item.pct.toFixed(1)}%</Text>
+                <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>
+                  {item.remainingXp.toLocaleString()} xp left
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>
+                  {item.hoursLeft !== null
+                    ? `${item.hoursLeft.toFixed(1)}h @ ${item.xpPerHour?.toLocaleString()} xp/hr`
+                    : 'Manual estimate'}
+                </Text>
+              </View>
             </View>
             <ProgressBar pct={item.pct} color={item.pct >= 80 ? colors.warning : colors.accent} colors={colors} />
           </View>
@@ -181,24 +210,56 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
       </SectionCard>
 
       <SectionCard title="Goal 2 - Total Level 2250 by RuneFest" emoji={'\u26F5'} colors={colors}>
-        <StatRow label="Deadline" value="2026-10-03 - RuneFest (200 days left)" colors={colors} />
+        <StatRow
+          label="Deadline"
+          value={`2026-10-03 - RuneFest (${goal2Projection.daysLeft} days left)`}
+          colors={colors}
+        />
         <StatRow
           label="Current total level"
           value={`${tracker.totalLevel} / ${totalLevelTarget}`}
           colors={colors}
         />
         <StatRow label="Levels still needed" value={`${totalLevelsNeeded}`} colors={colors} />
+        <StatRow
+          label="Estimated grind"
+          value={
+            goal2Projection.hoursLeft !== null
+              ? `${goal2Projection.hoursLeft.toFixed(1)} hours`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
         <ProgressBar pct={totalLevelPct} color={colors.accent} colors={colors} />
 
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
-          Need <Text style={{ fontWeight: '700', color: colors.text }}>0.54</Text> levels/day to hit 2250 in
-          time
+          Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
+          levels/day to hit 2250 in time
+        </Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
+          Pace check: {goal2Projection.status}
+          {goal2Projection.hoursPerDay !== null
+            ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day`
+            : ''}
         </Text>
       </SectionCard>
 
       <SectionCard title="Goal 3 - Max Cape by 33rd Birthday" emoji={'\uD83C\uDF82'} colors={colors}>
-        <StatRow label="Deadline" value="2027-03-15 - 33rd birthday (363 days left)" colors={colors} />
+        <StatRow
+          label="Deadline"
+          value={`2027-03-15 - 33rd birthday (${goal3Projection.daysLeft} days left)`}
+          colors={colors}
+        />
         <StatRow label="Skills maxed" value={`${tracker.maxedSkills.length}/24`} colors={colors} />
+        <StatRow
+          label="Estimated grind"
+          value={
+            goal3Projection.hoursLeft !== null
+              ? `${goal3Projection.hoursLeft.toFixed(1)} hours`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
         <ProgressBar pct={(tracker.maxedSkills.length / 24) * 100} color="#ec4899" colors={colors} />
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }}>

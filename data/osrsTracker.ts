@@ -41,6 +41,15 @@ type GoalTrainingPlan = {
   mode: string;
 };
 
+type GoalProjection = {
+  label: string;
+  daysLeft: number;
+  hoursLeft: number | null;
+  hoursPerDay: number | null;
+  status: 'On track' | 'Tight' | 'Off track' | 'Needs manual lane';
+  unestimatedSkills: string[];
+};
+
 export type OsrsSkillStat = {
   metric: string;
   experience: number;
@@ -80,6 +89,8 @@ export type TrackerGoal = {
   level: number;
   pct: number;
   remainingXp: number;
+  xpPerHour?: number;
+  hoursLeft?: number | null;
 };
 
 export type LiveRunescapeTracker = {
@@ -106,6 +117,12 @@ export type LiveRunescapeTracker = {
     target: string;
     remainingXp: number;
   }[];
+  goalProjections: {
+    base90: GoalProjection;
+    runefest: GoalProjection;
+    maxCape: GoalProjection;
+  };
+  runefestLevelsPerDayNeeded: number;
   coachingText: string;
 };
 
@@ -155,6 +172,110 @@ function percentToTarget(experience: number, targetLevel: number) {
   const progressed = Math.max(experience, 0);
 
   return Math.max(0, Math.min(100, (progressed / Math.max(targetXp, 1)) * 100));
+}
+
+function daysUntil(targetDate: string, now = new Date()) {
+  const goalDate = new Date(`${targetDate}T12:00:00-05:00`);
+  const diff = goalDate.getTime() - now.getTime();
+  return Math.max(Math.ceil(diff / (1000 * 60 * 60 * 24)), 0);
+}
+
+function getGoalStatus(hoursPerDay: number | null, unestimatedSkills: string[]) {
+  if (unestimatedSkills.length > 0) {
+    return 'Needs manual lane' as const;
+  }
+
+  if (hoursPerDay === null) {
+    return 'Off track' as const;
+  }
+
+  if (hoursPerDay <= 1.5) {
+    return 'On track' as const;
+  }
+
+  if (hoursPerDay <= 3) {
+    return 'Tight' as const;
+  }
+
+  return 'Off track' as const;
+}
+
+function buildGoalProjection(
+  label: string,
+  daysLeft: number,
+  estimatedHours: number,
+  unestimatedSkills: string[]
+): GoalProjection {
+  const safeDaysLeft = Math.max(daysLeft, 1);
+  const hoursLeft = estimatedHours > 0 ? estimatedHours : 0;
+  const hoursPerDay = hoursLeft / safeDaysLeft;
+
+  return {
+    label,
+    daysLeft,
+    hoursLeft,
+    hoursPerDay,
+    status: getGoalStatus(hoursPerDay, unestimatedSkills),
+    unestimatedSkills,
+  };
+}
+
+function buildRuneFestProjection(skills: OsrsSkillStat[], levelsNeeded: number) {
+  if (levelsNeeded <= 0) {
+    return {
+      hoursLeft: 0,
+      unestimatedSkills: [] as string[],
+    };
+  }
+
+  const projectedSkills = skills.map((skill) => ({
+    skill: skill.skill,
+    level: skill.level,
+    experience: skill.experience,
+  }));
+  const unestimatedSkills = new Set<string>();
+  let hoursLeft = 0;
+  let remainingLevels = levelsNeeded;
+
+  while (remainingLevels > 0) {
+    let bestIndex = -1;
+    let bestHours = Number.POSITIVE_INFINITY;
+
+    projectedSkills.forEach((skill, index) => {
+      const trainingPlan = GOAL_TRAINING_PLANS[skill.skill];
+
+      if (!trainingPlan || trainingPlan.xpPerHour <= 0 || skill.level >= 99) {
+        return;
+      }
+
+      const nextLevel = skill.level + 1;
+      const remainingXp = Math.max(xpForLevel(nextLevel) - skill.experience, 0);
+      const levelHours = remainingXp / trainingPlan.xpPerHour;
+
+      if (remainingXp > 0 && levelHours < bestHours) {
+        bestHours = levelHours;
+        bestIndex = index;
+      }
+    });
+
+    if (bestIndex === -1) {
+      projectedSkills
+        .filter((skill) => skill.level < 99)
+        .forEach((skill) => unestimatedSkills.add(formatSkillName(skill.skill)));
+      break;
+    }
+
+    const chosenSkill = projectedSkills[bestIndex];
+    chosenSkill.level += 1;
+    chosenSkill.experience = xpForLevel(chosenSkill.level);
+    hoursLeft += bestHours;
+    remainingLevels -= 1;
+  }
+
+  return {
+    hoursLeft,
+    unestimatedSkills: [...unestimatedSkills],
+  };
 }
 
 function getEasternTimeParts(date = new Date()) {
@@ -258,6 +379,33 @@ function fallbackTracker(): LiveRunescapeTracker {
     maxedSkills: [],
     hoursToNextLevel: [],
     milestoneAlerts: [],
+    goalProjections: {
+      base90: {
+        label: 'Base 90',
+        daysLeft: 0,
+        hoursLeft: null,
+        hoursPerDay: null,
+        status: 'Off track',
+        unestimatedSkills: [],
+      },
+      runefest: {
+        label: 'RuneFest 2250',
+        daysLeft: 0,
+        hoursLeft: null,
+        hoursPerDay: null,
+        status: 'Off track',
+        unestimatedSkills: [],
+      },
+      maxCape: {
+        label: 'Max Cape',
+        daysLeft: 0,
+        hoursLeft: null,
+        hoursPerDay: null,
+        status: 'Off track',
+        unestimatedSkills: [],
+      },
+    },
+    runefestLevelsPerDayNeeded: 0,
     coachingText:
       'No live or cached OSRS tracker data is available yet. Once the feed is reachable, this view will build from real snapshots instead of placeholder stats.',
   };
@@ -374,6 +522,11 @@ export function buildLiveRunescapeTracker(
       level: skill.level,
       pct: percentToTarget(skill.experience, 90),
       remainingXp: Math.max(xpForLevel(90) - skill.experience, 0),
+      xpPerHour: GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0,
+      hoursLeft:
+        (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
+          ? Math.max(xpForLevel(90) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
+          : null,
     }));
 
   const maxClosest = [...skills]
@@ -385,12 +538,19 @@ export function buildLiveRunescapeTracker(
       level: skill.level,
       pct: percentToTarget(skill.experience, 99),
       remainingXp: Math.max(xpForLevel(99) - skill.experience, 0),
+      xpPerHour: GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0,
+      hoursLeft:
+        (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
+          ? Math.max(xpForLevel(99) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
+          : null,
     }));
 
   const maxedSkills = skills
     .filter((skill) => skill.level >= 99)
     .map((skill) => formatSkillName(skill.skill))
     .slice(0, 8);
+  const totalLevelTarget = 2250;
+  const totalLevelsNeeded = Math.max(totalLevelTarget - player.overall.level, 0);
 
   const hoursToNextLevel = [...skills]
     .map((skill) => {
@@ -433,20 +593,6 @@ export function buildLiveRunescapeTracker(
 
       return left.hoursLeft - right.hoursLeft;
     });
-
-  const mostUrgent = base90Remaining[0];
-  const strongestGain = topSkills[0];
-  const coachingText = hasDelta
-    ? `${
-        strongestGain ? `${strongestGain.skill} led the gain block with ${strongestGain.xp.toLocaleString()} xp.` : ''
-      } ${
-        mostUrgent
-          ? `${mostUrgent.skill} is still the biggest gap to close for Base 90, with ${mostUrgent.remainingXp.toLocaleString()} xp left.`
-          : 'Most of the account is already in a strong place.'
-      }`
-    : mostUrgent
-      ? `${mostUrgent.skill} is the biggest push to shore up right now, with ${mostUrgent.remainingXp.toLocaleString()} xp left to 90.`
-      : 'Most skills are already in a strong place. Keep momentum on the closest 99 targets.';
   const milestoneAlerts = [...skills]
     .map((skill) => {
       const targetLevel = skill.level < 90 ? 90 : skill.level < 99 ? 99 : null;
@@ -471,6 +617,41 @@ export function buildLiveRunescapeTracker(
     .sort((left, right) => left.remainingXp - right.remainingXp)
     .slice(0, 5);
 
+  const base90Hours = base90Remaining.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
+  const base90Unestimated = base90Remaining
+    .filter((item) => item.hoursLeft === null)
+    .map((item) => item.skill);
+  const maxHours = maxClosest.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
+  const maxUnestimated = maxClosest.filter((item) => item.hoursLeft === null).map((item) => item.skill);
+  const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
+  const runefestProjectionPlan = buildRuneFestProjection(skills, totalLevelsNeeded);
+  const runefestProjection = buildGoalProjection(
+    'RuneFest 2250',
+    daysUntil('2026-10-03'),
+    runefestProjectionPlan.hoursLeft,
+    runefestProjectionPlan.unestimatedSkills
+  );
+  const goalProjections = {
+    base90: buildGoalProjection('Base 90', daysUntil('2026-05-22'), base90Hours, base90Unestimated),
+    runefest: runefestProjection,
+    maxCape: buildGoalProjection('Max Cape', daysUntil('2027-03-15'), maxHours, maxUnestimated),
+  };
+  const coachingParts = [
+    `${goalProjections.base90.label}: technically ${goalProjections.base90.status.toLowerCase()}${goalProjections.base90.hoursPerDay !== null ? ` at ${goalProjections.base90.hoursPerDay.toFixed(2)}h/day` : ''}.`,
+    `${goalProjections.runefest.label}: technically ${goalProjections.runefest.status.toLowerCase()}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)}h/day` : ''}.`,
+    `${goalProjections.maxCape.label}: technically ${goalProjections.maxCape.status.toLowerCase()}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)}h/day` : ''}.`,
+  ];
+  const manualLaneSkills = [
+    ...new Set([
+      ...goalProjections.base90.unestimatedSkills,
+      ...goalProjections.runefest.unestimatedSkills,
+      ...goalProjections.maxCape.unestimatedSkills,
+    ]),
+  ];
+  if (manualLaneSkills.length > 0) {
+    coachingParts.push(`Manual estimate still needed for: ${manualLaneSkills.join(', ')}.`);
+  }
+  const coachingText = coachingParts.join(' ');
   return {
     mode: hasDelta ? 'delta' : 'snapshot',
     snapshotDateLabel: snapshotKey ? formatSnapshotDate(snapshotKey) : 'Live snapshot',
@@ -485,6 +666,8 @@ export function buildLiveRunescapeTracker(
     maxedSkills,
     hoursToNextLevel,
     milestoneAlerts,
+    goalProjections,
+    runefestLevelsPerDayNeeded,
     coachingText,
   };
 }
