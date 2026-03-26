@@ -6,6 +6,7 @@ const TRACKER_TIME_ZONE = 'America/New_York';
 const SNAPSHOT_HOUR = 8;
 const SNAPSHOT_MINUTE = 45;
 const SNAPSHOT_FILE = `${FileSystem.documentDirectory ?? ''}osrs-daily-snapshots.json`;
+const GOAL_PROGRESS_START = '2026-03-25';
 
 const SKILL_ORDER = [
   'attack',
@@ -48,6 +49,8 @@ type GoalProjection = {
   hoursPerDay: number | null;
   status: 'On track' | 'Tight' | 'Off track' | 'Needs manual lane';
   unestimatedSkills: string[];
+  progressPct: number;
+  pacePct: number;
 };
 
 export type OsrsSkillStat = {
@@ -149,6 +152,34 @@ const GOAL_TRAINING_PLANS: Partial<Record<SkillName, GoalTrainingPlan>> = {
   sailing: { xpPerHour: 60000, mode: 'afk' },
 };
 
+const GOAL_PROGRESS_BASELINE: Record<SkillName | 'overall', Pick<OsrsSkillStat, 'level' | 'experience'>> = {
+  overall: { level: 2203, experience: 173773255 },
+  attack: { level: 91, experience: 6122415 },
+  defence: { level: 90, experience: 5712800 },
+  strength: { level: 92, experience: 7038075 },
+  hitpoints: { level: 95, experience: 9363218 },
+  ranged: { level: 92, experience: 7052764 },
+  prayer: { level: 89, experience: 5079595 },
+  magic: { level: 95, experience: 8857017 },
+  cooking: { level: 99, experience: 13063406 },
+  woodcutting: { level: 90, experience: 5440702 },
+  fletching: { level: 99, experience: 13038303 },
+  fishing: { level: 90, experience: 5424395 },
+  firemaking: { level: 99, experience: 13044402 },
+  crafting: { level: 90, experience: 5382552 },
+  smithing: { level: 90, experience: 5414717 },
+  mining: { level: 90, experience: 5367729 },
+  herblore: { level: 90, experience: 5618952 },
+  agility: { level: 90, experience: 5361513 },
+  thieving: { level: 87, experience: 4003425 },
+  slayer: { level: 89, experience: 4932213 },
+  farming: { level: 99, experience: 14415682 },
+  runecraft: { level: 83, experience: 2749504 },
+  hunter: { level: 86, experience: 3625366 },
+  construction: { level: 90, experience: 5361184 },
+  sailing: { level: 98, experience: 12303326 },
+};
+
 function formatSkillName(skill: string) {
   if (skill === 'runecraft') {
     return 'Runecraft';
@@ -200,11 +231,29 @@ function getGoalStatus(hoursPerDay: number | null, unestimatedSkills: string[]) 
   return 'Off track' as const;
 }
 
+function clampPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getPacePct(targetDate: string, now = new Date()) {
+  const start = new Date(`${GOAL_PROGRESS_START}T00:00:00-05:00`).getTime();
+  const end = new Date(`${targetDate}T23:59:59-05:00`).getTime();
+  const current = now.getTime();
+
+  if (end <= start) {
+    return 100;
+  }
+
+  return clampPct(((current - start) / (end - start)) * 100);
+}
+
 function buildGoalProjection(
   label: string,
   daysLeft: number,
   estimatedHours: number,
-  unestimatedSkills: string[]
+  unestimatedSkills: string[],
+  progressPct = 0,
+  pacePct = 0
 ): GoalProjection {
   const safeDaysLeft = Math.max(daysLeft, 1);
   const hoursLeft = estimatedHours > 0 ? estimatedHours : 0;
@@ -217,13 +266,16 @@ function buildGoalProjection(
     hoursPerDay,
     status: getGoalStatus(hoursPerDay, unestimatedSkills),
     unestimatedSkills,
+    progressPct,
+    pacePct,
   };
 }
 
-function buildRuneFestProjection(skills: OsrsSkillStat[], levelsNeeded: number) {
+function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[], levelsNeeded: number) {
   if (levelsNeeded <= 0) {
     return {
       hoursLeft: 0,
+      xpLeft: 0,
       unestimatedSkills: [] as string[],
     };
   }
@@ -235,6 +287,7 @@ function buildRuneFestProjection(skills: OsrsSkillStat[], levelsNeeded: number) 
   }));
   const unestimatedSkills = new Set<string>();
   let hoursLeft = 0;
+  let xpLeft = 0;
   let remainingLevels = levelsNeeded;
 
   while (remainingLevels > 0) {
@@ -266,16 +319,64 @@ function buildRuneFestProjection(skills: OsrsSkillStat[], levelsNeeded: number) 
     }
 
     const chosenSkill = projectedSkills[bestIndex];
+    const xpNeededForChosenLevel = Math.max(xpForLevel(chosenSkill.level + 1) - chosenSkill.experience, 0);
     chosenSkill.level += 1;
     chosenSkill.experience = xpForLevel(chosenSkill.level);
     hoursLeft += bestHours;
+    xpLeft += xpNeededForChosenLevel;
     remainingLevels -= 1;
   }
 
   return {
     hoursLeft,
+    xpLeft,
     unestimatedSkills: [...unestimatedSkills],
   };
+}
+
+function buildTargetProgress(
+  baselineSkills: Record<SkillName | 'overall', Pick<OsrsSkillStat, 'level' | 'experience'>>,
+  currentPlayer: OsrsPlayerStats,
+  targetType: 'base90' | 'runefest' | 'maxCape'
+) {
+  if (targetType === 'runefest') {
+    const baselineLevelsNeeded = Math.max(2250 - baselineSkills.overall.level, 0);
+    const baselineProjection = buildRuneFestProjection(
+      SKILL_ORDER.map((skill) => ({
+        ...baselineSkills[skill],
+        metric: skill,
+        rank: 0,
+        ehp: 0,
+      })),
+      baselineLevelsNeeded
+    );
+    const currentLevelsNeeded = Math.max(2250 - currentPlayer.overall.level, 0);
+    const currentProjection = buildRuneFestProjection(
+      SKILL_ORDER.map((skill) => currentPlayer[skill]),
+      currentLevelsNeeded
+    );
+    const totalNeededXp = baselineProjection.xpLeft;
+    const remainingXp = currentProjection.xpLeft;
+
+    return clampPct(totalNeededXp > 0 ? ((totalNeededXp - remainingXp) / totalNeededXp) * 100 : 100);
+  }
+
+  const targetLevel = targetType === 'base90' ? 90 : 99;
+  let totalNeededXp = 0;
+  let remainingXp = 0;
+
+  SKILL_ORDER.forEach((skill) => {
+    const baseline = baselineSkills[skill];
+    if (baseline.level >= targetLevel) {
+      return;
+    }
+
+    const targetXp = xpForLevel(targetLevel);
+    totalNeededXp += Math.max(targetXp - baseline.experience, 0);
+    remainingXp += Math.max(targetXp - currentPlayer[skill].experience, 0);
+  });
+
+  return clampPct(totalNeededXp > 0 ? ((totalNeededXp - remainingXp) / totalNeededXp) * 100 : 100);
 }
 
 function getEasternTimeParts(date = new Date()) {
@@ -387,6 +488,8 @@ function fallbackTracker(): LiveRunescapeTracker {
         hoursPerDay: null,
         status: 'Off track',
         unestimatedSkills: [],
+        progressPct: 0,
+        pacePct: 0,
       },
       runefest: {
         label: 'RuneFest 2250',
@@ -395,6 +498,8 @@ function fallbackTracker(): LiveRunescapeTracker {
         hoursPerDay: null,
         status: 'Off track',
         unestimatedSkills: [],
+        progressPct: 0,
+        pacePct: 0,
       },
       maxCape: {
         label: 'Max Cape',
@@ -403,6 +508,8 @@ function fallbackTracker(): LiveRunescapeTracker {
         hoursPerDay: null,
         status: 'Off track',
         unestimatedSkills: [],
+        progressPct: 0,
+        pacePct: 0,
       },
     },
     runefestLevelsPerDayNeeded: 0,
@@ -625,16 +732,35 @@ export function buildLiveRunescapeTracker(
   const maxUnestimated = maxClosest.filter((item) => item.hoursLeft === null).map((item) => item.skill);
   const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
   const runefestProjectionPlan = buildRuneFestProjection(skills, totalLevelsNeeded);
+  const base90ProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'base90');
+  const runefestProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'runefest');
+  const maxCapeProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'maxCape');
   const runefestProjection = buildGoalProjection(
     'RuneFest 2250',
     daysUntil('2026-10-03'),
     runefestProjectionPlan.hoursLeft,
-    runefestProjectionPlan.unestimatedSkills
+    runefestProjectionPlan.unestimatedSkills,
+    runefestProgressPct,
+    getPacePct('2026-10-03')
   );
   const goalProjections = {
-    base90: buildGoalProjection('Base 90', daysUntil('2026-05-22'), base90Hours, base90Unestimated),
+    base90: buildGoalProjection(
+      'Base 90',
+      daysUntil('2026-05-22'),
+      base90Hours,
+      base90Unestimated,
+      base90ProgressPct,
+      getPacePct('2026-05-22')
+    ),
     runefest: runefestProjection,
-    maxCape: buildGoalProjection('Max Cape', daysUntil('2027-03-15'), maxHours, maxUnestimated),
+    maxCape: buildGoalProjection(
+      'Max Cape',
+      daysUntil('2027-03-15'),
+      maxHours,
+      maxUnestimated,
+      maxCapeProgressPct,
+      getPacePct('2027-03-15')
+    ),
   };
   const coachingParts = [
     `${goalProjections.base90.label}: technically ${goalProjections.base90.status.toLowerCase()}${goalProjections.base90.hoursPerDay !== null ? ` at ${goalProjections.base90.hoursPerDay.toFixed(2)}h/day` : ''}.`,

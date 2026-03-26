@@ -55,10 +55,26 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
 
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - tracker.totalLevel, 0);
-  const totalLevelPct = (tracker.totalLevel / totalLevelTarget) * 100;
   const goal1Projection = tracker.goalProjections.base90;
   const goal2Projection = tracker.goalProjections.runefest;
   const goal3Projection = tracker.goalProjections.maxCape;
+
+  const renderPaceCheck = (projection: typeof goal1Projection, color: string) => (
+    <View style={{ marginTop: 10, marginBottom: 12 }}>
+      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 6 }}>
+        Pace Check
+      </Text>
+      <ProgressBar pct={projection.progressPct} markerPct={projection.pacePct} color={color} colors={colors} height={10} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+        <Text style={{ fontSize: 11, color: colors.subtext }}>
+          Actual {projection.progressPct.toFixed(1)}%
+        </Text>
+        <Text style={{ fontSize: 11, color: colors.subtext }}>
+          Pace {projection.pacePct.toFixed(1)}%
+        </Text>
+      </View>
+    </View>
+  );
 
   return (
     <>
@@ -171,6 +187,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
+        {renderPaceCheck(goal1Projection, colors.accent)}
 
         <Text
           style={{
@@ -230,7 +247,16 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
-        <ProgressBar pct={totalLevelPct} color={colors.accent} colors={colors} />
+        <StatRow
+          label="Required pace"
+          value={
+            goal2Projection.hoursPerDay !== null
+              ? `${goal2Projection.hoursPerDay.toFixed(2)} h/day`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
+        {renderPaceCheck(goal2Projection, colors.accent)}
 
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
@@ -260,6 +286,16 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           }
           colors={colors}
         />
+        <StatRow
+          label="Required pace"
+          value={
+            goal3Projection.hoursPerDay !== null
+              ? `${goal3Projection.hoursPerDay.toFixed(2)} h/day`
+              : 'Manual estimate needed'
+          }
+          colors={colors}
+        />
+        {renderPaceCheck(goal3Projection, '#ec4899')}
         <ProgressBar pct={(tracker.maxedSkills.length / 24) * 100} color="#ec4899" colors={colors} />
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }}>
