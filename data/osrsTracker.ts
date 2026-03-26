@@ -362,6 +362,7 @@ function buildTargetProgress(
     const baselineLevelsNeeded = Math.max(2250 - baselineSkills.overall.level, 0);
     const baselineProjection = buildRuneFestProjection(
       SKILL_ORDER.map((skill) => ({
+        skill,
         ...baselineSkills[skill],
         metric: skill,
         rank: 0,
@@ -371,7 +372,10 @@ function buildTargetProgress(
     );
     const currentLevelsNeeded = Math.max(2250 - currentPlayer.overall.level, 0);
     const currentProjection = buildRuneFestProjection(
-      SKILL_ORDER.map((skill) => currentPlayer[skill]),
+      SKILL_ORDER.map((skill) => ({
+        skill,
+        ...currentPlayer[skill],
+      })),
       currentLevelsNeeded
     );
     const totalNeededXp = baselineProjection.xpLeft;
