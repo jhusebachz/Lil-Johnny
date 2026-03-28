@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -125,6 +126,7 @@ function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
 export default function Gym() {
   const { theme, triggerHaptic, preferences } = useAppSettings();
   const colors = getThemeColors(theme);
+  const { width } = useWindowDimensions();
   const [selectedDay, setSelectedDay] = useState<GymDay>('Push');
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
   const [exerciseLogs, setExerciseLogs] = useState<Record<string, ExerciseLog>>({});
@@ -143,6 +145,7 @@ export default function Gym() {
     Legs: gymWorkoutTemplates.Legs.exercises[0].name,
   });
   const workout = gymWorkoutTemplates[selectedDay];
+  const isCompact = width < 430;
   const groupedWorkoutExercises = useMemo(() => {
     const grouped = new Map<string, typeof workout.exercises>();
 
@@ -751,7 +754,7 @@ export default function Gym() {
 
               <View
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: isCompact ? 'column' : 'row',
                   gap: 10,
                   marginBottom: 16,
                 }}

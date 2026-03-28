@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Image, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Animated, Easing, Image, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
@@ -62,12 +62,14 @@ function OverviewCard({
   colors,
   align = 'left',
   minWidth = 160,
+  fullWidth = false,
 }: {
   title: string;
   items: OverviewItem[];
   colors: ReturnType<typeof getThemeColors>;
   align?: 'left' | 'center';
   minWidth?: number;
+  fullWidth?: boolean;
 }) {
   const centered = align === 'center';
 
@@ -75,7 +77,8 @@ function OverviewCard({
     <View
       style={{
         flex: 1,
-        minWidth,
+        minWidth: fullWidth ? undefined : minWidth,
+        width: fullWidth ? '100%' : undefined,
         borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.cardBorder,
@@ -131,6 +134,7 @@ function OverviewCard({
 export default function Dashboard() {
   const { theme, reminders, preferences } = useAppSettings();
   const colors = getThemeColors(theme);
+  const { width } = useWindowDimensions();
   const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
   const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
   const [gymVisitCount, setGymVisitCount] = useState(0);
@@ -139,6 +143,8 @@ export default function Dashboard() {
   const heroLift = useState(() => new Animated.Value(18))[0];
   const logoFloat = useState(() => new Animated.Value(0))[0];
   const haloPulse = useState(() => new Animated.Value(0.94))[0];
+  const isCompact = width < 430;
+  const isVeryCompact = width < 380;
 
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
@@ -284,6 +290,12 @@ export default function Dashboard() {
   ].reduce((total, value) => total + value, 0) / 2;
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissScore = Math.round(((cyberScore + healthScore + hobbiesScore + streaksScore) / 4) * 100);
+  const blissBreakdown = [
+    `Cyber ${Math.round(cyberScore * 100)}`,
+    `Health ${Math.round(healthScore * 100)}`,
+    `Hobbies ${Math.round(hobbiesScore * 100)}`,
+    `Streaks ${Math.round(streaksScore * 100)}`,
+  ];
   const cyberOverviewItems: OverviewItem[] = [
     {
       label: currentCert
@@ -413,7 +425,7 @@ export default function Dashboard() {
             paddingBottom: 22,
             marginBottom: 20,
             overflow: 'hidden',
-            minHeight: 300,
+            minHeight: isCompact ? 0 : 300,
             opacity: heroOpacity,
             transform: [{ translateY: heroLift }],
           }}
@@ -441,30 +453,38 @@ export default function Dashboard() {
               left: -70,
             }}
           />
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ color: colors.heroText, fontSize: 42, fontWeight: '900', letterSpacing: 0.3, marginBottom: 10 }}>
+          <View
+            style={{
+              flexDirection: isCompact ? 'column' : 'row',
+              alignItems: isCompact ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flex: isCompact ? 0 : 1, width: '100%', paddingRight: isCompact ? 0 : 12 }}>
+              <Text style={{ color: colors.heroText, fontSize: isVeryCompact ? 32 : isCompact ? 36 : 42, fontWeight: '900', letterSpacing: 0.3, marginBottom: 10 }}>
                 Dashboard
               </Text>
-              <Text style={{ color: colors.heroSubtext, fontSize: 15, fontWeight: '700', marginBottom: 10 }}>{greeting}</Text>
-              <Text style={{ color: colors.heroSubtext, fontSize: 12, letterSpacing: 0.2 }}>
+              <Text style={{ color: colors.heroSubtext, fontSize: isCompact ? 14 : 15, fontWeight: '700', marginBottom: 10 }}>{greeting}</Text>
+              <Text style={{ color: colors.heroSubtext, fontSize: 12, letterSpacing: 0.2, lineHeight: 18 }}>
                 {todayLabel} · Next reminder {nextReminderLabel}
               </Text>
             </View>
             <Animated.View
               style={{
-                width: 176,
-                height: 176,
+                width: isVeryCompact ? 132 : isCompact ? 148 : 176,
+                height: isVeryCompact ? 132 : isCompact ? 148 : 176,
                 alignItems: 'center',
                 justifyContent: 'center',
+                alignSelf: isCompact ? 'center' : 'auto',
+                marginTop: isCompact ? 18 : 0,
                 transform: [{ translateY: logoFloat }],
               }}
             >
               <Animated.View
                 style={{
                   position: 'absolute',
-                  width: 176,
-                  height: 176,
+                  width: isVeryCompact ? 132 : isCompact ? 148 : 176,
+                  height: isVeryCompact ? 132 : isCompact ? 148 : 176,
                   borderRadius: 999,
                   borderWidth: 1,
                   borderColor: 'rgba(255,255,255,0.18)',
@@ -475,15 +495,19 @@ export default function Dashboard() {
               <Animated.View
                 style={{
                   position: 'absolute',
-                  width: 144,
-                  height: 144,
+                  width: isVeryCompact ? 108 : isCompact ? 120 : 144,
+                  height: isVeryCompact ? 108 : isCompact ? 120 : 144,
                   borderRadius: 999,
                   backgroundColor: colors.accentSoft,
                   opacity: 0.22,
                   transform: [{ scale: haloPulse }],
                 }}
               />
-              <Image source={require('../../assets/images/Huse Logo.png')} style={{ width: 150, height: 150 }} resizeMode="contain" />
+              <Image
+                source={require('../../assets/images/Huse Logo.png')}
+                style={{ width: isVeryCompact ? 112 : isCompact ? 124 : 150, height: isVeryCompact ? 112 : isCompact ? 124 : 150 }}
+                resizeMode="contain"
+              />
             </Animated.View>
           </View>
         </Animated.View>
@@ -491,19 +515,26 @@ export default function Dashboard() {
         <SectionCard title="Bliss Score" emoji={'✨'} colors={colors}>
           <Text
             style={{
-              fontSize: 58,
+              fontSize: isVeryCompact ? 48 : isCompact ? 52 : 58,
               color: colors.text,
               fontWeight: '900',
               marginBottom: 8,
-              lineHeight: 62,
+              lineHeight: isVeryCompact ? 52 : isCompact ? 56 : 62,
               textAlign: 'center',
             }}
           >
             {blissScore}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.text, textAlign: 'center' }}>
-            Cyber {Math.round(cyberScore * 100)} | Health {Math.round(healthScore * 100)} | Hobbies {Math.round(hobbiesScore * 100)} | Streaks {Math.round(streaksScore * 100)}
-          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+            {blissBreakdown.map((item) => (
+              <Text
+                key={item}
+                style={{ fontSize: 13, color: colors.text, textAlign: 'center', marginHorizontal: 6, marginBottom: 4 }}
+              >
+                {item}
+              </Text>
+            ))}
+          </View>
         </SectionCard>
 
         <SectionCard title="Suggested Next Actions" emoji={'🧭'} colors={colors}>
@@ -531,18 +562,21 @@ export default function Dashboard() {
               items={cyberOverviewItems}
               colors={colors}
               align="left"
+              fullWidth={isCompact}
             />
             <OverviewCard
               title="Health"
               items={healthOverviewItems}
               colors={colors}
               align="left"
+              fullWidth={isCompact}
             />
             <OverviewCard
               title="Hobbies"
               items={hobbiesOverviewItems}
               colors={colors}
               align="left"
+              fullWidth={isCompact}
             />
           </View>
         </SectionCard>
@@ -560,6 +594,7 @@ export default function Dashboard() {
               colors={colors}
               align="center"
               minWidth={220}
+              fullWidth={isCompact}
             />
             <OverviewCard
               title="Stretching"
@@ -572,6 +607,7 @@ export default function Dashboard() {
               colors={colors}
               align="center"
               minWidth={220}
+              fullWidth={isCompact}
             />
           </View>
         </SectionCard>

@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
 import { YearGoal, getTodayDateKey } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
@@ -16,8 +16,10 @@ export default function StreakGoalCard({
   onToggleToday: () => Promise<void>;
   onMarkFailure: () => Promise<void>;
 }) {
+  const { width } = useWindowDimensions();
   const todayKey = getTodayDateKey();
   const dailyCompleted = goal.type === 'daily-check' ? goal.completedDates.includes(todayKey) : false;
+  const isCompact = width < 430;
 
   return (
     <View
@@ -30,8 +32,14 @@ export default function StreakGoalCard({
         marginBottom: 12,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, paddingRight: 14 }}>
+      <View
+        style={{
+          flexDirection: isCompact ? 'column' : 'row',
+          alignItems: isCompact ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <View style={{ flex: isCompact ? 0 : 1, paddingRight: isCompact ? 0 : 14, marginBottom: isCompact ? 12 : 0 }}>
           <Text style={{ fontSize: 17, color: colors.text, fontWeight: '800', marginBottom: 6 }}>{goal.title}</Text>
           <Text style={{ fontSize: 16, color: colors.subtext }}>
             Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
@@ -45,8 +53,8 @@ export default function StreakGoalCard({
               void onToggleToday();
             }}
             style={{
-              width: 76,
-              height: 76,
+              width: isCompact ? '100%' : 76,
+              height: isCompact ? 54 : 76,
               borderRadius: 18,
               alignItems: 'center',
               justifyContent: 'center',
@@ -64,8 +72,9 @@ export default function StreakGoalCard({
               void onMarkFailure();
             }}
             style={{
-              minWidth: 112,
-              height: 76,
+              minWidth: isCompact ? 0 : 112,
+              width: isCompact ? '100%' : undefined,
+              height: isCompact ? 54 : 76,
               borderRadius: 18,
               alignItems: 'center',
               justifyContent: 'center',
