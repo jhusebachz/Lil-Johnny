@@ -147,7 +147,7 @@ export default function Dashboard() {
   const haloPulse = useState(() => new Animated.Value(0.94))[0];
   const isCompact = width < 430;
   const isVeryCompact = width < 380;
-  const overviewCardWidth = Math.max(width - 74, 250);
+  const overviewCardWidth = Math.min(Math.max(width - 120, 238), 300);
 
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
@@ -545,7 +545,7 @@ export default function Dashboard() {
           </View>
         </SectionCard>
 
-        <SectionCard title="Suggested Next Actions" emoji={'🧭'} colors={colors}>
+        <SectionCard title="Suggested Next Actions" emoji={'\uD83E\uDDED'} colors={colors}>
           {suggestedActions.map((action) => (
             <View
               key={action.label}
@@ -563,9 +563,16 @@ export default function Dashboard() {
           ))}
         </SectionCard>
 
-        <SectionCard title="Overview" emoji={'🧩'} colors={colors}>
+        <SectionCard title="Overview" emoji={'\uD83E\uDDE9'} colors={colors}>
           {isCompact ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={overviewCardWidth + 12}
+              snapToAlignment="start"
+              contentContainerStyle={{ paddingRight: 4 }}
+            >
               <OverviewCard
                 title="Cyber"
                 items={cyberOverviewItems}
