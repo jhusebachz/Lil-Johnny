@@ -417,6 +417,49 @@ export default function Gym() {
           </Text>
         </View>
 
+        <SectionCard title="Health Pace" emoji={'📈'} colors={colors}>
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Weekly gym target
+            </Text>
+            <ProgressBar pct={weeklyGymPct} markerPct={weeklyGymPacePct} color={colors.accent} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weeklyGymPct.toFixed(1)}%</Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weeklyGymPacePct.toFixed(1)}%</Text>
+            </View>
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Weight loss goal
+            </Text>
+            <ProgressBar pct={weightGoalPct} markerPct={weightGoalPacePct} color={colors.warning} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weightGoalPct.toFixed(1)}%</Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weightGoalPacePct.toFixed(1)}%</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>
+                {latestWeight ? `Current ${formatWeight(latestWeight.weight)} lb` : `Baseline ${STARTING_WEIGHT_LB} lb`}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Target {GOAL_WEIGHT_LB} lb</Text>
+            </View>
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Loop run sub-9 goal
+            </Text>
+            <ProgressBar pct={loopRunGoalPct} color={colors.success} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>
+                {bestLoopRun ? `Best ${formatLoopRunTime(bestLoopRun.timeSeconds)}` : 'No run logged'}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Target 9:00</Text>
+            </View>
+          </View>
+        </SectionCard>
+
         <SectionCard title="Body Metrics" emoji={'\u2696'} colors={colors}>
           <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 10 }}>
             Latest weight: {latestWeight ? `${latestWeight.weight.toFixed(1)} lb` : 'No entries yet'}
@@ -530,49 +573,6 @@ export default function Gym() {
           >
             <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Add weight entry</Text>
           </Pressable>
-        </SectionCard>
-
-        <SectionCard title="Health Pace" emoji={'📈'} colors={colors}>
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
-              Weekly gym target
-            </Text>
-            <ProgressBar pct={weeklyGymPct} markerPct={weeklyGymPacePct} color={colors.accent} colors={colors} height={10} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weeklyGymPct.toFixed(1)}%</Text>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weeklyGymPacePct.toFixed(1)}%</Text>
-            </View>
-          </View>
-
-          <View>
-            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
-              Weight loss goal
-            </Text>
-            <ProgressBar pct={weightGoalPct} markerPct={weightGoalPacePct} color={colors.warning} colors={colors} height={10} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weightGoalPct.toFixed(1)}%</Text>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weightGoalPacePct.toFixed(1)}%</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>
-                {latestWeight ? `Current ${formatWeight(latestWeight.weight)} lb` : `Baseline ${STARTING_WEIGHT_LB} lb`}
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Target {GOAL_WEIGHT_LB} lb</Text>
-            </View>
-          </View>
-
-          <View>
-            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
-              Loop run sub-9 goal
-            </Text>
-            <ProgressBar pct={loopRunGoalPct} color={colors.success} colors={colors} height={10} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>
-                {bestLoopRun ? `Best ${formatLoopRunTime(bestLoopRun.timeSeconds)}` : 'No run logged'}
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Target 9:00</Text>
-            </View>
-          </View>
         </SectionCard>
 
         <SectionCard title="Gym View" emoji={'\u21C4'} colors={colors}>

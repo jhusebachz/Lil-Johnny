@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -102,14 +102,6 @@ export default function Cyber() {
     void writePersistedLifeTrackerData(lifeData);
   }, [hydrated, lifeData]);
 
-  const totalChapters = useMemo(
-    () => lifeData.certifications.reduce((total, cert) => total + cert.chaptersCompleted, 0),
-    [lifeData.certifications]
-  );
-  const totalTargetChapters = useMemo(
-    () => lifeData.certifications.reduce((total, cert) => total + cert.chapterCount, 0),
-    [lifeData.certifications]
-  );
   const selectedCert = lifeData.certifications.find((cert) => cert.id === selectedCertId) ?? lifeData.certifications[0];
   const certLogs = lifeData.studyLogs
     .filter((entry) => entry.certId === selectedCert.id)
@@ -210,15 +202,48 @@ export default function Cyber() {
             backgroundColor: colors.hero,
             borderRadius: 16,
             padding: 20,
-            minHeight: 112,
+            minHeight: 148,
             justifyContent: 'center',
             marginBottom: 18,
           }}
         >
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Cyber</Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 12, lineHeight: 18 }}>
-            Total chapter progress: {totalChapters} / {totalTargetChapters}
-          </Text>
+          {lifeData.certifications.map((cert) => {
+            const selected = cert.id === selectedCertId;
+
+            return (
+              <View
+                key={`hero-cert-${cert.id}`}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: selected ? colors.heroText : colors.heroSubtext,
+                    fontSize: 13,
+                    fontWeight: selected ? '800' : '700',
+                    flex: 1,
+                    paddingRight: 12,
+                  }}
+                >
+                  {cert.name}
+                </Text>
+                <Text
+                  style={{
+                    color: selected ? colors.heroText : colors.heroSubtext,
+                    fontSize: 13,
+                    fontWeight: selected ? '800' : '700',
+                  }}
+                >
+                  {cert.chaptersCompleted}/{cert.chapterCount}
+                </Text>
+              </View>
+            );
+          })}
         </View>
 
         <SectionCard title="Certifications" emoji={'🧠'} colors={colors}>
