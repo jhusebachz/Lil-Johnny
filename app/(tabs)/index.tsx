@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Animated, Easing, Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { readPersistedGymData } from '../../data/gymData';
 import {
-  DailyCheckGoal,
+  GOAL_WEIGHT_LB,
   LifeTrackerData,
+  TRACKER_BASELINE_DATE,
+  WEIGHT_GOAL_TARGET_DATE,
   defaultLifeTrackerData,
-  formatLoopRunTime,
+  getDateRangePacePct,
   getAvoidanceStreak,
+  getCurrentWeekDateKeys,
   getDailyCheckStreak,
+  getScheduledGymPacePct,
   getTodayDateKey,
   getUniqueWeekCount,
+  getWeightLossProgressPct,
   readPersistedLifeTrackerData,
 } from '../../data/lifeTrackerData';
 import { formatUpcomingReminder, getNextReminder } from '../../data/reminders';
@@ -25,22 +30,52 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function getPacePct(startDate?: string, targetDate?: string) {
+  if (!startDate || !targetDate) {
+    return null;
+  }
+
+  const start = new Date(`${startDate}T12:00:00`).getTime();
+  const end = new Date(`${targetDate}T12:00:00`).getTime();
+  const now = Date.now();
+
+  if (end <= start) {
+    return 100;
+  }
+
+  if (now <= start) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, ((now - start) / (end - start)) * 100));
+}
+
+type OverviewItem = {
+  label: string;
+  complete?: boolean;
+  showCheck?: boolean;
+};
+
 function OverviewCard({
   title,
-  summary,
-  footer,
+  items,
   colors,
+  align = 'left',
+  minWidth = 160,
 }: {
   title: string;
-  summary: string;
-  footer: string;
+  items: OverviewItem[];
   colors: ReturnType<typeof getThemeColors>;
+  align?: 'left' | 'center';
+  minWidth?: number;
 }) {
+  const centered = align === 'center';
+
   return (
     <View
       style={{
         flex: 1,
-        minWidth: 160,
+        minWidth,
         borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.cardBorder,
@@ -49,9 +84,46 @@ function OverviewCard({
         marginBottom: 12,
       }}
     >
-      <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800', marginBottom: 6 }}>{title}</Text>
-      <Text style={{ color: colors.subtext, fontSize: 13, lineHeight: 20, marginBottom: 10 }}>{summary}</Text>
-      <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>{footer}</Text>
+      <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800', marginBottom: 6, textAlign: centered ? 'center' : 'left' }}>
+        {title}
+      </Text>
+      {items.map((item) => (
+        <View
+          key={`${title}-${item.label}`}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: centered ? 'center' : 'flex-start',
+            marginTop: 8,
+          }}
+        >
+          {item.showCheck === false ? null : (
+            <View
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: 4,
+                marginRight: 8,
+                borderWidth: 1,
+                borderColor: item.complete ? colors.success : colors.cardBorder,
+                backgroundColor: item.complete ? colors.success : 'transparent',
+              }}
+            />
+          )}
+          <Text
+            numberOfLines={centered ? 1 : undefined}
+            style={{
+              color: colors.text,
+              fontSize: 12,
+              fontWeight: '700',
+              flex: centered ? 1 : 1,
+              textAlign: centered ? 'center' : 'left',
+            }}
+          >
+            {item.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -63,6 +135,10 @@ export default function Dashboard() {
   const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
   const [gymVisitCount, setGymVisitCount] = useState(0);
   const { refreshing, triggerRefresh } = useTimedRefresh();
+  const heroOpacity = useState(() => new Animated.Value(0))[0];
+  const heroLift = useState(() => new Animated.Value(18))[0];
+  const logoFloat = useState(() => new Animated.Value(0))[0];
+  const haloPulse = useState(() => new Animated.Value(0.94))[0];
 
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
@@ -91,75 +167,177 @@ export default function Dashboard() {
     void refreshDashboard();
   }, [refreshDashboard]);
 
+  useEffect(() => {
+    const reveal = Animated.parallel([
+      Animated.timing(heroOpacity, {
+        toValue: 1,
+        duration: 480,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(heroLift, {
+        toValue: 0,
+        duration: 480,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloat, {
+          toValue: -8,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoFloat, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(haloPulse, {
+          toValue: 1.04,
+          duration: 2400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(haloPulse, {
+          toValue: 0.94,
+          duration: 2400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    reveal.start();
+    floatLoop.start();
+    pulseLoop.start();
+
+    return () => {
+      floatLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [haloPulse, heroLift, heroOpacity, logoFloat]);
+
   const nextReminder = getNextReminder(reminders);
   const nextReminderLabel = nextReminder ? formatUpcomingReminder(nextReminder.occurrence) : 'No reminder set';
-  const certChapters = lifeData.certifications.reduce((total, cert) => total + cert.chaptersCompleted, 0);
-  const certTargets = lifeData.certifications.reduce((total, cert) => total + cert.chapterCount, 0);
-  const certProgress = certTargets > 0 ? certChapters / certTargets : 0;
   const lowestCert = [...lifeData.certifications]
     .sort(
       (left, right) =>
         left.chaptersCompleted / Math.max(left.chapterCount, 1) - right.chaptersCompleted / Math.max(right.chapterCount, 1)
     )[0];
+  const currentCert = (() => {
+    const now = new Date();
+    return (
+      lifeData.certifications.find((cert) => cert.startDate && cert.examDate && now >= new Date(`${cert.startDate}T00:00:00`) && now <= new Date(`${cert.examDate}T23:59:59`)) ??
+      lifeData.certifications.find((cert) => cert.startDate && now < new Date(`${cert.startDate}T00:00:00`)) ??
+      lifeData.certifications[lifeData.certifications.length - 1]
+    );
+  })();
   const latestWeight = [...lifeData.weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
-  const latestLoopRun = [...lifeData.loopRuns].sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
-  const dailyGoals = lifeData.goals2026.filter((goal): goal is DailyCheckGoal => goal.type === 'daily-check');
+  const dailyGoals = useMemo(() => [] as { completedDates: string[] }[], []);
   const todayKey = getTodayDateKey();
-  const dailyChecksCompleted = dailyGoals.filter((goal) => goal.completedDates.includes(todayKey)).length;
-  const dailyCheckScore = dailyGoals.length > 0 ? dailyChecksCompleted / dailyGoals.length : 0;
   const avoidanceGoals = lifeData.goals2026.filter((goal) => goal.type === 'avoidance');
-  const avoidanceScore =
-    avoidanceGoals.length > 0
-      ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal) / 14), 0) / avoidanceGoals.length
-      : 0;
   const hobbiesOpenTasks = lifeData.diyTasks.filter((task) => !task.completed);
-  const hobbiesCompletedTasks = lifeData.diyTasks.filter((task) => task.completed);
-  const diyScore =
-    lifeData.diyTasks.length > 0
-      ? hobbiesCompletedTasks.length / lifeData.diyTasks.length
-      : 0.5;
-  const osrsStatuses = [
-    tracker.goalProjections.base90.status,
-    tracker.goalProjections.runefest.status,
-    tracker.goalProjections.maxCape.status,
-  ];
-  const osrsScore =
-    osrsStatuses.reduce((total, status) => {
-      if (status === 'On track') {
-        return total + 1;
-      }
-      if (status === 'Tight') {
-        return total + 0.65;
-      }
-      if (status === 'Needs manual lane') {
-        return total + 0.55;
-      }
-      return total + 0.35;
-    }, 0) / osrsStatuses.length;
-  const healthScore = [clamp01(gymVisitCount / 3), latestWeight ? 1 : 0.35, lifeData.loopRuns.length > 0 ? 0.85 : 0.35].reduce(
+
+  const alcoholGoal = lifeData.goals2026.find((goal) => goal.id === 'alcohol' && goal.type === 'avoidance');
+  const stretchingGoal = lifeData.goals2026.find((goal) => goal.id === 'stretching');
+  const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal) : 0;
+  const stretchingStreak = stretchingGoal
+    ? stretchingGoal.type === 'avoidance'
+      ? getAvoidanceStreak(stretchingGoal)
+      : getDailyCheckStreak(stretchingGoal)
+    : 0;
+  const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  const greeting = `${
+    new Intl.DateTimeFormat('en-US', { hour: 'numeric' }).format(new Date()).includes('AM') ? 'Good morning' : 'Good evening'
+  }, ${preferences.profileName || 'John'}`;
+  const currentCertPct = currentCert
+    ? Math.round((currentCert.chaptersCompleted / Math.max(currentCert.chapterCount, 1)) * 100)
+    : 0;
+  const currentCertPacePct = currentCert ? getPacePct(currentCert.startDate, currentCert.examDate) : null;
+  const currentCertStartLabel = currentCert?.startDate
+    ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${currentCert.startDate}T12:00:00`))
+    : null;
+  const currentWeekKeys = new Set(getCurrentWeekDateKeys());
+  const weeklyGymPacePct = getScheduledGymPacePct();
+  const weeklyGymActualPct = clamp01(gymVisitCount / 3) * 100;
+  const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;
+  const loopRunLoggedThisWeek = lifeData.loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
+  const cyberOnPace = currentCertPacePct !== null ? currentCertPct >= currentCertPacePct : false;
+  const weightLossActualPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
+  const weightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
+  const weightLossOnPace = weightLossActualPct >= weightLossPacePct;
+  const healthScore = [gymOnPace ? 1 : 0, loopRunLoggedThisWeek ? 1 : 0, weightLossOnPace ? 1 : 0].reduce(
     (total, value) => total + value,
     0
   ) / 3;
-  const cyberScore = clamp01(certProgress);
-  const goalsScore = (dailyCheckScore + avoidanceScore) / 2;
-  const hobbiesScore = (osrsScore + diyScore) / 2;
-  const blissScore = Math.round(((cyberScore + healthScore + goalsScore + hobbiesScore) / 4) * 100);
-
-  const alcoholGoal = lifeData.goals2026.find((goal) => goal.id === 'alcohol' && goal.type === 'avoidance');
-  const stretchingGoal = lifeData.goals2026.find((goal) => goal.id === 'stretching' && goal.type === 'daily-check');
-  const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal) : 0;
-  const stretchingStreak = stretchingGoal ? getDailyCheckStreak(stretchingGoal) : 0;
-  const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
-  const greeting = `${new Intl.DateTimeFormat('en-US', { hour: 'numeric' }).format(new Date()).includes('AM') ? 'Good morning' : 'Good evening'}, ${preferences.profileName || 'John'}`;
-  const studySummary = certTargets > 0 ? `${certChapters} / ${certTargets} chapters covered` : 'No study target set';
-  const hobbiesSummary =
-    tracker.totalLevel > 0
-      ? `OSRS total level ${tracker.totalLevel} | ${hobbiesOpenTasks.length} DIY tasks open`
-      : `${hobbiesOpenTasks.length} DIY tasks open`;
-  const weightSummary = latestWeight ? `${latestWeight.weight.toFixed(1)} lb latest` : 'No weight entries yet';
-  const loopSummary = latestLoopRun ? `Best loop: ${formatLoopRunTime(latestLoopRun.timeSeconds)}` : 'No loop runs logged';
-  const goalsSummary = `${alcoholStreak} days alcohol-free | ${stretchingStreak} day stretch streak`;
-
+  const streaksScore =
+    avoidanceGoals.length > 0
+      ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal) / 30), 0) / avoidanceGoals.length
+      : 1;
+  const hobbiesScore = [
+    tracker.goalProjections.base90.status === 'On track' ? 1 : 0,
+    tracker.goalProjections.runefest.status === 'On track' ? 1 : 0,
+  ].reduce((total, value) => total + value, 0) / 2;
+  const cyberScore = cyberOnPace ? 1 : 0;
+  const blissScore = Math.round(((cyberScore + healthScore + hobbiesScore + streaksScore) / 4) * 100);
+  const cyberOverviewItems: OverviewItem[] = [
+    {
+      label: currentCert
+        ? `${currentCert.name}${currentCertStartLabel ? ` starts ${currentCertStartLabel}` : ''}`
+        : 'No certification lane set',
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: cyberOnPace,
+    },
+  ];
+  const healthOverviewItems: OverviewItem[] = [
+    {
+      label: `Gym visits this week (${gymVisitCount}/3)`,
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: gymOnPace,
+    },
+    {
+      label: 'Loop run this week',
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: loopRunLoggedThisWeek,
+    },
+  ];
+  const hobbiesOverviewItems: OverviewItem[] = [
+    {
+      label: 'Base 90 by May 22',
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: tracker.goalProjections.base90.status === 'On track',
+    },
+    {
+      label: '2250 Total Level by RuneFest',
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: tracker.goalProjections.runefest.status === 'On track',
+    },
+  ];
   const suggestedActions = useMemo(() => {
     const candidates: { label: string; urgency: number }[] = [];
 
@@ -204,6 +382,13 @@ export default function Dashboard() {
         label: 'Log a weight entry so the health lane has a real body-metrics baseline to work from.',
         urgency: 0.7,
       });
+    } else if (Math.abs(latestWeight.weight - GOAL_WEIGHT_LB) > 1) {
+      candidates.push({
+        label: `Keep the weight lane moving toward ${GOAL_WEIGHT_LB} lb. You are currently ${Math.abs(
+          latestWeight.weight - GOAL_WEIGHT_LB
+        ).toFixed(1)} lb ${latestWeight.weight > GOAL_WEIGHT_LB ? 'above' : 'below'} target.`,
+        urgency: Math.min(Math.abs(latestWeight.weight - GOAL_WEIGHT_LB) / 10, 0.78),
+      });
     }
 
     return candidates.sort((left, right) => right.urgency - left.urgency).slice(0, 3);
@@ -225,55 +410,109 @@ export default function Dashboard() {
         }
         contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
-        <View
+        <Animated.View
           style={{
             backgroundColor: colors.hero,
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 18,
+            borderRadius: 28,
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: 22,
+            marginBottom: 20,
             overflow: 'hidden',
+            minHeight: 300,
+            opacity: heroOpacity,
+            transform: [{ translateY: heroLift }],
           }}
         >
           <View
             style={{
               position: 'absolute',
-              width: 180,
-              height: 180,
+              width: 260,
+              height: 260,
               borderRadius: 999,
               backgroundColor: 'rgba(255,255,255,0.08)',
-              top: -60,
-              right: -20,
+              top: -90,
+              right: -70,
             }}
           />
-          <Text style={{ color: colors.heroSubtext, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>
-            Life Tracker
-          </Text>
+          <View
+            style={{
+              position: 'absolute',
+              width: 220,
+              height: 220,
+              borderRadius: 999,
+              backgroundColor: colors.accentSoft,
+              opacity: 0.18,
+              bottom: -120,
+              left: -70,
+            }}
+          />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ color: colors.heroText, fontSize: 30, fontWeight: '900', marginBottom: 8 }}>{greeting}</Text>
-              <Text style={{ color: colors.heroSubtext, fontSize: 12 }}>
-                {todayLabel} | Next reminder: {nextReminderLabel}
+              <Text style={{ color: colors.heroText, fontSize: 42, fontWeight: '900', letterSpacing: 0.3, marginBottom: 10 }}>
+                Dashboard
+              </Text>
+              <Text style={{ color: colors.heroSubtext, fontSize: 15, fontWeight: '700', marginBottom: 10 }}>{greeting}</Text>
+              <Text style={{ color: colors.heroSubtext, fontSize: 12, letterSpacing: 0.2 }}>
+                {todayLabel} · Next reminder {nextReminderLabel}
               </Text>
             </View>
-            <Image source={require('../../assets/images/Huse Logo.png')} style={{ width: 132, height: 132 }} resizeMode="contain" />
+            <Animated.View
+              style={{
+                width: 176,
+                height: 176,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ translateY: logoFloat }],
+              }}
+            >
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: 176,
+                  height: 176,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.18)',
+                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  transform: [{ scale: haloPulse }],
+                }}
+              />
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: 144,
+                  height: 144,
+                  borderRadius: 999,
+                  backgroundColor: colors.accentSoft,
+                  opacity: 0.22,
+                  transform: [{ scale: haloPulse }],
+                }}
+              />
+              <Image source={require('../../assets/images/Huse Logo.png')} style={{ width: 150, height: 150 }} resizeMode="contain" />
+            </Animated.View>
           </View>
-        </View>
+        </Animated.View>
 
         <SectionCard title="Bliss Score" emoji={'✨'} colors={colors}>
-          <Text style={{ fontSize: 34, color: colors.text, fontWeight: '900', marginBottom: 6 }}>{blissScore}</Text>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            This is the quick health check on how aligned the whole system feels right now across Cyber, Health, Hobbies, and the 2026 habit lane.
+          <Text
+            style={{
+              fontSize: 58,
+              color: colors.text,
+              fontWeight: '900',
+              marginBottom: 8,
+              lineHeight: 62,
+              textAlign: 'center',
+            }}
+          >
+            {blissScore}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.text }}>
-            Cyber {Math.round(cyberScore * 100)} | Health {Math.round(healthScore * 100)} | Hobbies {Math.round(hobbiesScore * 100)} |
-            Goals {Math.round(goalsScore * 100)}
+          <Text style={{ fontSize: 13, color: colors.text, textAlign: 'center' }}>
+            Cyber {Math.round(cyberScore * 100)} | Health {Math.round(healthScore * 100)} | Hobbies {Math.round(hobbiesScore * 100)} | Streaks {Math.round(streaksScore * 100)}
           </Text>
         </SectionCard>
 
         <SectionCard title="Suggested Next Actions" emoji={'🧭'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            These are the moves that look most useful right now based on where the tracker says you are behind.
-          </Text>
           {suggestedActions.map((action) => (
             <View
               key={action.label}
@@ -295,47 +534,50 @@ export default function Dashboard() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <OverviewCard
               title="Cyber"
-              summary="Certification study progress, logged hours, and your next exam lane all live here now."
-              footer={studySummary}
+              items={cyberOverviewItems}
               colors={colors}
+              align="left"
             />
             <OverviewCard
               title="Health"
-              summary="Gym logging, weight entries, loop runs, and the weekly three-visit target all roll up here."
-              footer={`${weightSummary} | ${gymVisitCount}/3 gym visits this week`}
+              items={healthOverviewItems}
               colors={colors}
+              align="left"
             />
             <OverviewCard
               title="Hobbies"
-              summary="OSRS progress stays contained here, and the DIY list keeps house projects visible instead of floating around in your head."
-              footer={`${hobbiesSummary} | ${loopSummary}`}
+              items={hobbiesOverviewItems}
               colors={colors}
+              align="left"
             />
           </View>
         </SectionCard>
 
-        <SectionCard title="2026 Goals" emoji={'🏁'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22, marginBottom: 12 }}>
-            Keep the year visible. This is the quick read on the habit lane that supports everything else.
-          </Text>
+        <SectionCard title="Streaks" emoji={'🏁'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <OverviewCard
-              title="Alcohol"
-              summary="This resets only when you log that you drank."
-              footer={`${alcoholStreak} days without alcohol`}
+              title="No Alcohol"
+              items={[
+                {
+                  label: `Current streak: ${alcoholStreak} day${alcoholStreak === 1 ? '' : 's'}`,
+                  showCheck: false,
+                },
+              ]}
               colors={colors}
+              align="center"
+              minWidth={220}
             />
             <OverviewCard
               title="Stretching"
-              summary="A simple daily check so mobility does not drift into the background."
-              footer={`${stretchingStreak} day current streak`}
+              items={[
+                {
+                  label: `Current streak: ${stretchingStreak} day${stretchingStreak === 1 ? '' : 's'}`,
+                  showCheck: false,
+                },
+              ]}
               colors={colors}
-            />
-            <OverviewCard
-              title="Year view"
-              summary="Fast food, coffee spending, soda limit, and the rest of the discipline lane now sit inside Hobbies."
-              footer={goalsSummary}
-              colors={colors}
+              align="center"
+              minWidth={220}
             />
           </View>
         </SectionCard>

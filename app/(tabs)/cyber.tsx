@@ -210,16 +210,13 @@ export default function Cyber() {
             backgroundColor: colors.hero,
             borderRadius: 16,
             padding: 20,
+            minHeight: 112,
+            justifyContent: 'center',
             marginBottom: 18,
           }}
         >
-          <Text style={{ color: colors.heroSubtext, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
-            Cyber Trackers
-          </Text>
-          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
-            Track the cert grind
-          </Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 12 }}>
+          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Cyber</Text>
+          <Text style={{ color: colors.heroSubtext, fontSize: 12, lineHeight: 18 }}>
             Total chapter progress: {totalChapters} / {totalTargetChapters}
           </Text>
         </View>
@@ -272,7 +269,7 @@ export default function Cyber() {
                   padding: 14,
                 }}
               >
-                <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+                <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6, textAlign: 'center' }}>
                   {selectedCert.name}
                 </Text>
                 <StatRow
@@ -290,7 +287,7 @@ export default function Cyber() {
                     {pacePct !== null ? `Pace ${pacePct.toFixed(1)}%` : 'No pace line'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700' }}>
+                <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700', textAlign: 'center' }}>
                   Practice score average:{' '}
                   <Text style={{ color: colors.subtext, fontWeight: '400' }}>
                     {averageScore !== null ? `${averageScore.toFixed(1)}%` : 'No scores logged yet'}
@@ -302,9 +299,6 @@ export default function Cyber() {
         </SectionCard>
 
         <SectionCard title="Log Chapter Progress" emoji={'✍'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Log chapter progress against the current study guide so the progress bars and dashboard stay honest.
-          </Text>
           <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Selected tracker</Text>
           <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800', marginBottom: 12 }}>{selectedCert.name}</Text>
 
@@ -363,10 +357,6 @@ export default function Cyber() {
         </SectionCard>
 
         <SectionCard title="Practice Exam Scores" emoji={'📊'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Track the end-of-chapter practice exam scores for the current study guide.
-          </Text>
-
           <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Chapter number</Text>
           <TextInput
             value={draftScoreChapter}

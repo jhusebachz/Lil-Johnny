@@ -28,14 +28,21 @@ import {
   writePersistedGymData,
 } from '../../data/gymData';
 import {
+  GOAL_WEIGHT_LB,
   LifeTrackerData,
   LoopRunEntry,
+  STARTING_WEIGHT_LB,
+  TRACKER_BASELINE_DATE,
+  WEIGHT_GOAL_TARGET_DATE,
   WeightEntry,
   defaultLifeTrackerData,
   formatDateKey,
   formatLoopRunTime,
+  getDateRangePacePct,
+  getScheduledGymPacePct,
   getTodayDateKey,
   getUniqueWeekCount,
+  getWeightLossProgressPct,
   readPersistedLifeTrackerData,
   writePersistedLifeTrackerData,
 } from '../../data/lifeTrackerData';
@@ -98,12 +105,6 @@ function getTodayEntryMeta() {
 
 function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
-}
-
-function getWeeklyPacePct(now = new Date()) {
-  const day = now.getDay();
-  const normalizedDay = day === 0 ? 7 : day;
-  return clampPct((normalizedDay / 7) * 100);
 }
 
 function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
@@ -189,10 +190,13 @@ export default function Gym() {
     lifeData.loopRuns[0]
   );
   const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
-  const weeklyGymPacePct = getWeeklyPacePct();
+  const weeklyGymPacePct = getScheduledGymPacePct();
   const loopRunGoalPct = bestLoopRun
     ? clampPct(((12 * 60 - bestLoopRun.timeSeconds) / ((12 * 60) - (9 * 60))) * 100)
     : 0;
+  const weightGoalPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
+  const weightGoalPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
+  const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
@@ -238,7 +242,7 @@ export default function Gym() {
           setLifeData({
             ...defaultLifeTrackerData,
             ...persisted,
-            weightEntries: persisted.weightEntries ?? [],
+            weightEntries: persisted.weightEntries?.length ? persisted.weightEntries : defaultLifeTrackerData.weightEntries,
             loopRuns: persisted.loopRuns ?? [],
           });
         }
@@ -395,56 +399,97 @@ export default function Gym() {
             backgroundColor: colors.hero,
             borderRadius: 16,
             padding: 20,
+            minHeight: 112,
+            justifyContent: 'center',
             marginBottom: 18,
           }}
         >
-          <Text
-            style={{
-              color: colors.heroSubtext,
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            Health
-          </Text>
-          <Text style={{ color: colors.heroText, fontSize: 26, fontWeight: '800', marginBottom: 10 }}>
-            Health trackers
-          </Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 12, marginTop: 10 }}>
+          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Health</Text>
+          <Text style={{ color: colors.heroSubtext, fontSize: 12, lineHeight: 18 }}>
             Preferred split: {preferences.preferredWorkoutSplit} | {weeklyGymVisits}/3 gym visits this week
           </Text>
         </View>
 
         <SectionCard title="Body Metrics" emoji={'\u2696'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Log weight and keep the most recent thirty entries visible so the trend stays honest.
-          </Text>
           <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 10 }}>
             Latest weight: {latestWeight ? `${latestWeight.weight.toFixed(1)} lb` : 'No entries yet'}
           </Text>
+          <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 12 }}>
+            2026 goal weight: {GOAL_WEIGHT_LB} lb
+            {weightGoalDelta !== null
+              ? weightGoalDelta === 0
+                ? ' | On target'
+                : ` | ${Math.abs(weightGoalDelta).toFixed(1)} lb ${weightGoalDelta > 0 ? 'above' : 'below'} target`
+              : ''}
+          </Text>
 
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', minHeight: 170, marginBottom: 16 }}>
-            {recentWeights.map((entry) => {
-              const normalized = weightMax === weightMin ? 1 : (entry.weight - weightMin) / (weightMax - weightMin);
-              const height = 36 + normalized * 100;
+          <View
+            style={{
+              height: 190,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.cardBorder,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 12,
+              overflow: 'hidden',
+              paddingHorizontal: 12,
+              paddingVertical: 12,
+            }}
+          >
+            {[0.2, 0.5, 0.8].map((line) => (
+              <View
+                key={line}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  right: 12,
+                  bottom: 12 + line * 150,
+                  height: 1,
+                  backgroundColor: colors.cardBorder,
+                }}
+              />
+            ))}
+            <View
+              style={{
+                position: 'absolute',
+                left: 12,
+                right: 12,
+                bottom: 12,
+                height: 1,
+                backgroundColor: colors.cardBorder,
+              }}
+            />
+
+            {recentWeights.map((entry, index) => {
+              const normalizedY = weightMax === weightMin ? 0.5 : (entry.weight - weightMin) / (weightMax - weightMin);
+              const normalizedX = recentWeights.length === 1 ? 0.5 : index / Math.max(recentWeights.length - 1, 1);
 
               return (
-                <View key={entry.id} style={{ flex: 1, alignItems: 'center' }}>
-                  <View
-                    style={{
-                      width: 10,
-                      height,
-                      borderRadius: 999,
-                      backgroundColor: colors.accent,
-                      marginBottom: 6,
-                    }}
-                  />
-                  <Text style={{ color: colors.subtext, fontSize: 9 }}>{entry.label.split(',')[0]}</Text>
-                </View>
+                <View
+                  key={entry.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${normalizedX * 100}%`,
+                    bottom: 12 + normalizedY * 150,
+                    marginLeft: -5,
+                    marginBottom: -5,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    backgroundColor: colors.accent,
+                    borderWidth: 2,
+                    borderColor: colors.card,
+                  }}
+                />
               );
             })}
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text style={{ color: colors.subtext, fontSize: 10 }}>{recentWeights[0]?.label.split(',')[0] ?? ''}</Text>
+            <Text style={{ color: colors.subtext, fontSize: 10 }}>
+              {recentWeights.at(-1)?.label.split(',')[0] ?? ''}
+            </Text>
           </View>
 
           <TextInput
@@ -481,10 +526,6 @@ export default function Gym() {
         </SectionCard>
 
         <SectionCard title="Health Pace" emoji={'📈'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            This keeps the key health trackers in the same kind of pace view as OSRS, where it actually makes sense.
-          </Text>
-
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
               Weekly gym target
@@ -493,6 +534,23 @@ export default function Gym() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weeklyGymPct.toFixed(1)}%</Text>
               <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weeklyGymPacePct.toFixed(1)}%</Text>
+            </View>
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Weight loss goal
+            </Text>
+            <ProgressBar pct={weightGoalPct} markerPct={weightGoalPacePct} color={colors.warning} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weightGoalPct.toFixed(1)}%</Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weightGoalPacePct.toFixed(1)}%</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>
+                {latestWeight ? `Current ${formatWeight(latestWeight.weight)} lb` : `Baseline ${STARTING_WEIGHT_LB} lb`}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Target {GOAL_WEIGHT_LB} lb</Text>
             </View>
           </View>
 
@@ -549,10 +607,6 @@ export default function Gym() {
         </SectionCard>
 
         <SectionCard title="Day Selector" emoji={'\uD83D\uDCCB'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 12 }}>
-            Choose the training day you want to run.
-          </Text>
-
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {gymDays.map((day) => {
               const selected = day === selectedDay;
@@ -593,13 +647,7 @@ export default function Gym() {
               <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 6 }}>
                 Focus: <Text style={{ color: colors.text, fontWeight: '700' }}>{workout.focus}</Text>
               </Text>
-              <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 10 }}>
-                You are logging this {selectedDay.toLowerCase()} session for {todayEntry.fullLabel}.
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 14 }}>
-                Save today&apos;s actual numbers for each exercise. If you edit the same lift again today, it updates
-                today&apos;s entry instead of creating empty chart space.
-              </Text>
+              <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 14 }}>{todayEntry.fullLabel}</Text>
 
               {workout.exercises.map((exercise) => {
                 const exerciseKey = `${selectedDay}-${exercise.name}`;
@@ -621,19 +669,10 @@ export default function Gym() {
                 );
               })}
             </SectionCard>
-
-            <SectionCard title="Coaching Insight" emoji={'\uD83C\uDFAF'} colors={colors}>
-              <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{workout.coaching}</Text>
-            </SectionCard>
           </>
         ) : (
           <>
             <SectionCard title="Exercise Progress" emoji={'\uD83D\uDCCA'} colors={colors}>
-              <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 14 }}>
-                Pick an exercise to see the last ten logged entries for this training day. The chart tracks the most
-                recent actual sessions only.
-              </Text>
-
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
                 {workout.exercises.map((exercise) => {
                   const selected = exercise.name === progressExerciseName;
@@ -811,9 +850,6 @@ export default function Gym() {
         )}
 
         <SectionCard title="Loop Run Tracker" emoji={'\uD83C\uDFC3'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Goal: break 9:00 on the Loop run and keep a clean history of every attempt.
-          </Text>
           <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 4 }}>
             Best time: {bestLoopRun ? formatLoopRunTime(bestLoopRun.timeSeconds) : 'No run logged yet'}
           </Text>
@@ -872,6 +908,12 @@ export default function Gym() {
             </View>
           ))}
         </SectionCard>
+
+        {selectedView === 'Workout' ? (
+          <SectionCard title="Coaching Insight" emoji={'\uD83C\uDFAF'} colors={colors}>
+            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{workout.coaching}</Text>
+          </SectionCard>
+        ) : null}
       </ScrollView>
 
       <Modal visible={activeExercise !== null} transparent animationType="fade" onRequestClose={closeExerciseLogger}>
@@ -904,9 +946,7 @@ export default function Gym() {
                 <Text style={{ fontSize: 22, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
                   {activeExercise.name}
                 </Text>
-                <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 14 }}>
-                  Enter what you did for {todayEntry.fullLabel}.
-                </Text>
+                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 14 }}>{todayEntry.fullLabel}</Text>
 
                 <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Sets</Text>
                 <TextInput

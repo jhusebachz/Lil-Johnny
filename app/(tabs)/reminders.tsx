@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -10,19 +12,30 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import ReminderCard from '../../components/reminders/ReminderCard';
 import ReminderTimeWheel from '../../components/reminders/ReminderTimeWheel';
 import SectionCard from '../../components/SectionCard';
+import StreakGoalCard from '../../components/streaks/StreakGoalCard';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
+  LifeTrackerData,
+  YearGoal,
+  defaultLifeTrackerData,
+  getAvoidanceStreak,
+  getTodayDateKey,
+  readPersistedLifeTrackerData,
+  writePersistedLifeTrackerData,
+} from '../../data/lifeTrackerData';
+import {
   formatUpcomingReminder,
-  getReminderCompletionStreak,
-  getTodayReminderSummary,
   getNextReminder,
   isReminderCompleteOnDate,
 } from '../../data/reminders';
 import { getThemeColors } from '../../data/theme';
+
+type StreaksView = 'streaks' | 'alarms';
 
 export default function Reminders() {
   const {
@@ -31,22 +44,95 @@ export default function Reminders() {
     updateReminder,
     toggleReminderCompletion,
     theme,
-    preferences,
     notificationAccess,
     requestNotificationAccess,
     triggerHaptic,
   } = useAppSettings();
   const colors = getThemeColors(theme);
   const nextReminderEntry = getNextReminder(reminders);
-  const todaySummary = getTodayReminderSummary(reminders);
-  const reminderStreak = getReminderCompletionStreak(reminders);
+  const enabledReminderCount = reminders.filter((reminder) => reminder.enabled).length;
+  const [selectedView, setSelectedView] = useState<StreaksView>('streaks');
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null);
   const [draftReminderTime, setDraftReminderTime] = useState<string | null>(null);
+  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
+  const [hydrated, setHydrated] = useState(false);
   const { refreshing, triggerRefresh } = useTimedRefresh();
+  const heroOpacity = useState(() => new Animated.Value(0))[0];
+  const heroLift = useState(() => new Animated.Value(18))[0];
   const expandedReminder = reminders.find((reminder) => reminder.id === expandedReminderId) ?? null;
-  const nextReminderLabel = nextReminderEntry
-    ? formatUpcomingReminder(nextReminderEntry.occurrence)
-    : 'None';
+
+  useEffect(() => {
+    let mounted = true;
+
+    const hydrate = async () => {
+      const persisted = await readPersistedLifeTrackerData().catch(() => null);
+      if (!mounted) {
+        return;
+      }
+
+      if (persisted) {
+        setLifeData({
+          ...defaultLifeTrackerData,
+          ...persisted,
+          goals2026: persisted.goals2026?.length ? persisted.goals2026 : defaultLifeTrackerData.goals2026,
+          diyTasks: persisted.diyTasks?.length ? persisted.diyTasks : defaultLifeTrackerData.diyTasks,
+        });
+      }
+      setHydrated(true);
+    };
+
+    void hydrate();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    void writePersistedLifeTrackerData(lifeData);
+  }, [hydrated, lifeData]);
+
+  useEffect(() => {
+    const reveal = Animated.parallel([
+      Animated.timing(heroOpacity, {
+        toValue: 1,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(heroLift, {
+        toValue: 0,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    reveal.start();
+  }, [heroLift, heroOpacity]);
+
+  const updateGoal = async (goalId: string, updater: (goal: YearGoal) => YearGoal) => {
+    await triggerHaptic();
+    setLifeData((current) => ({
+      ...current,
+      goals2026: current.goals2026.map((goal) => (goal.id === goalId ? updater(goal) : goal)),
+    }));
+  };
+
+  const avoidanceGoals = useMemo(
+    () =>
+      lifeData.goals2026
+        .filter((goal) => goal.type === 'avoidance')
+        .map((goal) => ({
+          goal,
+          streak: getAvoidanceStreak(goal),
+        })),
+    [lifeData.goals2026]
+  );
 
   const openReminderTimePicker = async (reminderId: string, time: string) => {
     await triggerHaptic();
@@ -74,163 +160,169 @@ export default function Reminders() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={16}
       >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshReminders}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
-        }
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-      >
-        <View
-          style={{
-            backgroundColor: colors.hero,
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 18,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.heroSubtext,
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            Reminders
-          </Text>
-          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
-            Reminder tracker
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                borderRadius: 16,
-                padding: 14,
-              }}
-            >
-              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Done today</Text>
-              <Text style={{ color: colors.heroText, fontSize: 16, fontWeight: '800' }}>
-                {todaySummary.completed}/{Math.max(todaySummary.scheduled, 1)}
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                borderRadius: 16,
-                padding: 14,
-              }}
-            >
-              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Next reminder</Text>
-              <Text style={{ color: colors.heroText, fontSize: 16, fontWeight: '800' }}>
-                {nextReminderLabel}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <SectionCard title="Tracker Snapshot" emoji={'\u23F0'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 10 }}>
-            Reminder alerts are {preferences.notificationsEnabled ? 'enabled' : 'disabled'} globally, so this lane
-            follows the main notification setting from the app.
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
-            Alert access: {notificationAccess}
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
-            Today: {todaySummary.completed} logged, {todaySummary.remaining} still open
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text }}>
-            Next reminder:{' '}
-            {nextReminderEntry
-              ? `${nextReminderEntry.reminder.topic} at ${formatUpcomingReminder(nextReminderEntry.occurrence)}`
-              : 'None'}
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 10, lineHeight: 18 }}>
-            Phone alerts are scheduled directly on-device. Browser alerts only work while the app stays open in the tab.
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
-            Completion streak: {reminderStreak} {reminderStreak === 1 ? 'day' : 'days'}
-          </Text>
-          {notificationAccess !== 'granted' ? (
-            <Pressable
-              onPress={async () => {
-                await triggerHaptic();
-                await requestNotificationAccess();
-              }}
-              style={{
-                marginTop: 12,
-                paddingVertical: 10,
-                paddingHorizontal: 12,
-                borderRadius: 10,
-                backgroundColor: colors.accent,
-                alignSelf: 'flex-start',
-              }}
-            >
-              <Text style={{ color: 'white', fontWeight: '700' }}>Allow reminder alerts</Text>
-            </Pressable>
-          ) : null}
-        </SectionCard>
-
-        <SectionCard title="Reminder List" emoji={'\uD83D\uDCDD'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 14 }}>
-            Use this list to keep study blocks, routines, and accountability check-ins locked to the schedule.
-          </Text>
-          <Pressable
-            onPress={async () => {
-              await triggerHaptic();
-              const nextReminder = addReminder();
-              await openReminderTimePicker(nextReminder.id, nextReminder.time);
-            }}
-            style={{
-              alignSelf: 'flex-start',
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 10,
-              backgroundColor: colors.accent,
-              marginBottom: 14,
-            }}
-          >
-            <Text style={{ color: 'white', fontWeight: '800' }}>Add reminder</Text>
-          </Pressable>
-
-          {reminders.map((reminder) => (
-            <ReminderCard
-              key={reminder.id}
-              reminder={reminder}
-              colors={colors}
-              onTopicChange={(text) => updateReminder(reminder.id, { topic: text })}
-              onNotesChange={(text) => updateReminder(reminder.id, { notes: text })}
-              onTimePress={async () => {
-                await openReminderTimePicker(reminder.id, reminder.time);
-              }}
-              onToggle={async () => {
-                await triggerHaptic();
-                updateReminder(reminder.id, { enabled: !reminder.enabled });
-              }}
-              onRecurrenceChange={async (recurrence) => {
-                await triggerHaptic();
-                updateReminder(reminder.id, { recurrence });
-              }}
-              onCompleteToggle={async () => {
-                await triggerHaptic();
-                toggleReminderCompletion(reminder.id);
-              }}
-              completedToday={isReminderCompleteOnDate(reminder, new Date())}
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshReminders}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+              progressBackgroundColor={colors.card}
             />
-          ))}
-        </SectionCard>
-      </ScrollView>
+          }
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+        >
+          <Animated.View
+            style={{
+              backgroundColor: colors.hero,
+              borderRadius: 16,
+              padding: 20,
+              minHeight: 112,
+              justifyContent: 'center',
+              marginBottom: 18,
+              opacity: heroOpacity,
+              transform: [{ translateY: heroLift }],
+            }}
+          >
+            <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800' }}>Streaks</Text>
+          </Animated.View>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 18 }}>
+            {(['streaks', 'alarms'] as StreaksView[]).map((view) => {
+              const selected = selectedView === view;
+              const label = view === 'streaks' ? '2026 Streaks' : 'Reminder Alarms';
+
+              return (
+                <Pressable
+                  key={view}
+                  onPress={async () => {
+                    await triggerHaptic();
+                    setSelectedView(view);
+                  }}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderRadius: 999,
+                    backgroundColor: selected ? colors.accent : colors.card,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.accent : colors.cardBorder,
+                    marginRight: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {selectedView === 'streaks' ? (
+            <>
+              <SectionCard title="Streaks" emoji={'🔥'} colors={colors}>
+                {avoidanceGoals.map(({ goal, streak }) => (
+                  <StreakGoalCard
+                    key={goal.id}
+                    goal={goal}
+                    colors={colors}
+                    streak={streak}
+                    onToggleToday={async () => Promise.resolve()}
+                    onMarkFailure={async () => {
+                      await updateGoal(goal.id, (currentGoal) =>
+                        currentGoal.type === 'avoidance'
+                          ? {
+                              ...currentGoal,
+                              lastFailureDate: getTodayDateKey(),
+                            }
+                          : currentGoal
+                      );
+                    }}
+                  />
+                ))}
+              </SectionCard>
+            </>
+          ) : null}
+
+          {selectedView === 'alarms' ? (
+            <>
+              <SectionCard title="Alarm Snapshot" emoji={'⏰'} colors={colors}>
+                <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
+                  Enabled alarms: {enabledReminderCount}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.text }}>
+                  Next reminder:{' '}
+                  {nextReminderEntry
+                    ? `${nextReminderEntry.reminder.topic} at ${formatUpcomingReminder(nextReminderEntry.occurrence)}`
+                    : 'None'}
+                </Text>
+                {notificationAccess !== 'granted' ? (
+                  <Pressable
+                    onPress={async () => {
+                      await triggerHaptic();
+                      await requestNotificationAccess();
+                    }}
+                    style={{
+                      marginTop: 12,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      backgroundColor: colors.accent,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    <Text style={{ color: 'white', fontWeight: '700' }}>Allow reminder alerts</Text>
+                  </Pressable>
+                ) : null}
+              </SectionCard>
+
+              <SectionCard title="Reminder Alarms" emoji={'📝'} colors={colors}>
+                <Pressable
+                  onPress={async () => {
+                    await triggerHaptic();
+                    const nextReminder = addReminder();
+                    await openReminderTimePicker(nextReminder.id, nextReminder.time);
+                  }}
+                  style={{
+                    alignSelf: 'flex-start',
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                    backgroundColor: colors.accent,
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text style={{ color: 'white', fontWeight: '800' }}>Add reminder</Text>
+                </Pressable>
+
+                {reminders.map((reminder) => (
+                  <ReminderCard
+                    key={reminder.id}
+                    reminder={reminder}
+                    colors={colors}
+                    onTopicChange={(text) => updateReminder(reminder.id, { topic: text })}
+                    onNotesChange={(text) => updateReminder(reminder.id, { notes: text })}
+                    onTimePress={async () => {
+                      await openReminderTimePicker(reminder.id, reminder.time);
+                    }}
+                    onToggle={async () => {
+                      await triggerHaptic();
+                      updateReminder(reminder.id, { enabled: !reminder.enabled });
+                    }}
+                    onRecurrenceChange={async (recurrence) => {
+                      await triggerHaptic();
+                      updateReminder(reminder.id, { recurrence });
+                    }}
+                    onCompleteToggle={async () => {
+                      await triggerHaptic();
+                      toggleReminderCompletion(reminder.id);
+                    }}
+                    completedToday={isReminderCompleteOnDate(reminder, new Date())}
+                  />
+                ))}
+              </SectionCard>
+            </>
+          ) : null}
+        </ScrollView>
       </KeyboardAvoidingView>
       <Modal
         visible={expandedReminder !== null}

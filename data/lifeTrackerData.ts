@@ -83,6 +83,10 @@ export type LifeTrackerData = {
 const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-life-trackers.json`;
 const WEB_STORAGE_KEY = 'lil-johnny-life-trackers';
 export const TRACKER_BASELINE_DATE = '2026-03-28';
+export const GOAL_WEIGHT_LB = 185;
+export const STARTING_WEIGHT_LB = 205;
+export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
+export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
 
 export const defaultLifeTrackerData: LifeTrackerData = {
   certifications: [
@@ -118,12 +122,19 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   chapterPracticeScores: [],
   goals2026: [
     { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'stretching', title: 'Stretching daily', type: 'daily-check', completedDates: [] },
+    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
     { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
     { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'daily-check', completedDates: [] },
+    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
   ],
-  weightEntries: [],
+  weightEntries: [
+    {
+      id: 'weight-baseline-2026',
+      dateKey: TRACKER_BASELINE_DATE,
+      label: formatDateKey(TRACKER_BASELINE_DATE),
+      weight: STARTING_WEIGHT_LB,
+    },
+  ],
   loopRuns: [],
   diyTasks: [
     {
@@ -159,6 +170,10 @@ export function formatLoopRunTime(totalSeconds: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function clampPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
 export function getAvoidanceStreak(goal: AvoidanceGoal, now = new Date()) {
   const anchor = goal.lastFailureDate ? new Date(`${goal.lastFailureDate}T12:00:00`) : new Date(`${goal.startedAt}T12:00:00`);
   const today = new Date(`${getTodayDateKey(now)}T12:00:00`);
@@ -188,8 +203,7 @@ export function getDailyCheckStreak(goal: DailyCheckGoal, now = new Date()) {
 export function getCurrentWeekDateKeys(now = new Date()) {
   const current = new Date(now);
   const day = current.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  current.setDate(current.getDate() + diffToMonday);
+  current.setDate(current.getDate() - day);
   const start = new Date(current);
   start.setHours(0, 0, 0, 0);
 
@@ -206,6 +220,49 @@ export function getCurrentWeekDateKeys(now = new Date()) {
 export function getUniqueWeekCount(dateKeys: string[], now = new Date()) {
   const weekKeys = new Set(getCurrentWeekDateKeys(now));
   return new Set(dateKeys.filter((key) => weekKeys.has(key))).size;
+}
+
+export function getScheduledGymVisitsByToday(
+  now = new Date(),
+  targetDays: readonly number[] = WEEKLY_GYM_TARGET_DAYS
+) {
+  const currentDay = now.getDay();
+  return targetDays.filter((day) => day <= currentDay).length;
+}
+
+export function getScheduledGymPacePct(
+  now = new Date(),
+  targetDays: readonly number[] = WEEKLY_GYM_TARGET_DAYS
+) {
+  if (targetDays.length === 0) {
+    return 0;
+  }
+
+  return clampPct((getScheduledGymVisitsByToday(now, targetDays) / targetDays.length) * 100);
+}
+
+export function getDateRangePacePct(startDate: string, targetDate: string, now = new Date()) {
+  const start = new Date(`${startDate}T12:00:00`).getTime();
+  const end = new Date(`${targetDate}T12:00:00`).getTime();
+  const current = now.getTime();
+
+  if (end <= start) {
+    return 100;
+  }
+
+  if (current <= start) {
+    return 0;
+  }
+
+  return clampPct(((current - start) / (end - start)) * 100);
+}
+
+export function getWeightLossProgressPct(weight: number) {
+  const effectiveWeight = Math.min(weight, STARTING_WEIGHT_LB);
+  const totalLossNeeded = Math.max(STARTING_WEIGHT_LB - GOAL_WEIGHT_LB, 1);
+  const lossAchieved = Math.max(STARTING_WEIGHT_LB - effectiveWeight, 0);
+
+  return clampPct((lossAchieved / totalLossNeeded) * 100);
 }
 
 export async function readPersistedLifeTrackerData(): Promise<LifeTrackerData | null> {
@@ -241,12 +298,55 @@ export async function writePersistedLifeTrackerData(data: LifeTrackerData) {
 }
 
 function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerData {
-  const certificationFallbacks = new Map(
-    defaultLifeTrackerData.certifications.map((cert) => [cert.id, cert])
-  );
   const persistedCertifications = new Map(
     (data.certifications ?? []).map((cert) => [cert.id === 'pnpt' ? 'cloud-plus' : cert.id, cert])
   );
+  const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
+    const persistedGoal = data.goals2026?.find((goal) => goal.id === fallback.id);
+
+    if (!persistedGoal) {
+      return fallback;
+    }
+
+    if ((fallback.id === 'stretching' || fallback.id === 'soda') && persistedGoal.type === 'daily-check') {
+      return {
+        id: fallback.id,
+        title: fallback.title,
+        type: 'avoidance' as const,
+        startedAt: TRACKER_BASELINE_DATE,
+        lastFailureDate: null,
+      };
+    }
+
+    if (fallback.type === 'avoidance') {
+      if (persistedGoal.type === 'avoidance') {
+        return {
+          ...fallback,
+          ...persistedGoal,
+          id: fallback.id,
+          title: fallback.title,
+          type: 'avoidance' as const,
+          startedAt: persistedGoal.startedAt ?? fallback.startedAt,
+          lastFailureDate: persistedGoal.lastFailureDate ?? null,
+        };
+      }
+
+      return fallback;
+    }
+
+    if (persistedGoal.type === 'daily-check') {
+      return {
+        ...fallback,
+        ...persistedGoal,
+        id: fallback.id,
+        title: fallback.title,
+        type: 'daily-check' as const,
+        completedDates: persistedGoal.completedDates ?? [],
+      };
+    }
+
+    return fallback;
+  });
 
   return {
     ...defaultLifeTrackerData,
@@ -283,8 +383,8 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         ...entry,
         certId: entry.certId === 'pnpt' ? 'cloud-plus' : entry.certId,
       })) ?? [],
-    goals2026: data.goals2026 ?? defaultLifeTrackerData.goals2026,
-    weightEntries: data.weightEntries ?? [],
+    goals2026: normalizedGoals2026,
+    weightEntries: data.weightEntries?.length ? data.weightEntries : defaultLifeTrackerData.weightEntries,
     loopRuns: data.loopRuns ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
   };

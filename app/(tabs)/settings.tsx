@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
@@ -15,13 +15,11 @@ const themeOptions: { label: string; value: ThemeMode }[] = [
 
 function SettingToggle({
   label,
-  description,
   enabled,
   onPress,
   colors,
 }: {
   label: string;
-  description: string;
   enabled: boolean;
   onPress: () => void;
   colors: ReturnType<typeof getThemeColors>;
@@ -42,8 +40,7 @@ function SettingToggle({
       }}
     >
       <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 4 }}>{label}</Text>
-        <Text style={{ fontSize: 12, color: colors.subtext, lineHeight: 18 }}>{description}</Text>
+        <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800' }}>{label}</Text>
       </View>
       <View
         style={{
@@ -66,41 +63,6 @@ function SettingToggle({
         />
       </View>
     </Pressable>
-  );
-}
-
-function SettingsInput({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  colors,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  colors: ReturnType<typeof getThemeColors>;
-}) {
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.subtext}
-        style={{
-          backgroundColor: colors.inputBackground,
-          borderWidth: 1,
-          borderColor: colors.inputBorder,
-          borderRadius: 12,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          color: colors.text,
-        }}
-      />
-    </View>
   );
 }
 
@@ -132,37 +94,22 @@ export default function Settings() {
         }
         contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
-        <SectionCard title="Profile" emoji={'\u{1F464}'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            These settings shape the way Lil Johnny talks to you across the tracker app. Changes save automatically.
-          </Text>
-          <SettingsInput
-            label="Name"
-            value={preferences.profileName}
-            onChangeText={(text) => updatePreferences({ profileName: text })}
-            placeholder="Your name"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Preferred health split"
-            value={preferences.preferredWorkoutSplit}
-            onChangeText={(text) => updatePreferences({ preferredWorkoutSplit: text })}
-            placeholder="Push / Pull / Legs"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Primary schedule window"
-            value={preferences.scheduleWindow}
-            onChangeText={(text) => updatePreferences({ scheduleWindow: text })}
-            placeholder="Morning focus block"
-            colors={colors}
-          />
-        </SectionCard>
+        <View
+          style={{
+            backgroundColor: colors.hero,
+            borderRadius: 16,
+            padding: 20,
+            minHeight: 112,
+            justifyContent: 'center',
+            marginBottom: 18,
+          }}
+        >
+          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800' }}>Settings</Text>
+        </View>
 
         <SectionCard title="Notifications" emoji={'\u{1F514}'} colors={colors}>
           <SettingToggle
             label="Notifications"
-            description="Master switch for reminder alerts across the app."
             enabled={preferences.notificationsEnabled}
             onPress={() => {
               void (async () => {
@@ -180,7 +127,6 @@ export default function Settings() {
           <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 12 }}>Alert access: {notificationAccess}</Text>
           <SettingToggle
             label="Haptics"
-            description="Keep tactile feedback enabled for interactions when supported."
             enabled={preferences.hapticsEnabled}
             onPress={() => {
               void (async () => {
@@ -192,7 +138,6 @@ export default function Settings() {
           />
           <SettingToggle
             label="Private reminder notifications"
-            description="Hide reminder topic text in alerts and use generic notification copy instead."
             enabled={preferences.privateNotifications}
             onPress={() => {
               void (async () => {
@@ -204,36 +149,11 @@ export default function Settings() {
           />
         </SectionCard>
 
-        <SectionCard title="Tracker Layout" emoji={'\u{1F9ED}'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Lil Johnny is now set up as one tracker system for the main lanes you care about through the year.
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Dashboard: fast overview of Cyber, Health, Hobbies, and the year-goal lane
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Cyber: certification chapter progress, pace tracking, and practice scores
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Health: gym tracking, weight entries, loop runs, and weekly consistency
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Hobbies: OSRS progress, DIY house tasks, and year-long personal trackers in one lane
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.text }}>
-            Reminders: your schedule lane for study blocks, habits, and daily accountability
-          </Text>
-        </SectionCard>
-
         <SectionCard title="Appearance" emoji={'\u{1F3A8}'} colors={colors}>
           <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 4 }}>Current theme</Text>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 12 }}>
             {currentThemeLabel}
           </Text>
-          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 12 }}>
-            Choose the overall color treatment for the tracker app.
-          </Text>
-
           {themeOptions.map((option) => {
             const selected = theme === option.value;
 
@@ -265,17 +185,10 @@ export default function Settings() {
         </SectionCard>
 
         <SectionCard title="System Snapshot" emoji={'\u2699\uFE0F'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 8 }}>
-            Preferences apply immediately, and reminder alerts keep syncing to the device whenever access is granted.
-          </Text>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Notifications: {preferences.notificationsEnabled ? 'Enabled' : 'Disabled'} | Haptics:{' '}
             {preferences.hapticsEnabled ? 'Enabled' : 'Disabled'} | Privacy:{' '}
             {preferences.privateNotifications ? 'Private alerts' : 'Full alerts'}
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
-            Profile: {preferences.profileName || 'Not set'} | Health split: {preferences.preferredWorkoutSplit} |
-            Window: {preferences.scheduleWindow}
           </Text>
         </SectionCard>
       </ScrollView>

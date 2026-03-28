@@ -48,7 +48,7 @@ type GoalProjection = {
   daysLeft: number;
   hoursLeft: number | null;
   hoursPerDay: number | null;
-  status: 'On track' | 'Tight' | 'Off track' | 'Needs manual lane';
+  status: 'On track' | 'Tight' | 'Off track';
   unestimatedSkills: string[];
   progressPct: number;
   pacePct: number;
@@ -212,11 +212,7 @@ function daysUntil(targetDate: string, now = new Date()) {
   return Math.max(Math.ceil(diff / (1000 * 60 * 60 * 24)), 0);
 }
 
-function getGoalStatus(hoursPerDay: number | null, unestimatedSkills: string[]) {
-  if (unestimatedSkills.length > 0) {
-    return 'Needs manual lane' as const;
-  }
-
+function getGoalStatus(hoursPerDay: number | null) {
   if (hoursPerDay === null) {
     return 'Off track' as const;
   }
@@ -240,8 +236,6 @@ function describeGoalStatus(status: GoalProjection['status']) {
       return 'looks tight';
     case 'Off track':
       return 'looks off track';
-    case 'Needs manual lane':
-      return 'needs a manual estimate';
     default:
       return 'needs review';
   }
@@ -284,7 +278,7 @@ function buildGoalProjection(
     daysLeft,
     hoursLeft,
     hoursPerDay,
-    status: getGoalStatus(hoursPerDay, unestimatedSkills),
+    status: getGoalStatus(hoursPerDay),
     unestimatedSkills,
     progressPct,
     pacePct,
@@ -317,13 +311,14 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
     projectedSkills.forEach((skill, index) => {
       const trainingPlan = GOAL_TRAINING_PLANS[skill.skill];
 
-      if (!trainingPlan || trainingPlan.xpPerHour <= 0 || skill.level >= 99) {
+      if (!trainingPlan || skill.level >= 99) {
         return;
       }
 
       const nextLevel = skill.level + 1;
       const remainingXp = Math.max(xpForLevel(nextLevel) - skill.experience, 0);
-      const levelHours = remainingXp / trainingPlan.xpPerHour;
+      const levelHours =
+        trainingPlan.xpPerHour > 0 || !isSlayerTrackedSkill(skill.skill) ? remainingXp / Math.max(trainingPlan.xpPerHour, 1) : 0;
 
       if (remainingXp > 0 && levelHours < bestHours) {
         bestHours = levelHours;
@@ -800,16 +795,6 @@ export function buildLiveRunescapeTracker(
     `${goalProjections.runefest.label} ${describeGoalStatus(goalProjections.runefest.status)}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
     `${goalProjections.maxCape.label} ${describeGoalStatus(goalProjections.maxCape.status)}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
   ];
-  const manualLaneSkills = [
-    ...new Set([
-      ...goalProjections.base90.unestimatedSkills,
-      ...goalProjections.runefest.unestimatedSkills,
-      ...goalProjections.maxCape.unestimatedSkills,
-    ]),
-  ];
-  if (manualLaneSkills.length > 0) {
-    coachingParts.push(`Manual estimate still needed for: ${manualLaneSkills.join(', ')}.`);
-  }
   const coachingText = coachingParts.join(' ');
   return {
     mode: hasDelta ? 'delta' : 'snapshot',

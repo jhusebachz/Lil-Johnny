@@ -55,8 +55,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reminders"
         options={{
-          title: 'Reminders',
-          tabBarIcon: ({ color, size }) => <Ionicons name="alarm" size={size} color={color} />,
+          title: 'Streaks',
+          tabBarIcon: ({ color, size }) => <Ionicons name="flame" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

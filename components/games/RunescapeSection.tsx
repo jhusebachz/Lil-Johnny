@@ -331,10 +331,6 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
       </SectionCard>
 
       <SectionCard title="Hours Left Until Next Level" emoji={'\u23F3'} colors={colors}>
-        <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-          Based on your current skill XP and the next level for each tracked skill.
-        </Text>
-
         {tracker.hoursToNextLevel.length > 0 ? (
           tracker.hoursToNextLevel.map((item) => (
             <View
@@ -371,10 +367,6 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
       </SectionCard>
 
       <SectionCard title="Milestone Alerts" emoji={'\uD83D\uDEA8'} colors={colors}>
-        <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-          Skills that are close enough to a major target to be worth a short push.
-        </Text>
-
         {tracker.milestoneAlerts.length > 0 ? (
           tracker.milestoneAlerts.map((item) => (
             <View

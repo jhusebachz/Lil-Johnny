@@ -9,8 +9,8 @@ Lil Johnny is a personal life-tracker app built with Expo and React Native. It i
 - `Dashboard`: overall life overview, Bliss Score, and suggested next actions
 - `Cyber`: Linux+, PenTest+, and Cloud+ progress with chapter pacing and chapter-end practice scores
 - `Health`: gym tracking, weight entries, loop run tracking, and weekly gym pace
-- `Hobbies`: OSRS tracker, DIY to-do list, and 2026 personal streaks
-- `Reminders`: recurring reminders, notes, completion tracking, and notifications
+- `Hobbies`: OSRS tracker and DIY to-do list
+- `Streaks`: 2026 streak tracking plus reminder alarms, notes, completion tracking, and notifications
 - `Settings`: app appearance, profile preferences, and notification controls
 
 ## Current Highlights
@@ -18,6 +18,7 @@ Lil Johnny is a personal life-tracker app built with Expo and React Native. It i
 - OSRS tracker with live snapshot data, pace bars, and coaching
 - Certification tracker based on real Sybex chapter counts
 - DIY task tracking inside the Hobbies lane
+- 2026 streak tracking and reminder alarms combined in one tab
 - Bliss Score and suggested next actions on the dashboard
 - Real reminder notifications on supported builds
 - Theme system with `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
