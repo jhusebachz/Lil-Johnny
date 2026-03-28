@@ -6,20 +6,22 @@ Lil Johnny is a personal life-tracker app built with Expo and React Native. It i
 
 ## What The App Tracks
 
-- `Dashboard`: overall life overview, Bliss Score, and suggested next actions
+- `Dashboard`: overall life overview, pace-based Bliss Score, and suggested next actions
 - `Cyber`: Linux+, PenTest+, and Cloud+ progress with chapter pacing and chapter-end practice scores
-- `Health`: gym tracking, weight entries, loop run tracking, and weekly gym pace
+- `Health`: gym tracking, weight entries, loop run tracking, weekly gym pace, and weight-loss pace
 - `Hobbies`: OSRS tracker and DIY to-do list
-- `Streaks`: 2026 streak tracking plus reminder alarms, notes, completion tracking, and notifications
-- `Settings`: app appearance, profile preferences, and notification controls
+- `Streaks`: 2026 streak tracking plus reminder alarms and notifications
+- `Settings`: app appearance and notification controls
 
 ## Current Highlights
 
 - OSRS tracker with live snapshot data, pace bars, and coaching
 - Certification tracker based on real Sybex chapter counts
+- Dashboard Bliss Score now evaluates daily pace instead of raw year-to-date completion
+- Health pacing reflects the real Wednesday/Thursday/Friday gym schedule
+- Weight-loss pace is tracked from a `205 lb` starting point toward a `185 lb` goal
 - DIY task tracking inside the Hobbies lane
 - 2026 streak tracking and reminder alarms combined in one tab
-- Bliss Score and suggested next actions on the dashboard
 - Real reminder notifications on supported builds
 - Theme system with `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
 
@@ -107,10 +109,11 @@ Because Expo Updates uses `runtimeVersion.policy = "appVersion"`, version change
 
 This version reflects the shift from a dashboard/news-style app into a broader life-tracker system, plus the follow-up cleanup that removed stale Games/news remnants and tightened the tracker wording:
 
-- dashboard action guidance and Bliss Score
+- dashboard action guidance and a pace-based Bliss Score
 - Cyber chapter-based cert tracking
-- Hobbies lane with OSRS, DIY, and 2026 goals
-- broader health tracking and pacing views
+- Hobbies lane with OSRS and DIY
+- broader health tracking with gym, loop-run, and weight-loss pacing
+- Streaks lane with avoidance streaks and reminder alarms
 
 ## GitHub Sync
 
