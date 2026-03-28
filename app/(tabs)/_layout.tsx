@@ -4,7 +4,7 @@ import { useAppSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
 
 export default function TabLayout() {
-  const { theme, trackTabVisit } = useAppSettings();
+  const { theme } = useAppSettings();
   const colors = getThemeColors(theme);
 
   return (
@@ -28,7 +28,6 @@ export default function TabLayout() {
           title: 'Dashboard',
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
-        listeners={{ tabPress: () => trackTabVisit('dashboard') }}
       />
       <Tabs.Screen
         name="cyber"
@@ -38,7 +37,6 @@ export default function TabLayout() {
             <Ionicons name="shield-checkmark" size={size} color={color} />
           ),
         }}
-        listeners={{ tabPress: () => trackTabVisit('cyber') }}
       />
       <Tabs.Screen
         name="gym"
@@ -46,16 +44,6 @@ export default function TabLayout() {
           title: 'Health',
           tabBarIcon: ({ color, size }) => <Ionicons name="barbell" size={size} color={color} />,
         }}
-        listeners={{ tabPress: () => trackTabVisit('gym') }}
-      />
-      <Tabs.Screen
-        name="games"
-        options={{
-          href: null,
-          title: 'Games',
-          tabBarIcon: ({ color, size }) => <Ionicons name="game-controller" size={size} color={color} />,
-        }}
-        listeners={{ tabPress: () => trackTabVisit('games') }}
       />
       <Tabs.Screen
         name="goals"
@@ -70,7 +58,6 @@ export default function TabLayout() {
           title: 'Reminders',
           tabBarIcon: ({ color, size }) => <Ionicons name="alarm" size={size} color={color} />,
         }}
-        listeners={{ tabPress: () => trackTabVisit('reminders') }}
       />
       <Tabs.Screen
         name="settings"
@@ -78,7 +65,6 @@ export default function TabLayout() {
           title: 'Settings',
           tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
         }}
-        listeners={{ tabPress: () => trackTabVisit('settings') }}
       />
     </Tabs>
   );

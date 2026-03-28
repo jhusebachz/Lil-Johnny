@@ -104,7 +104,7 @@ export default function Reminders() {
               marginBottom: 6,
             }}
           >
-            {preferences.customTabLabels.reminders}
+            Reminders
           </Text>
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
             Reminder tracker

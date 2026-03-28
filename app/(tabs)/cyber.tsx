@@ -19,8 +19,6 @@ import {
 import { getThemeColors } from '../../data/theme';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
-const TRACKER_START_DATE = new Date('2026-03-28T12:00:00');
-
 function parsePositiveNumber(value: string) {
   const parsed = Number(value.trim());
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -35,17 +33,21 @@ function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-function getPacePct(targetDate?: string) {
-  if (!targetDate) {
+function getPacePct(startDate?: string, targetDate?: string) {
+  if (!startDate || !targetDate) {
     return null;
   }
 
-  const start = TRACKER_START_DATE.getTime();
+  const start = new Date(`${startDate}T12:00:00`).getTime();
   const end = new Date(`${targetDate}T12:00:00`).getTime();
   const now = Date.now();
 
   if (end <= start) {
     return 100;
+  }
+
+  if (now <= start) {
+    return 0;
   }
 
   return clampPct(((now - start) / (end - start)) * 100);
@@ -258,7 +260,7 @@ export default function Cyber() {
           {(() => {
             const pct =
               selectedCert.chapterCount > 0 ? (selectedCert.chaptersCompleted / selectedCert.chapterCount) * 100 : 0;
-            const pacePct = getPacePct(selectedCert.examDate);
+            const pacePct = getPacePct(selectedCert.startDate, selectedCert.examDate);
 
             return (
               <View
@@ -279,6 +281,7 @@ export default function Cyber() {
                   colors={colors}
                 />
                 {selectedCert.studyGuide ? <StatRow label="Study guide" value={selectedCert.studyGuide} colors={colors} /> : null}
+                {selectedCert.startDate ? <StatRow label="Start target" value={selectedCert.startDate} colors={colors} /> : null}
                 {selectedCert.examDate ? <StatRow label="Exam target" value={selectedCert.examDate} colors={colors} /> : null}
                 <ProgressBar pct={pct} markerPct={pacePct ?? undefined} color={colors.accent} colors={colors} height={10} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>

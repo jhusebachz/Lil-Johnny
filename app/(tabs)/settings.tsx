@@ -9,7 +9,7 @@ import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 const themeOptions: { label: string; value: ThemeMode }[] = [
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
-  { label: 'Silver & Black ☠️', value: 'silver-black' },
+  { label: 'Silver & Black \u2620\uFE0F', value: 'silver-black' },
   { label: 'Gangsta Green', value: 'gangsta-green' },
 ];
 
@@ -132,7 +132,7 @@ export default function Settings() {
         }
         contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
-        <SectionCard title="Profile" emoji={'👤'} colors={colors}>
+        <SectionCard title="Profile" emoji={'\u{1F464}'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
             These settings shape the way Lil Johnny talks to you across the tracker app. Changes save automatically.
           </Text>
@@ -159,7 +159,7 @@ export default function Settings() {
           />
         </SectionCard>
 
-        <SectionCard title="Notifications" emoji={'🔔'} colors={colors}>
+        <SectionCard title="Notifications" emoji={'\u{1F514}'} colors={colors}>
           <SettingToggle
             label="Notifications"
             description="Master switch for reminder alerts across the app."
@@ -204,15 +204,15 @@ export default function Settings() {
           />
         </SectionCard>
 
-        <SectionCard title="Tracker Layout" emoji={'🧭'} colors={colors}>
+        <SectionCard title="Tracker Layout" emoji={'\u{1F9ED}'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
             Lil Johnny is now set up as one tracker system for the main lanes you care about through the year.
           </Text>
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Dashboard: fast overview of Cyber, Health, Games, and 2026 goals
+            Dashboard: fast overview of Cyber, Health, Hobbies, and the year-goal lane
           </Text>
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
-            Cyber: certification study progress, logged hours, and recent sessions
+            Cyber: certification chapter progress, pace tracking, and practice scores
           </Text>
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
             Health: gym tracking, weight entries, loop runs, and weekly consistency
@@ -225,7 +225,7 @@ export default function Settings() {
           </Text>
         </SectionCard>
 
-        <SectionCard title="Appearance" emoji={'🎨'} colors={colors}>
+        <SectionCard title="Appearance" emoji={'\u{1F3A8}'} colors={colors}>
           <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 4 }}>Current theme</Text>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 12 }}>
             {currentThemeLabel}
@@ -264,7 +264,7 @@ export default function Settings() {
           })}
         </SectionCard>
 
-        <SectionCard title="System Snapshot" emoji={'⚙'} colors={colors}>
+        <SectionCard title="System Snapshot" emoji={'\u2699\uFE0F'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 8 }}>
             Preferences apply immediately, and reminder alerts keep syncing to the device whenever access is granted.
           </Text>

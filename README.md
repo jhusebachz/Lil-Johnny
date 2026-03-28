@@ -102,9 +102,9 @@ Because Expo Updates uses `runtimeVersion.policy = "appVersion"`, version change
 
 ## Current Release
 
-`1.2.0`
+`1.2.1`
 
-This version reflects the shift from a dashboard/news-style app into a broader life-tracker system with:
+This version reflects the shift from a dashboard/news-style app into a broader life-tracker system, plus the follow-up cleanup that removed stale Games/news remnants and tightened the tracker wording:
 
 - dashboard action guidance and Bliss Score
 - Cyber chapter-based cert tracking

@@ -6,6 +6,7 @@ export type CertificationTracker = {
   name: string;
   chapterCount: number;
   chaptersCompleted: number;
+  startDate?: string;
   examDate?: string;
   studyGuide?: string;
 };
@@ -60,15 +61,6 @@ export type LoopRunEntry = {
   timeSeconds: number;
 };
 
-export type GameSessionEntry = {
-  id: string;
-  dateKey: string;
-  label: string;
-  game: string;
-  hours: number;
-  note?: string;
-};
-
 export type DiyTask = {
   id: string;
   title: string;
@@ -85,7 +77,6 @@ export type LifeTrackerData = {
   goals2026: YearGoal[];
   weightEntries: WeightEntry[];
   loopRuns: LoopRunEntry[];
-  gameSessions: GameSessionEntry[];
   diyTasks: DiyTask[];
 };
 
@@ -100,7 +91,8 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'Linux+',
       chapterCount: 31,
       chaptersCompleted: 0,
-      examDate: '2026-07-15',
+      startDate: '2026-06-20',
+      examDate: '2026-09-15',
       studyGuide: 'Sybex Linux+ Study Guide (XK0-006, 6th Edition)',
     },
     {
@@ -108,7 +100,8 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'PenTest+',
       chapterCount: 12,
       chaptersCompleted: 0,
-      examDate: '2026-09-15',
+      startDate: '2026-10-15',
+      examDate: '2026-12-15',
       studyGuide: 'Sybex PenTest+ Study Guide (PT0-003, 3rd Edition)',
     },
     {
@@ -116,7 +109,8 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'Cloud+',
       chapterCount: 10,
       chaptersCompleted: 0,
-      examDate: '2026-11-15',
+      startDate: '2027-01-15',
+      examDate: '2027-03-15',
       studyGuide: 'Sybex Cloud+ Study Guide (CV0-004, 4th Edition)',
     },
   ],
@@ -131,7 +125,6 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   ],
   weightEntries: [],
   loopRuns: [],
-  gameSessions: [],
   diyTasks: [
     {
       id: 'diy-1',
@@ -251,33 +244,34 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const certificationFallbacks = new Map(
     defaultLifeTrackerData.certifications.map((cert) => [cert.id, cert])
   );
+  const persistedCertifications = new Map(
+    (data.certifications ?? []).map((cert) => [cert.id === 'pnpt' ? 'cloud-plus' : cert.id, cert])
+  );
 
   return {
     ...defaultLifeTrackerData,
     ...data,
-    certifications:
-      data.certifications?.length
-        ? data.certifications.map((cert, index) => {
-            const normalizedId = cert.id === 'pnpt' ? 'cloud-plus' : cert.id;
-            const fallback =
-              certificationFallbacks.get(normalizedId) ??
-              defaultLifeTrackerData.certifications[index] ??
-              defaultLifeTrackerData.certifications[0];
-            const legacyTarget = (cert as CertificationTracker & { targetHours?: number }).targetHours;
-            const legacyCompleted = (cert as CertificationTracker & { hoursCompleted?: number }).hoursCompleted;
+    certifications: defaultLifeTrackerData.certifications.map((fallback) => {
+      const cert = persistedCertifications.get(fallback.id);
+      const legacyTarget = (cert as CertificationTracker & { targetHours?: number } | undefined)?.targetHours;
+      const legacyCompleted = (cert as CertificationTracker & { hoursCompleted?: number } | undefined)?.hoursCompleted;
 
-            return {
-              ...fallback,
-              ...cert,
-              id: normalizedId,
-              name: cert.id === 'pnpt' ? fallback.name : cert.name ?? fallback.name,
-              studyGuide: cert.id === 'pnpt' ? fallback.studyGuide : cert.studyGuide ?? fallback.studyGuide,
-              examDate: cert.id === 'pnpt' ? fallback.examDate : cert.examDate ?? fallback.examDate,
-              chapterCount: cert.chapterCount ?? legacyTarget ?? fallback.chapterCount,
-              chaptersCompleted: cert.chaptersCompleted ?? legacyCompleted ?? fallback.chaptersCompleted,
-            };
-          })
-        : defaultLifeTrackerData.certifications,
+      if (!cert) {
+        return fallback;
+      }
+
+      return {
+        ...fallback,
+        ...cert,
+        id: fallback.id,
+        name: fallback.name,
+        studyGuide: fallback.studyGuide,
+        startDate: fallback.startDate,
+        examDate: fallback.examDate,
+        chapterCount: cert.chapterCount ?? legacyTarget ?? fallback.chapterCount,
+        chaptersCompleted: cert.chaptersCompleted ?? legacyCompleted ?? fallback.chaptersCompleted,
+      };
+    }),
     studyLogs:
       data.studyLogs?.map((entry) => ({
         ...entry,
@@ -292,7 +286,6 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     goals2026: data.goals2026 ?? defaultLifeTrackerData.goals2026,
     weightEntries: data.weightEntries ?? [],
     loopRuns: data.loopRuns ?? [],
-    gameSessions: data.gameSessions ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
   };
 }

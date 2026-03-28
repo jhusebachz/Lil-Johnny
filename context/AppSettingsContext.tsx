@@ -10,11 +10,8 @@ import {
 } from './reminderNotifications';
 
 export type ThemeMode = 'light' | 'dark' | 'gangsta-green' | 'silver-black';
-export type DefaultGamesView = 'gaming' | 'pokopia' | 'runescape';
 export type NotificationAccess = 'granted' | 'denied' | 'undetermined' | 'unsupported';
 export type ReminderRecurrence = 'daily' | 'weekdays' | 'weekends';
-export type FavoriteFocus = 'cyber' | 'gym' | 'reminders';
-export type AppTabKey = 'dashboard' | 'cyber' | 'gym' | 'games' | 'goals' | 'reminders' | 'settings';
 
 export type ReminderItem = {
   id: string;
@@ -30,19 +27,9 @@ export type AppPreferences = {
   notificationsEnabled: boolean;
   privateNotifications: boolean;
   hapticsEnabled: boolean;
-  autoRefreshGamingNews: boolean;
-  defaultGamesView: DefaultGamesView;
-  favoriteFocus: FavoriteFocus;
   profileName: string;
   preferredWorkoutSplit: string;
   scheduleWindow: string;
-  customTabLabels: Record<AppTabKey, string>;
-  gamesFeeds: {
-    pokopiaQuery: string;
-    switchQuery: string;
-    steamQuery: string;
-  };
-  usageCounts: Record<AppTabKey, number>;
 };
 
 export type PersistedSettings = {
@@ -51,13 +38,7 @@ export type PersistedSettings = {
   preferences: AppPreferences;
 };
 
-export type AppPreferencesUpdate = Partial<
-  Omit<AppPreferences, 'customTabLabels' | 'gamesFeeds' | 'usageCounts'>
-> & {
-  customTabLabels?: Partial<Record<AppTabKey, string>>;
-  gamesFeeds?: Partial<AppPreferences['gamesFeeds']>;
-  usageCounts?: Partial<Record<AppTabKey, number>>;
-};
+export type AppPreferencesUpdate = Partial<AppPreferences>;
 
 type AppSettingsContextType = {
   theme: ThemeMode;
@@ -72,7 +53,6 @@ type AppSettingsContextType = {
   requestNotificationAccess: () => Promise<boolean>;
   triggerHaptic: (force?: boolean) => Promise<void>;
   triggerTabHaptic: () => Promise<void>;
-  trackTabVisit: (tab: AppTabKey) => void;
 };
 
 const AppSettingsContext = createContext<AppSettingsContextType | undefined>(undefined);
@@ -98,10 +78,10 @@ const initialReminders: ReminderItem[] = [
   },
   {
     id: '3',
-    topic: 'Games Check-in',
+    topic: 'Hobbies Check-in',
     time: '7:30 PM',
     enabled: false,
-    notes: 'Use this only when you actually want a games window later in the day.',
+    notes: 'Use this only when you actually want a hobbies window later in the day.',
     recurrence: 'weekends',
     completedDates: [],
   },
@@ -111,35 +91,9 @@ const initialPreferences: AppPreferences = {
   notificationsEnabled: true,
   privateNotifications: false,
   hapticsEnabled: true,
-  autoRefreshGamingNews: true,
-  defaultGamesView: 'gaming',
-  favoriteFocus: 'cyber',
   profileName: 'John',
   preferredWorkoutSplit: 'Push / Pull / Legs',
   scheduleWindow: 'Early focus block',
-  customTabLabels: {
-    dashboard: 'Dashboard',
-    cyber: 'Cyber',
-    gym: 'Health',
-    games: 'Games',
-    goals: 'Hobbies',
-    reminders: 'Reminders',
-    settings: 'Settings',
-  },
-  gamesFeeds: {
-    pokopiaQuery: 'Pokopia',
-    switchQuery: '"Nintendo Switch 2"',
-    steamQuery: 'Steam PC gaming',
-  },
-  usageCounts: {
-    dashboard: 0,
-    cyber: 0,
-    gym: 0,
-    games: 0,
-    goals: 0,
-    reminders: 0,
-    settings: 0,
-  },
 };
 
 const defaultSettings: PersistedSettings = {
@@ -163,24 +117,30 @@ function mergeReminder(reminder?: Partial<ReminderItem>, fallback?: ReminderItem
 function normalizePersistedSettings(persisted: PersistedSettings): PersistedSettings {
   return {
     theme: persisted.theme ?? defaultSettings.theme,
-    reminders: (persisted.reminders ?? defaultSettings.reminders).map((reminder, index) =>
-      mergeReminder(reminder, defaultSettings.reminders[index])
-    ),
+    reminders: (persisted.reminders ?? defaultSettings.reminders).map((reminder, index) => {
+      const merged = mergeReminder(reminder, defaultSettings.reminders[index]);
+
+      if (merged.topic === 'Cyber Threat Intel Review') {
+        return {
+          ...merged,
+          topic: 'Cyber Study Block',
+          notes: 'Use this as the first clean certification study block for the day.',
+        };
+      }
+
+      if (merged.topic === 'Games Check-in') {
+        return {
+          ...merged,
+          topic: 'Hobbies Check-in',
+          notes: 'Use this only when you actually want a hobbies window later in the day.',
+        };
+      }
+
+      return merged;
+    }),
     preferences: {
       ...defaultSettings.preferences,
       ...persisted.preferences,
-      customTabLabels: {
-        ...defaultSettings.preferences.customTabLabels,
-        ...persisted.preferences?.customTabLabels,
-      },
-      gamesFeeds: {
-        ...defaultSettings.preferences.gamesFeeds,
-        ...persisted.preferences?.gamesFeeds,
-      },
-      usageCounts: {
-        ...defaultSettings.preferences.usageCounts,
-        ...persisted.preferences?.usageCounts,
-      },
     },
   };
 }
@@ -311,11 +271,6 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     setPreferences((current) => ({
       ...current,
       ...updates,
-      customTabLabels: updates.customTabLabels
-        ? { ...current.customTabLabels, ...updates.customTabLabels }
-        : current.customTabLabels,
-      gamesFeeds: updates.gamesFeeds ? { ...current.gamesFeeds, ...updates.gamesFeeds } : current.gamesFeeds,
-      usageCounts: updates.usageCounts ? { ...current.usageCounts, ...updates.usageCounts } : current.usageCounts,
     }));
   };
 
@@ -342,16 +297,6 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     await Haptics.selectionAsync();
   };
 
-  const trackTabVisit = (tab: AppTabKey) => {
-    setPreferences((current) => ({
-      ...current,
-      usageCounts: {
-        ...current.usageCounts,
-        [tab]: (current.usageCounts[tab] ?? 0) + 1,
-      },
-    }));
-  };
-
   const value = useMemo(
     () => ({
       theme,
@@ -366,7 +311,6 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       requestNotificationAccess,
       triggerHaptic,
       triggerTabHaptic,
-      trackTabVisit,
     }),
     [notificationAccess, preferences, reminders, theme]
   );
