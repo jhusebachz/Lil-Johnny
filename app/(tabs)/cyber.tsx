@@ -239,7 +239,7 @@ export default function Cyber() {
                     fontWeight: selected ? '800' : '700',
                   }}
                 >
-                  {cert.chaptersCompleted}/{cert.chapterCount}
+                  {cert.chaptersCompleted}/{cert.chapterCount} Chapters
                 </Text>
               </View>
             );

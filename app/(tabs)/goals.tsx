@@ -30,37 +30,133 @@ function DiyTaskCard({
   onToggle: () => Promise<void>;
 }) {
   return (
-    <Pressable
-      onPress={() => {
-        void onToggle();
-      }}
-      style={{
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: task.completed ? colors.success : colors.cardBorder,
-        backgroundColor: colors.inputBackground,
-        padding: 14,
-        marginBottom: 12,
-      }}
-    >
+    <SectionCard title={task.title} emoji={'ðŸ”¨'} colors={colors}>
       <Text
         style={{
-          fontSize: 16,
-          color: colors.text,
+          fontSize: 12,
+          color: task.completed ? colors.success : colors.subtext,
           fontWeight: '800',
-          marginBottom: 6,
-          textDecorationLine: task.completed ? 'line-through' : 'none',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
         }}
       >
-        {task.title}
-      </Text>
-      {task.note ? (
-        <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 8 }}>{task.note}</Text>
-      ) : null}
-      <Text style={{ fontSize: 12, color: task.completed ? colors.success : colors.subtext, fontWeight: '700' }}>
         {task.completed ? 'Completed' : 'Open task'}
       </Text>
-    </Pressable>
+      {task.note ? (
+        <Text
+          style={{
+            fontSize: 14,
+            color: colors.text,
+            lineHeight: 22,
+            marginBottom: 12,
+            textDecorationLine: task.completed ? 'line-through' : 'none',
+          }}
+        >
+          {task.note}
+        </Text>
+      ) : null}
+      <Text
+        style={{
+          fontSize: 12,
+          color: colors.subtext,
+          marginBottom: 12,
+        }}
+      >
+        Created {task.createdAt}
+        {task.completedAt ? ` | Completed ${task.completedAt}` : ''}
+      </Text>
+      <Pressable
+        onPress={() => {
+          void onToggle();
+        }}
+        style={{
+          alignSelf: 'flex-start',
+          borderRadius: 12,
+          backgroundColor: task.completed ? colors.success : colors.accent,
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+        }}
+      >
+        <Text
+          style={{
+            color: 'white',
+          fontWeight: '800',
+          }}
+        >
+          {task.completed ? 'Completed' : 'Task completed'}
+        </Text>
+      </Pressable>
+    </SectionCard>
+  );
+}
+
+function DiyAddCard({
+  colors,
+  draftDiyTitle,
+  draftDiyNote,
+  setDraftDiyTitle,
+  setDraftDiyNote,
+  addDiyTask,
+}: {
+  colors: ReturnType<typeof getThemeColors>;
+  draftDiyTitle: string;
+  draftDiyNote: string;
+  setDraftDiyTitle: (value: string) => void;
+  setDraftDiyNote: (value: string) => void;
+  addDiyTask: () => Promise<void>;
+}) {
+  return (
+    <SectionCard title="Add DIY Task" emoji={'ðŸ§°'} colors={colors}>
+      <TextInput
+        value={draftDiyTitle}
+        onChangeText={setDraftDiyTitle}
+        placeholder="Add a DIY task"
+        placeholderTextColor={colors.subtext}
+        style={{
+          borderWidth: 1,
+          borderColor: colors.inputBorder,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          fontSize: 15,
+          color: colors.text,
+          backgroundColor: colors.inputBackground,
+          marginBottom: 10,
+        }}
+      >
+      </TextInput>
+      <TextInput
+        value={draftDiyNote}
+        onChangeText={setDraftDiyNote}
+        placeholder="Optional note"
+        placeholderTextColor={colors.subtext}
+        style={{
+          borderWidth: 1,
+          borderColor: colors.inputBorder,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          fontSize: 15,
+          color: colors.text,
+          backgroundColor: colors.inputBackground,
+          marginBottom: 12,
+        }}
+      />
+      <Pressable
+        onPress={() => {
+          void addDiyTask();
+        }}
+        style={{
+          borderRadius: 12,
+          backgroundColor: colors.accent,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+        }}
+      >
+        <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Add DIY task</Text>
+      </Pressable>
+    </SectionCard>
   );
 }
 
@@ -190,7 +286,7 @@ export default function Goals() {
           </Text>
         </View>
 
-        <SectionCard title="Hobbies View" emoji={'🧩'} colors={colors}>
+        <SectionCard title="Hobbies View" emoji={'ðŸ§©'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {(['osrs', 'diy'] as HobbiesView[]).map((view) => {
               const selected = view === selectedView;
@@ -224,71 +320,33 @@ export default function Goals() {
         {selectedView === 'osrs' ? <RunescapeSection colors={colors} refreshToken={runescapeRefreshToken} /> : null}
 
         {selectedView === 'diy' ? (
-          <SectionCard title="DIY To-Do List" emoji={'🛠️'} colors={colors}>
-            <Text style={{ color: colors.text, fontSize: 13, fontWeight: '800', marginBottom: 10 }}>
-              Open: {openDiyCount} | Completed: {completedDiyCount}
-            </Text>
-            <ProgressBar
-              pct={lifeData.diyTasks.length > 0 ? (completedDiyCount / lifeData.diyTasks.length) * 100 : 0}
-              color={colors.success}
-              colors={colors}
-              height={10}
-            />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: -2, marginBottom: 14 }}>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>
-                Actual {lifeData.diyTasks.length > 0 ? ((completedDiyCount / lifeData.diyTasks.length) * 100).toFixed(1) : '0.0'}%
+          <>
+            <SectionCard title="DIY To-Do List" emoji={'🛠️'} colors={colors}>
+              <Text style={{ color: colors.text, fontSize: 13, fontWeight: '800', marginBottom: 10 }}>
+                Open: {openDiyCount} | Completed: {completedDiyCount}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.subtext }}>Completion progress</Text>
-            </View>
+              <ProgressBar
+                pct={lifeData.diyTasks.length > 0 ? (completedDiyCount / lifeData.diyTasks.length) * 100 : 0}
+                color={colors.success}
+                colors={colors}
+                height={10}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: -2, marginBottom: 2 }}>
+                <Text style={{ fontSize: 11, color: colors.subtext }}>
+                  Actual {lifeData.diyTasks.length > 0 ? ((completedDiyCount / lifeData.diyTasks.length) * 100).toFixed(1) : '0.0'}%
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.subtext }}>Completion progress</Text>
+              </View>
+            </SectionCard>
 
-            <TextInput
-              value={draftDiyTitle}
-              onChangeText={setDraftDiyTitle}
-              placeholder="Add a DIY task"
-              placeholderTextColor={colors.subtext}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.inputBorder,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: 15,
-                color: colors.text,
-                backgroundColor: colors.inputBackground,
-                marginBottom: 10,
-              }}
+            <DiyAddCard
+              colors={colors}
+              draftDiyTitle={draftDiyTitle}
+              draftDiyNote={draftDiyNote}
+              setDraftDiyTitle={setDraftDiyTitle}
+              setDraftDiyNote={setDraftDiyNote}
+              addDiyTask={addDiyTask}
             />
-            <TextInput
-              value={draftDiyNote}
-              onChangeText={setDraftDiyNote}
-              placeholder="Optional note"
-              placeholderTextColor={colors.subtext}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.inputBorder,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: 15,
-                color: colors.text,
-                backgroundColor: colors.inputBackground,
-                marginBottom: 12,
-              }}
-            />
-            <Pressable
-              onPress={() => {
-                void addDiyTask();
-              }}
-              style={{
-                borderRadius: 12,
-                backgroundColor: colors.accent,
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                marginBottom: 14,
-              }}
-            >
-              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Add DIY task</Text>
-            </Pressable>
 
             {lifeData.diyTasks.map((task) => (
               <DiyTaskCard
@@ -300,7 +358,7 @@ export default function Goals() {
                 }}
               />
             ))}
-          </SectionCard>
+          </>
         ) : null}
       </ScrollView>
     </SafeAreaView>

@@ -21,7 +21,6 @@ import {
   getWeightLossProgressPct,
   readPersistedLifeTrackerData,
 } from '../../data/lifeTrackerData';
-import { formatUpcomingReminder, getNextReminder } from '../../data/reminders';
 import { fetchRunescapeTrackerSnapshot, getFallbackRunescapeTracker, LiveRunescapeTracker } from '../../data/osrsTracker';
 import { getThemeColors } from '../../data/theme';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
@@ -63,6 +62,7 @@ function OverviewCard({
   align = 'left',
   minWidth = 160,
   fullWidth = false,
+  fixedWidth,
 }: {
   title: string;
   items: OverviewItem[];
@@ -70,21 +70,23 @@ function OverviewCard({
   align?: 'left' | 'center';
   minWidth?: number;
   fullWidth?: boolean;
+  fixedWidth?: number;
 }) {
   const centered = align === 'center';
 
   return (
     <View
       style={{
-        flex: 1,
-        minWidth: fullWidth ? undefined : minWidth,
-        width: fullWidth ? '100%' : undefined,
+        flex: fixedWidth ? undefined : 1,
+        minWidth: fullWidth || fixedWidth ? undefined : minWidth,
+        width: fixedWidth ?? (fullWidth ? '100%' : undefined),
         borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.cardBorder,
         backgroundColor: colors.inputBackground,
         padding: 14,
         marginBottom: 12,
+        marginRight: fixedWidth ? 12 : 0,
       }}
     >
       <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800', marginBottom: 6, textAlign: centered ? 'center' : 'left' }}>
@@ -132,7 +134,7 @@ function OverviewCard({
 }
 
 export default function Dashboard() {
-  const { theme, reminders, preferences } = useAppSettings();
+  const { theme, preferences } = useAppSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
   const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
@@ -145,6 +147,7 @@ export default function Dashboard() {
   const haloPulse = useState(() => new Animated.Value(0.94))[0];
   const isCompact = width < 430;
   const isVeryCompact = width < 380;
+  const overviewCardWidth = Math.max(width - 74, 250);
 
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
@@ -227,8 +230,6 @@ export default function Dashboard() {
     };
   }, [haloPulse, heroLift, heroOpacity, logoFloat]);
 
-  const nextReminder = getNextReminder(reminders);
-  const nextReminderLabel = nextReminder ? formatUpcomingReminder(nextReminder.occurrence) : 'No reminder set';
   const lowestCert = [...lifeData.certifications]
     .sort(
       (left, right) =>
@@ -259,7 +260,7 @@ export default function Dashboard() {
   const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
   const greeting = `${
     new Intl.DateTimeFormat('en-US', { hour: 'numeric' }).format(new Date()).includes('AM') ? 'Good morning' : 'Good evening'
-  }, ${preferences.profileName || 'John'}`;
+  }, ${preferences.profileName || 'John'}!`;
   const currentCertPct = currentCert
     ? Math.round((currentCert.chaptersCompleted / Math.max(currentCert.chapterCount, 1)) * 100)
     : 0;
@@ -291,10 +292,10 @@ export default function Dashboard() {
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissScore = Math.round(((cyberScore + healthScore + hobbiesScore + streaksScore) / 4) * 100);
   const blissBreakdown = [
-    `Cyber ${Math.round(cyberScore * 100)}`,
-    `Health ${Math.round(healthScore * 100)}`,
-    `Hobbies ${Math.round(hobbiesScore * 100)}`,
-    `Streaks ${Math.round(streaksScore * 100)}`,
+    `Cyber: ${Math.round(cyberScore * 100)}`,
+    `Health: ${Math.round(healthScore * 100)}`,
+    `Hobbies: ${Math.round(hobbiesScore * 100)}`,
+    `Streaks: ${Math.round(streaksScore * 100)}`,
   ];
   const cyberOverviewItems: OverviewItem[] = [
     {
@@ -364,7 +365,7 @@ export default function Dashboard() {
 
     if (dailyGoals.some((goal) => !goal.completedDates.includes(todayKey))) {
       candidates.push({
-        label: 'Close out today’s daily-check streaks before the day ends so you do not leak easy momentum.',
+        label: 'Close out todayÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s daily-check streaks before the day ends so you do not leak easy momentum.',
         urgency: 0.82,
       });
     }
@@ -461,12 +462,19 @@ export default function Dashboard() {
             }}
           >
             <View style={{ flex: isCompact ? 0 : 1, width: '100%', paddingRight: isCompact ? 0 : 12 }}>
-              <Text style={{ color: colors.heroText, fontSize: isVeryCompact ? 32 : isCompact ? 36 : 42, fontWeight: '900', letterSpacing: 0.3, marginBottom: 10 }}>
-                Dashboard
+              <Text
+                style={{
+                  color: colors.heroText,
+                  fontSize: isVeryCompact ? 24 : isCompact ? 26 : 30,
+                  fontWeight: '800',
+                  letterSpacing: 0.2,
+                  marginBottom: 10,
+                }}
+              >
+                {greeting}
               </Text>
-              <Text style={{ color: colors.heroSubtext, fontSize: isCompact ? 14 : 15, fontWeight: '700', marginBottom: 10 }}>{greeting}</Text>
               <Text style={{ color: colors.heroSubtext, fontSize: 12, letterSpacing: 0.2, lineHeight: 18 }}>
-                {todayLabel} · Next reminder {nextReminderLabel}
+                {todayLabel}
               </Text>
             </View>
             <Animated.View
@@ -512,7 +520,7 @@ export default function Dashboard() {
           </View>
         </Animated.View>
 
-        <SectionCard title="Bliss Score" emoji={'✨'} colors={colors}>
+        <SectionCard title="Bliss Score" emoji={'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨'} colors={colors}>
           <Text
             style={{
               fontSize: isVeryCompact ? 48 : isCompact ? 52 : 58,
@@ -556,32 +564,55 @@ export default function Dashboard() {
         </SectionCard>
 
         <SectionCard title="Overview" emoji={'🧩'} colors={colors}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <OverviewCard
-              title="Cyber"
-              items={cyberOverviewItems}
-              colors={colors}
-              align="left"
-              fullWidth={isCompact}
-            />
-            <OverviewCard
-              title="Health"
-              items={healthOverviewItems}
-              colors={colors}
-              align="left"
-              fullWidth={isCompact}
-            />
-            <OverviewCard
-              title="Hobbies"
-              items={hobbiesOverviewItems}
-              colors={colors}
-              align="left"
-              fullWidth={isCompact}
-            />
-          </View>
+          {isCompact ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
+              <OverviewCard
+                title="Cyber"
+                items={cyberOverviewItems}
+                colors={colors}
+                align="left"
+                fixedWidth={overviewCardWidth}
+              />
+              <OverviewCard
+                title="Health"
+                items={healthOverviewItems}
+                colors={colors}
+                align="left"
+                fixedWidth={overviewCardWidth}
+              />
+              <OverviewCard
+                title="Hobbies"
+                items={hobbiesOverviewItems}
+                colors={colors}
+                align="left"
+                fixedWidth={overviewCardWidth}
+              />
+            </ScrollView>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <OverviewCard
+                title="Cyber"
+                items={cyberOverviewItems}
+                colors={colors}
+                align="left"
+              />
+              <OverviewCard
+                title="Health"
+                items={healthOverviewItems}
+                colors={colors}
+                align="left"
+              />
+              <OverviewCard
+                title="Hobbies"
+                items={hobbiesOverviewItems}
+                colors={colors}
+                align="left"
+              />
+            </View>
+          )}
         </SectionCard>
 
-        <SectionCard title="Streaks" emoji={'🏁'} colors={colors}>
+        <SectionCard title="Streaks" emoji={'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <OverviewCard
               title="No Alcohol"
