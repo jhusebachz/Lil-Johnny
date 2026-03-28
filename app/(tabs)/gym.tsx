@@ -23,6 +23,7 @@ import {
   GymExerciseHistory,
   GymView,
   createEmptyGymProgressHistory,
+  getLoggedGymDateKeys,
   gymWorkoutTemplates,
   readPersistedGymData,
   writePersistedGymData,
@@ -142,6 +143,17 @@ export default function Gym() {
     Legs: gymWorkoutTemplates.Legs.exercises[0].name,
   });
   const workout = gymWorkoutTemplates[selectedDay];
+  const groupedWorkoutExercises = useMemo(() => {
+    const grouped = new Map<string, typeof workout.exercises>();
+
+    workout.exercises.forEach((exercise) => {
+      const category = exercise.category ?? 'Exercises';
+      const existing = grouped.get(category) ?? [];
+      grouped.set(category, [...existing, exercise]);
+    });
+
+    return [...grouped.entries()];
+  }, [workout]);
   const progressExerciseName = selectedProgressExercise[selectedDay];
   const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
   const progressPoints = [...rawProgressPoints]
@@ -168,15 +180,7 @@ export default function Gym() {
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
   const weeklyGymVisits = useMemo(() => {
-    const dateKeys = new Set<string>();
-
-    Object.values(exerciseHistory).forEach((dayHistory) => {
-      Object.values(dayHistory).forEach((points) => {
-        points.forEach((point) => dateKeys.add(point.dateKey));
-      });
-    });
-
-    return getUniqueWeekCount([...dateKeys]);
+    return getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory));
   }, [exerciseHistory]);
   const recentWeights = [...lifeData.weightEntries]
     .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
@@ -647,27 +651,46 @@ export default function Gym() {
               <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 6 }}>
                 Focus: <Text style={{ color: colors.text, fontWeight: '700' }}>{workout.focus}</Text>
               </Text>
-              <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 14 }}>{todayEntry.fullLabel}</Text>
+              <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 14 }}>
+                {todayEntry.fullLabel} | {workout.exercises.length} exercises
+              </Text>
 
-              {workout.exercises.map((exercise) => {
-                const exerciseKey = `${selectedDay}-${exercise.name}`;
-                const exerciseLog = exerciseLogs[exerciseKey];
-
-                return (
-                  <WorkoutExerciseCard
-                    key={exerciseKey}
-                    onPress={() => {
-                      void openExerciseLogger(exercise.name);
+              {groupedWorkoutExercises.map(([category, exercises]) => (
+                <View key={`${selectedDay}-${category}`} style={{ marginBottom: 8 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: colors.subtext,
+                      fontWeight: '800',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.8,
+                      marginBottom: 8,
                     }}
-                    name={exercise.name}
-                    sets={exercise.sets}
-                    reps={exercise.reps}
-                    note={exercise.note}
-                    exerciseLog={exerciseLog}
-                    colors={colors}
-                  />
-                );
-              })}
+                  >
+                    {category}
+                  </Text>
+
+                  {exercises.map((exercise) => {
+                    const exerciseKey = `${selectedDay}-${exercise.name}`;
+                    const exerciseLog = exerciseLogs[exerciseKey];
+
+                    return (
+                      <WorkoutExerciseCard
+                        key={exerciseKey}
+                        onPress={() => {
+                          void openExerciseLogger(exercise.name);
+                        }}
+                        name={exercise.name}
+                        sets={exercise.sets}
+                        reps={exercise.reps}
+                        note={exercise.note}
+                        exerciseLog={exerciseLog}
+                        colors={colors}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
             </SectionCard>
           </>
         ) : (

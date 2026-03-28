@@ -6,7 +6,7 @@ type WorkoutExerciseCardProps = {
   name: string;
   sets: string;
   reps: string;
-  note: string;
+  note?: string;
   exerciseLog?: ExerciseLog;
   colors: ThemeColors;
   onPress: () => void;
@@ -25,8 +25,8 @@ export default function WorkoutExerciseCard({
     <Pressable
       onPress={onPress}
       style={{
-        marginBottom: 12,
-        padding: 14,
+        marginBottom: 10,
+        padding: 12,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: colors.cardBorder,
@@ -34,10 +34,10 @@ export default function WorkoutExerciseCard({
       }}
     >
       <Text style={{ fontSize: 15, color: colors.text, fontWeight: '800', marginBottom: 4 }}>{name}</Text>
-      <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 4 }}>
+      <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: note ? 4 : 10 }}>
         {sets} sets x {reps}
       </Text>
-      <Text style={{ fontSize: 13, color: colors.text, marginBottom: 12 }}>{note}</Text>
+      {note ? <Text style={{ fontSize: 12, color: colors.text, marginBottom: 10 }}>{note}</Text> : null}
       {exerciseLog ? (
         <View
           style={{

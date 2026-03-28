@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
 import { useAppSettings } from '../../context/AppSettingsContext';
-import { readPersistedGymData } from '../../data/gymData';
+import { getLoggedGymDateKeys, readPersistedGymData } from '../../data/gymData';
 import {
   GOAL_WEIGHT_LB,
   LifeTrackerData,
@@ -154,13 +154,7 @@ export default function Dashboard() {
     }
     setTracker(osrs);
 
-    const gymDateKeys = new Set<string>();
-    Object.values(gym?.exerciseHistory ?? {}).forEach((dayHistory) => {
-      Object.values(dayHistory).forEach((points) => {
-        points.forEach((point) => gymDateKeys.add(point.dateKey));
-      });
-    });
-    setGymVisitCount(getUniqueWeekCount([...gymDateKeys]));
+    setGymVisitCount(getUniqueWeekCount(getLoggedGymDateKeys(gym?.exerciseHistory)));
   }, [triggerRefresh]);
 
   useEffect(() => {

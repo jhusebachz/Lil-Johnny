@@ -6,9 +6,10 @@ export type GymView = 'Workout' | 'Progress';
 
 type WorkoutExercise = {
   name: string;
+  category?: string;
   sets: string;
   reps: string;
-  note: string;
+  note?: string;
 };
 
 type WorkoutBlock = {
@@ -43,6 +44,35 @@ type PersistedGymData = {
 
 const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-gym.json`;
 const WEB_STORAGE_KEY = 'lil-johnny-gym';
+const EXERCISE_ALIASES: Partial<Record<GymDay, Record<string, string>>> = {
+  Push: {
+    'Barbell Bench Press': 'Barbell Bench Press (Flat)',
+    'Incline Dumbbell Press': 'Incline Dumbbell Bench Press',
+    'Seated Shoulder Press': 'Machine Shoulder Press (Military Press)',
+    'Cable Lateral Raise': 'Dumbbell Lateral Raise',
+    'Rope Pressdown': 'Cable Triceps Pushdown',
+  },
+  Pull: {
+    'Weighted Pull-Up': 'Pull-Ups / Chin-Ups',
+    'Face Pull': 'Rear Delt Cable Face Pull',
+    'EZ Bar Curl': 'Barbell Curl',
+  },
+  Legs: {
+    'Back Squat': 'Smith Machine Squats',
+    'Romanian Deadlift': 'Deadlift',
+    'Standing Calf Raise': 'Calf Raise',
+  },
+};
+
+function exercise(
+  name: string,
+  category: string,
+  sets: string,
+  reps: string,
+  note?: string
+): WorkoutExercise {
+  return { name, category, sets, reps, note };
+}
 
 export const gymWorkoutTemplates: Record<GymDay, WorkoutBlock> = {
   Push: {
@@ -50,11 +80,19 @@ export const gymWorkoutTemplates: Record<GymDay, WorkoutBlock> = {
     focus: 'Chest, shoulders, triceps',
     coaching: 'Control the eccentric and keep 1-2 reps in reserve on your main press.',
     exercises: [
-      { name: 'Barbell Bench Press', sets: '4', reps: '6-8', note: 'Main strength lift' },
-      { name: 'Incline Dumbbell Press', sets: '3', reps: '8-10', note: 'Full stretch at bottom' },
-      { name: 'Seated Shoulder Press', sets: '3', reps: '8-10', note: 'Smooth lockout' },
-      { name: 'Cable Lateral Raise', sets: '3', reps: '12-15', note: 'Slow and controlled' },
-      { name: 'Rope Pressdown', sets: '3', reps: '10-12', note: 'Hard triceps squeeze' },
+      exercise('Barbell Bench Press (Flat)', 'Pressing', '4', '5-8', 'Main flat press'),
+      exercise('Barbell Bench Press (Incline)', 'Pressing', '4', '5-8'),
+      exercise('Close-Grip Bench Press (Flat)', 'Pressing', '3', '6-8'),
+      exercise('Incline Dumbbell Bench Press', 'Pressing', '3', '8-10'),
+      exercise('Machine Shoulder Press (Military Press)', 'Pressing', '3', '8-10'),
+      exercise('Chest Press Machine', 'Pressing', '3', '8-10'),
+      exercise('Triceps Dips', 'Pressing', '3', '6-10'),
+      exercise('Push-Ups', 'Pressing', '2', 'AMRAP'),
+      exercise('Dual Cable Crossover', 'Chest Isolation', '3', '12-15'),
+      exercise('Dumbbell Chest Fly', 'Chest Isolation', '3', '10-15'),
+      exercise('Cable Triceps Pushdown', 'Triceps', '3', '10-15'),
+      exercise('Dumbbell Lateral Raise', 'Delts', '3', '12-20'),
+      exercise('Shoulder Internal/External Rotation', 'Shoulder Health', '2', '12-20'),
     ],
   },
   Pull: {
@@ -62,11 +100,19 @@ export const gymWorkoutTemplates: Record<GymDay, WorkoutBlock> = {
     focus: 'Back, rear delts, biceps',
     coaching: 'Start each rep by pulling through the elbows instead of yanking with the hands.',
     exercises: [
-      { name: 'Weighted Pull-Up', sets: '4', reps: '5-8', note: 'Full hang each rep' },
-      { name: 'Chest-Supported Row', sets: '3', reps: '8-10', note: 'Pause at contraction' },
-      { name: 'Lat Pulldown', sets: '3', reps: '10-12', note: 'Drive elbows down' },
-      { name: 'Face Pull', sets: '3', reps: '12-15', note: 'Rear delt focus' },
-      { name: 'EZ Bar Curl', sets: '3', reps: '10-12', note: 'No swinging' },
+      exercise('Pull-Ups / Chin-Ups', 'Vertical Pull', '4', '5-10'),
+      exercise('Deadlift', 'Posterior Chain', '3', '3-6'),
+      exercise('Chest-Supported Row', 'Rows', '3', '8-10'),
+      exercise('Lat Pulldown', 'Vertical Pull', '3', '8-12'),
+      exercise('Upright Barbell Row', 'Upper Back', '3', '8-12'),
+      exercise('Upright Cable Row', 'Upper Back', '3', '10-12'),
+      exercise('Rear Delt Cable Face Pull', 'Rear Delts', '3', '12-15'),
+      exercise('Barbell Curl', 'Biceps', '3', '8-12'),
+      exercise('Preacher Curl', 'Biceps', '3', '10-12'),
+      exercise('Cable Biceps Curl', 'Biceps', '3', '10-15'),
+      exercise('Bayesian Cable Curl', 'Biceps', '3', '10-15'),
+      exercise('Cable 45-Degree Raise', 'Rear Delts', '3', '12-20'),
+      exercise('Back Extension', 'Posterior Chain', '3', '10-15'),
     ],
   },
   Legs: {
@@ -74,11 +120,14 @@ export const gymWorkoutTemplates: Record<GymDay, WorkoutBlock> = {
     focus: 'Quads, hamstrings, glutes, calves',
     coaching: 'Keep the first compound lift crisp, then chase volume on accessories.',
     exercises: [
-      { name: 'Back Squat', sets: '4', reps: '5-8', note: 'Brace hard before descent' },
-      { name: 'Romanian Deadlift', sets: '3', reps: '8-10', note: 'Stretch hamstrings' },
-      { name: 'Leg Press', sets: '3', reps: '10-12', note: 'Controlled depth' },
-      { name: 'Walking Lunge', sets: '3', reps: '12/leg', note: 'Long stride, steady pace' },
-      { name: 'Standing Calf Raise', sets: '4', reps: '12-15', note: 'Pause at top and bottom' },
+      exercise('Smith Machine Squats', 'Squat Pattern', '4', '5-8'),
+      exercise('Leg Press', 'Squat Pattern', '3', '10-12'),
+      exercise('Bodyweight Squats', 'Squat Pattern', '2', 'AMRAP'),
+      exercise('Leg Curl', 'Hamstrings', '3', '10-15'),
+      exercise('Leg Extension', 'Quads', '3', '10-15'),
+      exercise('Hip Adduction Machine (pushing inward)', 'Hip Machines', '3', '12-20'),
+      exercise('Hip Abduction Machine (pushing outward)', 'Hip Machines', '3', '12-20'),
+      exercise('Calf Raise', 'Calves', '4', '12-20'),
     ],
   },
 };
@@ -91,6 +140,60 @@ export function createEmptyGymProgressHistory(): GymExerciseHistory {
   };
 }
 
+export function getLoggedGymDateKeys(exerciseHistory?: GymExerciseHistory | null) {
+  const loggedDateKeys = new Set<string>();
+
+  Object.values(exerciseHistory ?? {}).forEach((dayHistory) => {
+    Object.values(dayHistory).forEach((points) => {
+      points.forEach((point) => {
+        // One saved exercise entry is enough to count that calendar day as a gym day.
+        loggedDateKeys.add(point.dateKey);
+      });
+    });
+  });
+
+  return [...loggedDateKeys];
+}
+
+function normalizeExerciseName(day: GymDay, name: string) {
+  return EXERCISE_ALIASES[day]?.[name] ?? name;
+}
+
+function normalizePersistedGymData(data: PersistedGymData): PersistedGymData {
+  const exerciseHistory = createEmptyGymProgressHistory();
+
+  (Object.keys(data.exerciseHistory ?? {}) as GymDay[]).forEach((day) => {
+    const dayHistory = data.exerciseHistory?.[day] ?? {};
+
+    Object.entries(dayHistory).forEach(([exerciseName, points]) => {
+      const normalizedName = normalizeExerciseName(day, exerciseName);
+      const existing = exerciseHistory[day][normalizedName] ?? [];
+      exerciseHistory[day][normalizedName] = [...existing, ...points];
+    });
+  });
+
+  const exerciseLogs = Object.fromEntries(
+    Object.entries(data.exerciseLogs ?? {}).map(([key, value]) => {
+      const separatorIndex = key.indexOf('-');
+
+      if (separatorIndex <= 0) {
+        return [key, value];
+      }
+
+      const day = key.slice(0, separatorIndex) as GymDay;
+      const exerciseName = key.slice(separatorIndex + 1);
+      const normalizedName = normalizeExerciseName(day, exerciseName);
+
+      return [`${day}-${normalizedName}`, value];
+    })
+  );
+
+  return {
+    exerciseLogs,
+    exerciseHistory,
+  };
+}
+
 export async function readPersistedGymData(): Promise<PersistedGymData | null> {
   if (Platform.OS === 'web') {
     if (typeof localStorage === 'undefined') {
@@ -98,7 +201,7 @@ export async function readPersistedGymData(): Promise<PersistedGymData | null> {
     }
 
     const raw = localStorage.getItem(WEB_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PersistedGymData) : null;
+    return raw ? normalizePersistedGymData(JSON.parse(raw) as PersistedGymData) : null;
   }
 
   const fileInfo = await FileSystem.getInfoAsync(STORAGE_FILE);
@@ -108,7 +211,7 @@ export async function readPersistedGymData(): Promise<PersistedGymData | null> {
   }
 
   const raw = await FileSystem.readAsStringAsync(STORAGE_FILE);
-  return raw.trim() ? (JSON.parse(raw) as PersistedGymData) : null;
+  return raw.trim() ? normalizePersistedGymData(JSON.parse(raw) as PersistedGymData) : null;
 }
 
 export async function writePersistedGymData(data: PersistedGymData) {
