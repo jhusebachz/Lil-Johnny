@@ -1,27 +1,16 @@
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import SectionCard from '../../components/SectionCard';
-import { DefaultGamesView, ThemeMode, useAppSettings } from '../../context/AppSettingsContext';
-import { useTimedRefresh } from '../../hooks/use-timed-refresh';
+import { ThemeMode, useAppSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
+import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 const themeOptions: { label: string; value: ThemeMode }[] = [
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
   { label: 'Silver & Black ☠️', value: 'silver-black' },
   { label: 'Gangsta Green', value: 'gangsta-green' },
-];
-
-const defaultGamesViewOptions: { label: string; value: DefaultGamesView }[] = [
-  { label: 'Gaming News', value: 'gaming' },
-  { label: 'Pokopia', value: 'pokopia' },
-  { label: 'RuneScape', value: 'runescape' },
-];
-
-const favoriteFocusOptions = [
-  { label: 'Cyber', value: 'cyber' as const },
-  { label: 'Gym', value: 'gym' as const },
-  { label: 'Reminders', value: 'reminders' as const },
 ];
 
 function SettingToggle({
@@ -128,13 +117,6 @@ export default function Settings() {
   const colors = getThemeColors(theme);
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const currentThemeLabel = themeOptions.find((option) => option.value === theme)?.label ?? theme;
-  const defaultGamesViewLabel =
-    defaultGamesViewOptions.find((option) => option.value === preferences.defaultGamesView)?.label ??
-    preferences.defaultGamesView;
-  const mostUsedKey = Object.entries(preferences.usageCounts).sort((left, right) => right[1] - left[1])[0]?.[0] as
-    | keyof typeof preferences.customTabLabels
-    | undefined;
-  const mostUsedLane = mostUsedKey ? preferences.customTabLabels[mostUsedKey] : undefined;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
@@ -150,7 +132,10 @@ export default function Settings() {
         }
         contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
-        <SectionCard title="Profile" emoji={'\uD83D\uDC64'} colors={colors}>
+        <SectionCard title="Profile" emoji={'👤'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            These settings shape the way Lil Johnny talks to you across the tracker app. Changes save automatically.
+          </Text>
           <SettingsInput
             label="Name"
             value={preferences.profileName}
@@ -159,25 +144,25 @@ export default function Settings() {
             colors={colors}
           />
           <SettingsInput
-            label="Preferred workout split"
+            label="Preferred health split"
             value={preferences.preferredWorkoutSplit}
             onChangeText={(text) => updatePreferences({ preferredWorkoutSplit: text })}
             placeholder="Push / Pull / Legs"
             colors={colors}
           />
           <SettingsInput
-            label="Default daily schedule window"
+            label="Primary schedule window"
             value={preferences.scheduleWindow}
             onChangeText={(text) => updatePreferences({ scheduleWindow: text })}
-            placeholder="Early focus block"
+            placeholder="Morning focus block"
             colors={colors}
           />
         </SectionCard>
 
-        <SectionCard title="Notifications" emoji={'\uD83D\uDD14'} colors={colors}>
+        <SectionCard title="Notifications" emoji={'🔔'} colors={colors}>
           <SettingToggle
             label="Notifications"
-            description="Master switch for reminder-style alerts across the app."
+            description="Master switch for reminder alerts across the app."
             enabled={preferences.notificationsEnabled}
             onPress={() => {
               void (async () => {
@@ -219,148 +204,34 @@ export default function Settings() {
           />
         </SectionCard>
 
-        <SectionCard title="Games Tab" emoji={'\uD83C\uDFAE'} colors={colors}>
-          <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 12 }}>
-            Starts on: {defaultGamesViewLabel}
+        <SectionCard title="Tracker Layout" emoji={'🧭'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            Lil Johnny is now set up as one tracker system for the main lanes you care about through the year.
           </Text>
-
-          <SettingToggle
-            label="Auto-refresh gaming news"
-            description="Refresh Reddit-based Pokopia, Switch 2, and Steam headlines when opening Games."
-            enabled={preferences.autoRefreshGamingNews}
-            onPress={() => {
-              void (async () => {
-                await triggerHaptic();
-                updatePreferences({ autoRefreshGamingNews: !preferences.autoRefreshGamingNews });
-              })();
-            }}
-            colors={colors}
-          />
-
-          {defaultGamesViewOptions.map((option) => {
-            const selected = preferences.defaultGamesView === option.value;
-
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => {
-                  void (async () => {
-                    await triggerHaptic();
-                    updatePreferences({ defaultGamesView: option.value });
-                  })();
-                }}
-                style={{
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  borderRadius: 12,
-                  backgroundColor: selected ? colors.accentSoft : colors.card,
-                  borderWidth: 1,
-                  borderColor: selected ? colors.accent : colors.cardBorder,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
-
-          <Text style={{ fontSize: 13, color: colors.subtext, marginTop: 6, marginBottom: 8 }}>
-            Favorite feed queries or subreddits
+          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
+            Dashboard: fast overview of Cyber, Health, Games, and 2026 goals
           </Text>
-          <SettingsInput
-            label="Pokopia query"
-            value={preferences.gamesFeeds.pokopiaQuery}
-            onChangeText={(text) => updatePreferences({ gamesFeeds: { pokopiaQuery: text } })}
-            placeholder="Pokopia"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Switch 2 query"
-            value={preferences.gamesFeeds.switchQuery}
-            onChangeText={(text) => updatePreferences({ gamesFeeds: { switchQuery: text } })}
-            placeholder="Nintendo Switch 2"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Steam / PC query"
-            value={preferences.gamesFeeds.steamQuery}
-            onChangeText={(text) => updatePreferences({ gamesFeeds: { steamQuery: text } })}
-            placeholder="Steam PC gaming"
-            colors={colors}
-          />
+          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
+            Cyber: certification study progress, logged hours, and recent sessions
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
+            Health: gym tracking, weight entries, loop runs, and weekly consistency
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text, marginBottom: 6 }}>
+            Hobbies: OSRS progress, DIY house tasks, and year-long personal trackers in one lane
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text }}>
+            Reminders: your schedule lane for study blocks, habits, and daily accountability
+          </Text>
         </SectionCard>
 
-        <SectionCard title="Personalization" emoji={'\u2728'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 12 }}>
-            Favorite focus decides what the dashboard puts in the front lane first.
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
-            {favoriteFocusOptions.map((option) => {
-              const selected = preferences.favoriteFocus === option.value;
-
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => {
-                    void (async () => {
-                      await triggerHaptic();
-                      updatePreferences({ favoriteFocus: option.value });
-                    })();
-                  }}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 12,
-                    borderRadius: 12,
-                    backgroundColor: selected ? colors.accent : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.cardBorder,
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text style={{ color: selected ? 'white' : colors.text, fontWeight: '700' }}>{option.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <SettingsInput
-            label="Cyber tab label"
-            value={preferences.customTabLabels.cyber}
-            onChangeText={(text) => updatePreferences({ customTabLabels: { cyber: text || 'Cyber' } })}
-            placeholder="Cyber"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Gym tab label"
-            value={preferences.customTabLabels.gym}
-            onChangeText={(text) => updatePreferences({ customTabLabels: { gym: text || 'Gym' } })}
-            placeholder="Gym"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Games tab label"
-            value={preferences.customTabLabels.games}
-            onChangeText={(text) => updatePreferences({ customTabLabels: { games: text || 'Games' } })}
-            placeholder="Games"
-            colors={colors}
-          />
-          <SettingsInput
-            label="Reminders tab label"
-            value={preferences.customTabLabels.reminders}
-            onChangeText={(text) => updatePreferences({ customTabLabels: { reminders: text || 'Reminders' } })}
-            placeholder="Reminders"
-            colors={colors}
-          />
-        </SectionCard>
-
-        <SectionCard title="Appearance" emoji={'\uD83C\uDFA8'} colors={colors}>
+        <SectionCard title="Appearance" emoji={'🎨'} colors={colors}>
           <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 4 }}>Current theme</Text>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 12 }}>
             {currentThemeLabel}
           </Text>
           <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 12 }}>
-            Choose the overall app color scheme.
+            Choose the overall color treatment for the tracker app.
           </Text>
 
           {themeOptions.map((option) => {
@@ -393,9 +264,9 @@ export default function Settings() {
           })}
         </SectionCard>
 
-        <SectionCard title="System Snapshot" emoji={'\u2699'} colors={colors}>
+        <SectionCard title="System Snapshot" emoji={'⚙'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 8 }}>
-            Theme, reminders, and Games preferences update immediately and reminders sync to device alerts when notification access is granted.
+            Preferences apply immediately, and reminder alerts keep syncing to the device whenever access is granted.
           </Text>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Notifications: {preferences.notificationsEnabled ? 'Enabled' : 'Disabled'} | Haptics:{' '}
@@ -403,7 +274,8 @@ export default function Settings() {
             {preferences.privateNotifications ? 'Private alerts' : 'Full alerts'}
           </Text>
           <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
-            Most-used lane: {mostUsedLane ?? 'none'} | Favorite focus: {preferences.favoriteFocus}
+            Profile: {preferences.profileName || 'Not set'} | Health split: {preferences.preferredWorkoutSplit} |
+            Window: {preferences.scheduleWindow}
           </Text>
         </SectionCard>
       </ScrollView>

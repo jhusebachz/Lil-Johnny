@@ -27,7 +27,20 @@ import {
   readPersistedGymData,
   writePersistedGymData,
 } from '../../data/gymData';
+import {
+  LifeTrackerData,
+  LoopRunEntry,
+  WeightEntry,
+  defaultLifeTrackerData,
+  formatDateKey,
+  formatLoopRunTime,
+  getTodayDateKey,
+  getUniqueWeekCount,
+  readPersistedLifeTrackerData,
+  writePersistedLifeTrackerData,
+} from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import ProgressBar from '../../components/ProgressBar';
 
 const gymDays: GymDay[] = ['Push', 'Pull', 'Legs'];
 const gymViews: GymView[] = ['Workout', 'Progress'];
@@ -51,6 +64,23 @@ function estimateOneRepMax(weight: number, reps: number) {
   return weight * (1 + reps / 30);
 }
 
+function parseSeconds(value: string) {
+  const cleaned = value.trim();
+  if (!cleaned) {
+    return null;
+  }
+
+  if (cleaned.includes(':')) {
+    const [minutes, seconds] = cleaned.split(':').map((part) => Number(part));
+    if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return minutes * 60 + seconds;
+    }
+  }
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function getTodayEntryMeta() {
   const now = new Date();
 
@@ -64,6 +94,16 @@ function getTodayEntryMeta() {
       year: 'numeric',
     }).format(now),
   };
+}
+
+function clampPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getWeeklyPacePct(now = new Date()) {
+  const day = now.getDay();
+  const normalizedDay = day === 0 ? 7 : day;
+  return clampPct((normalizedDay / 7) * 100);
 }
 
 function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
@@ -87,10 +127,14 @@ export default function Gym() {
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
   const [exerciseLogs, setExerciseLogs] = useState<Record<string, ExerciseLog>>({});
   const [exerciseHistory, setExerciseHistory] = useState<GymExerciseHistory>(createEmptyGymProgressHistory());
+  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [lifeHydrated, setLifeHydrated] = useState(false);
   const [activeExerciseKey, setActiveExerciseKey] = useState<string | null>(null);
   const [draftLog, setDraftLog] = useState<ExerciseLog>({ sets: '', reps: '', weight: '', note: '' });
+  const [draftWeight, setDraftWeight] = useState('');
+  const [draftLoopRun, setDraftLoopRun] = useState('');
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<Record<GymDay, string>>({
     Push: gymWorkoutTemplates.Push.exercises[0].name,
     Pull: gymWorkoutTemplates.Pull.exercises[0].name,
@@ -120,7 +164,9 @@ export default function Gym() {
           qualifyingProgressPoints.at(-2)?.reps ?? 0
         )
       : null;
-  const gymStreak = useMemo(() => {
+  const todayEntry = getTodayEntryMeta();
+  const todayKey = getTodayDateKey();
+  const weeklyGymVisits = useMemo(() => {
     const dateKeys = new Set<string>();
 
     Object.values(exerciseHistory).forEach((dayHistory) => {
@@ -129,24 +175,24 @@ export default function Gym() {
       });
     });
 
-    const sortedDates = [...dateKeys].sort().reverse();
-    let streak = 0;
-
-    for (let index = 0; index < sortedDates.length; index += 1) {
-      const expected = new Date();
-      expected.setDate(expected.getDate() - index);
-      const expectedKey = expected.toISOString().slice(0, 10);
-
-      if (sortedDates[index] !== expectedKey) {
-        break;
-      }
-
-      streak += 1;
-    }
-
-    return streak;
+    return getUniqueWeekCount([...dateKeys]);
   }, [exerciseHistory]);
-  const todayEntry = getTodayEntryMeta();
+  const recentWeights = [...lifeData.weightEntries]
+    .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+    .slice(-30);
+  const latestWeight = recentWeights.at(-1);
+  const weightMin = recentWeights.length > 0 ? Math.min(...recentWeights.map((entry) => entry.weight)) : 0;
+  const weightMax = recentWeights.length > 0 ? Math.max(...recentWeights.map((entry) => entry.weight)) : 1;
+  const recentLoopRuns = [...lifeData.loopRuns].sort((left, right) => right.dateKey.localeCompare(left.dateKey)).slice(0, 10);
+  const bestLoopRun = lifeData.loopRuns.reduce(
+    (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
+    lifeData.loopRuns[0]
+  );
+  const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
+  const weeklyGymPacePct = getWeeklyPacePct();
+  const loopRunGoalPct = bestLoopRun
+    ? clampPct(((12 * 60 - bestLoopRun.timeSeconds) / ((12 * 60) - (9 * 60))) * 100)
+    : 0;
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
@@ -182,12 +228,49 @@ export default function Gym() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
+    const hydrateLifeData = async () => {
+      try {
+        const persisted = await readPersistedLifeTrackerData();
+
+        if (persisted && mounted) {
+          setLifeData({
+            ...defaultLifeTrackerData,
+            ...persisted,
+            weightEntries: persisted.weightEntries ?? [],
+            loopRuns: persisted.loopRuns ?? [],
+          });
+        }
+      } finally {
+        if (mounted) {
+          setLifeHydrated(true);
+        }
+      }
+    };
+
+    void hydrateLifeData();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!hasHydrated) {
       return;
     }
 
     void writePersistedGymData({ exerciseLogs, exerciseHistory });
   }, [exerciseHistory, exerciseLogs, hasHydrated]);
+
+  useEffect(() => {
+    if (!lifeHydrated) {
+      return;
+    }
+
+    void writePersistedLifeTrackerData(lifeData);
+  }, [lifeData, lifeHydrated]);
 
   const openExerciseLogger = async (exerciseName: string) => {
     const nextKey = `${selectedDay}-${exerciseName}`;
@@ -251,6 +334,48 @@ export default function Gym() {
     triggerRefresh();
   };
 
+  const logWeight = async () => {
+    const parsed = parseNumber(draftWeight);
+    if (parsed === null) {
+      return;
+    }
+
+    await triggerHaptic();
+    const nextEntry: WeightEntry = {
+      id: `weight-${todayKey}-${Date.now()}`,
+      dateKey: todayKey,
+      label: formatDateKey(todayKey),
+      weight: parsed,
+    };
+
+    setLifeData((current) => ({
+      ...current,
+      weightEntries: [...current.weightEntries, nextEntry].slice(-60),
+    }));
+    setDraftWeight('');
+  };
+
+  const logLoopRun = async () => {
+    const seconds = parseSeconds(draftLoopRun);
+    if (seconds === null) {
+      return;
+    }
+
+    await triggerHaptic();
+    const nextEntry: LoopRunEntry = {
+      id: `loop-${todayKey}-${Date.now()}`,
+      dateKey: todayKey,
+      label: formatDateKey(todayKey),
+      timeSeconds: seconds,
+    };
+
+    setLifeData((current) => ({
+      ...current,
+      loopRuns: [nextEntry, ...current.loopRuns],
+    }));
+    setDraftLoopRun('');
+  };
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
@@ -282,19 +407,108 @@ export default function Gym() {
               marginBottom: 6,
             }}
           >
-            {preferences.customTabLabels.gym}
+            Health
           </Text>
           <Text style={{ color: colors.heroText, fontSize: 26, fontWeight: '800', marginBottom: 10 }}>
-            Train with intent
-          </Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 15, lineHeight: 22 }}>
-            Pick the block for today and keep the workout structure clean, simple, and easy to update.
+            Health trackers
           </Text>
           <Text style={{ color: colors.heroSubtext, fontSize: 12, marginTop: 10 }}>
-            Preferred split: {preferences.preferredWorkoutSplit} | Gym streak: {gymStreak}{' '}
-            {gymStreak === 1 ? 'day' : 'days'}
+            Preferred split: {preferences.preferredWorkoutSplit} | {weeklyGymVisits}/3 gym visits this week
           </Text>
         </View>
+
+        <SectionCard title="Body Metrics" emoji={'\u2696'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            Log weight and keep the most recent thirty entries visible so the trend stays honest.
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 10 }}>
+            Latest weight: {latestWeight ? `${latestWeight.weight.toFixed(1)} lb` : 'No entries yet'}
+          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', minHeight: 170, marginBottom: 16 }}>
+            {recentWeights.map((entry) => {
+              const normalized = weightMax === weightMin ? 1 : (entry.weight - weightMin) / (weightMax - weightMin);
+              const height = 36 + normalized * 100;
+
+              return (
+                <View key={entry.id} style={{ flex: 1, alignItems: 'center' }}>
+                  <View
+                    style={{
+                      width: 10,
+                      height,
+                      borderRadius: 999,
+                      backgroundColor: colors.accent,
+                      marginBottom: 6,
+                    }}
+                  />
+                  <Text style={{ color: colors.subtext, fontSize: 9 }}>{entry.label.split(',')[0]}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <TextInput
+            value={draftWeight}
+            onChangeText={setDraftWeight}
+            keyboardType="decimal-pad"
+            placeholder="Log weight"
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 12,
+            }}
+          />
+          <Pressable
+            onPress={() => {
+              void logWeight();
+            }}
+            style={{
+              borderRadius: 12,
+              backgroundColor: colors.accent,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+            }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Add weight entry</Text>
+          </Pressable>
+        </SectionCard>
+
+        <SectionCard title="Health Pace" emoji={'📈'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            This keeps the key health trackers in the same kind of pace view as OSRS, where it actually makes sense.
+          </Text>
+
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Weekly gym target
+            </Text>
+            <ProgressBar pct={weeklyGymPct} markerPct={weeklyGymPacePct} color={colors.accent} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {weeklyGymPct.toFixed(1)}%</Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Pace {weeklyGymPacePct.toFixed(1)}%</Text>
+            </View>
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+              Loop run sub-9 goal
+            </Text>
+            <ProgressBar pct={loopRunGoalPct} color={colors.success} colors={colors} height={10} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>
+                {bestLoopRun ? `Best ${formatLoopRunTime(bestLoopRun.timeSeconds)}` : 'No run logged'}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Target 9:00</Text>
+            </View>
+          </View>
+        </SectionCard>
 
         <SectionCard title="Gym View" emoji={'\u21C4'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -595,6 +809,69 @@ export default function Gym() {
             </SectionCard>
           </>
         )}
+
+        <SectionCard title="Loop Run Tracker" emoji={'\uD83C\uDFC3'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            Goal: break 9:00 on the Loop run and keep a clean history of every attempt.
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 4 }}>
+            Best time: {bestLoopRun ? formatLoopRunTime(bestLoopRun.timeSeconds) : 'No run logged yet'}
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 12 }}>
+            Total loop runs logged: {lifeData.loopRuns.length}
+          </Text>
+
+          <TextInput
+            value={draftLoopRun}
+            onChangeText={setDraftLoopRun}
+            placeholder="8:57 or 537"
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 12,
+            }}
+          />
+          <Pressable
+            onPress={() => {
+              void logLoopRun();
+            }}
+            style={{
+              borderRadius: 12,
+              backgroundColor: colors.accent,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Log loop run</Text>
+          </Pressable>
+
+          {recentLoopRuns.map((run) => (
+            <View
+              key={run.id}
+              style={{
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.cardBorder,
+                backgroundColor: colors.inputBackground,
+                padding: 12,
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginBottom: 2 }}>
+                {formatLoopRunTime(run.timeSeconds)}
+              </Text>
+              <Text style={{ color: colors.subtext, fontSize: 13 }}>{run.label}</Text>
+            </View>
+          ))}
+        </SectionCard>
       </ScrollView>
 
       <Modal visible={activeExercise !== null} transparent animationType="fade" onRequestClose={closeExerciseLogger}>

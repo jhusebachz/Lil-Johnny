@@ -107,12 +107,8 @@ export default function Reminders() {
             {preferences.customTabLabels.reminders}
           </Text>
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
-            Let&apos;s keep you on track
+            Reminder tracker
           </Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 15, lineHeight: 22, marginBottom: 14 }}>
-            Keep your schedule clear, visible, and easy to adjust as the week changes.
-          </Text>
-
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View
               style={{
@@ -122,7 +118,7 @@ export default function Reminders() {
                 padding: 14,
               }}
             >
-              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Active now</Text>
+              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Done today</Text>
               <Text style={{ color: colors.heroText, fontSize: 16, fontWeight: '800' }}>
                 {todaySummary.completed}/{Math.max(todaySummary.scheduled, 1)}
               </Text>
@@ -135,7 +131,7 @@ export default function Reminders() {
                 padding: 14,
               }}
             >
-              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Next up</Text>
+              <Text style={{ color: colors.heroSubtext, fontSize: 11, marginBottom: 4 }}>Next reminder</Text>
               <Text style={{ color: colors.heroText, fontSize: 16, fontWeight: '800' }}>
                 {nextReminderLabel}
               </Text>
@@ -143,28 +139,28 @@ export default function Reminders() {
           </View>
         </View>
 
-        <SectionCard title="Reminder Status" emoji={'\u23F0'} colors={colors}>
+        <SectionCard title="Tracker Snapshot" emoji={'\u23F0'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 10 }}>
-            Notifications are {preferences.notificationsEnabled ? 'enabled' : 'disabled'} globally, so
-            reminder alerts will follow that master setting.
+            Reminder alerts are {preferences.notificationsEnabled ? 'enabled' : 'disabled'} globally, so this lane
+            follows the main notification setting from the app.
           </Text>
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
             Alert access: {notificationAccess}
           </Text>
           <Text style={{ fontSize: 13, color: colors.text, marginBottom: 8 }}>
-            Today: {todaySummary.completed} complete, {todaySummary.remaining} left
+            Today: {todaySummary.completed} logged, {todaySummary.remaining} still open
           </Text>
           <Text style={{ fontSize: 13, color: colors.text }}>
-            Next tracked reminder:{' '}
+            Next reminder:{' '}
             {nextReminderEntry
               ? `${nextReminderEntry.reminder.topic} at ${formatUpcomingReminder(nextReminderEntry.occurrence)}`
               : 'None'}
           </Text>
           <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 10, lineHeight: 18 }}>
-            Phone alerts are scheduled directly on-device. Browser alerts work while the app stays open in the tab.
+            Phone alerts are scheduled directly on-device. Browser alerts only work while the app stays open in the tab.
           </Text>
           <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
-            Reminder streak: {reminderStreak} {reminderStreak === 1 ? 'day' : 'days'}
+            Completion streak: {reminderStreak} {reminderStreak === 1 ? 'day' : 'days'}
           </Text>
           {notificationAccess !== 'granted' ? (
             <Pressable
@@ -186,7 +182,10 @@ export default function Reminders() {
           ) : null}
         </SectionCard>
 
-        <SectionCard title="Reminders" emoji={'\uD83D\uDCDD'} colors={colors}>
+        <SectionCard title="Reminder List" emoji={'\uD83D\uDCDD'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 14 }}>
+            Use this list to keep study blocks, routines, and accountability check-ins locked to the schedule.
+          </Text>
           <Pressable
             onPress={async () => {
               await triggerHaptic();

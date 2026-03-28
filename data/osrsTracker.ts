@@ -7,6 +7,7 @@ const SNAPSHOT_HOUR = 8;
 const SNAPSHOT_MINUTE = 45;
 const SNAPSHOT_FILE = `${FileSystem.documentDirectory ?? ''}osrs-daily-snapshots.json`;
 const GOAL_PROGRESS_START = '2026-03-25';
+const FRIEND_ORDER = ['mufkr', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
 
 const SKILL_ORDER = [
   'attack',
@@ -638,10 +639,17 @@ export function buildLiveRunescapeTracker(
             skill: formatSkillName(skill.skill),
             xp: skill.xp,
             level: skill.level,
-          })),
+        })),
       };
     })
-    .sort((left, right) => right.overallXp - left.overallXp);
+    .sort((left, right) => {
+      const leftIndex = FRIEND_ORDER.indexOf(left.name as (typeof FRIEND_ORDER)[number]);
+      const rightIndex = FRIEND_ORDER.indexOf(right.name as (typeof FRIEND_ORDER)[number]);
+      const safeLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+      const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+
+      return safeLeftIndex - safeRightIndex;
+    });
 
   const base90Remaining = [...skills]
     .filter((skill) => skill.level < 90)

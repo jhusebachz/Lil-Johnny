@@ -14,7 +14,7 @@ export type DefaultGamesView = 'gaming' | 'pokopia' | 'runescape';
 export type NotificationAccess = 'granted' | 'denied' | 'undetermined' | 'unsupported';
 export type ReminderRecurrence = 'daily' | 'weekdays' | 'weekends';
 export type FavoriteFocus = 'cyber' | 'gym' | 'reminders';
-export type AppTabKey = 'dashboard' | 'cyber' | 'gym' | 'games' | 'reminders' | 'settings';
+export type AppTabKey = 'dashboard' | 'cyber' | 'gym' | 'games' | 'goals' | 'reminders' | 'settings';
 
 export type ReminderItem = {
   id: string;
@@ -89,10 +89,10 @@ const initialReminders: ReminderItem[] = [
   },
   {
     id: '2',
-    topic: 'Cyber Threat Intel Review',
+    topic: 'Cyber Study Block',
     time: '8:45 AM',
     enabled: true,
-    notes: 'Use this as the first clean threat read for the day.',
+    notes: 'Use this as the first clean certification study block for the day.',
     recurrence: 'daily',
     completedDates: [],
   },
@@ -120,8 +120,9 @@ const initialPreferences: AppPreferences = {
   customTabLabels: {
     dashboard: 'Dashboard',
     cyber: 'Cyber',
-    gym: 'Gym',
+    gym: 'Health',
     games: 'Games',
+    goals: 'Hobbies',
     reminders: 'Reminders',
     settings: 'Settings',
   },
@@ -135,6 +136,7 @@ const initialPreferences: AppPreferences = {
     cyber: 0,
     gym: 0,
     games: 0,
+    goals: 0,
     reminders: 0,
     settings: 0,
   },

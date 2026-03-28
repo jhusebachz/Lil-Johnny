@@ -1,191 +1,193 @@
-import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
-import { InteractionManager, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Pill from '../../components/Pill';
+import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
-
 import { useAppSettings } from '../../context/AppSettingsContext';
-import { CyberBriefEntry, getCyberBriefMeta, getCyberBriefStreak, readCyberBriefs, writeCyberBriefs } from '../../data/cyberBriefs';
 import {
-  ActionItem,
-  cyberDefaults,
-  fetchCyberIntel,
-  fetchKnownExploitedVulnerabilities,
-  formatThreatLevel,
-  getFallbackIntel,
-  getFallbackVulnerabilities,
-  IntelItem,
-  VulnerabilityItem,
-} from '../../data/cyberData';
+  ChapterPracticeScore,
+  LifeTrackerData,
+  StudyLogEntry,
+  defaultLifeTrackerData,
+  formatDateKey,
+  getTodayDateKey,
+  readPersistedLifeTrackerData,
+  writePersistedLifeTrackerData,
+} from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useTimedRefresh } from '../../hooks/use-timed-refresh';
+
+const TRACKER_START_DATE = new Date('2026-03-28T12:00:00');
+
+function parsePositiveNumber(value: string) {
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseScore(value: string) {
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+}
+
+function clampPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getPacePct(targetDate?: string) {
+  if (!targetDate) {
+    return null;
+  }
+
+  const start = TRACKER_START_DATE.getTime();
+  const end = new Date(`${targetDate}T12:00:00`).getTime();
+  const now = Date.now();
+
+  if (end <= start) {
+    return 100;
+  }
+
+  return clampPct(((now - start) / (end - start)) * 100);
+}
 
 export default function Cyber() {
-  const { theme, preferences, triggerHaptic } = useAppSettings();
+  const { theme, triggerHaptic } = useAppSettings();
   const colors = getThemeColors(theme);
-  const isFocused = useIsFocused();
-  const [topIntel, setTopIntel] = useState<IntelItem[]>(getFallbackIntel());
-  const [vulnerabilities, setVulnerabilities] = useState<VulnerabilityItem[]>(getFallbackVulnerabilities());
-  const [intelLoading, setIntelLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [intelError, setIntelError] = useState<string | null>(null);
-  const [kevError, setKevError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>('Refreshing cyber sources...');
-  const [briefEntries, setBriefEntries] = useState<CyberBriefEntry[]>([]);
-  const [draftBrief, setDraftBrief] = useState('');
+  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
+  const [hydrated, setHydrated] = useState(false);
+  const [selectedCertId, setSelectedCertId] = useState(defaultLifeTrackerData.certifications[0].id);
+  const [draftChapters, setDraftChapters] = useState('');
+  const [draftStudyNote, setDraftStudyNote] = useState('');
+  const [draftScoreChapter, setDraftScoreChapter] = useState('');
+  const [draftScoreValue, setDraftScoreValue] = useState('');
+  const [draftScoreNote, setDraftScoreNote] = useState('');
+  const { refreshing, triggerRefresh } = useTimedRefresh();
 
   useEffect(() => {
     let mounted = true;
 
-    void readCyberBriefs().then((entries) => {
-      if (!mounted) {
-        return;
-      }
+    void readPersistedLifeTrackerData()
+      .then((persisted) => {
+        if (!mounted || !persisted) {
+          return;
+        }
 
-      setBriefEntries(entries);
-      const todayMeta = getCyberBriefMeta();
-      const todayEntry = entries.find((entry) => entry.dateKey === todayMeta.dateKey);
-      setDraftBrief(todayEntry?.note ?? '');
-    });
+        setLifeData({
+          ...defaultLifeTrackerData,
+          ...persisted,
+          certifications: persisted.certifications?.length ? persisted.certifications : defaultLifeTrackerData.certifications,
+          studyLogs: persisted.studyLogs ?? [],
+          chapterPracticeScores: persisted.chapterPracticeScores ?? [],
+        });
+      })
+      .finally(() => {
+        if (mounted) {
+          setHydrated(true);
+        }
+      });
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const refreshIntel = async (options?: { pullToRefresh?: boolean }) => {
-    if (options?.pullToRefresh) {
-      setRefreshing(true);
-    } else {
-      setIntelLoading(true);
-    }
-    setIntelError(null);
-    setKevError(null);
-
-    try {
-      const [intelResult, kevResult] = await Promise.allSettled([
-        fetchCyberIntel(),
-        fetchKnownExploitedVulnerabilities(),
-      ]);
-
-      const intelOk = intelResult.status === 'fulfilled' && intelResult.value.length > 0;
-      const kevOk = kevResult.status === 'fulfilled' && kevResult.value.length > 0;
-
-      if (intelOk) {
-        setTopIntel(intelResult.value);
-      } else {
-        setTopIntel(getFallbackIntel());
-      }
-
-      if (kevOk) {
-        setVulnerabilities(kevResult.value);
-      } else {
-        setVulnerabilities(getFallbackVulnerabilities());
-      }
-
-      setIntelError(
-        intelResult.status === 'rejected'
-          ? intelResult.reason instanceof Error
-            ? intelResult.reason.message
-            : 'Unable to refresh cyber intel.'
-          : null
-      );
-      setKevError(
-        kevResult.status === 'rejected'
-          ? kevResult.reason instanceof Error
-            ? kevResult.reason.message
-            : 'Unable to refresh KEV data.'
-          : null
-      );
-
-      setLastUpdated(
-        !intelOk && !kevOk
-          ? 'Using fallback cyber guidance'
-          : !intelOk
-            ? 'Live KEV loaded | Intel feed unavailable'
-            : !kevOk
-              ? 'Live intel loaded | KEV feed unavailable'
-              : new Intl.DateTimeFormat('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                }).format(new Date())
-      );
-    } finally {
-      setIntelLoading(false);
-      setRefreshing(false);
-    }
-  };
-
   useEffect(() => {
-    if (!isFocused) {
+    if (!hydrated) {
       return;
     }
 
-    const interaction = InteractionManager.runAfterInteractions(() => {
-      void refreshIntel();
-    });
+    void writePersistedLifeTrackerData(lifeData);
+  }, [hydrated, lifeData]);
 
-    return () => interaction.cancel();
-  }, [isFocused]);
-
-  const today = useMemo(
-    () =>
-      new Intl.DateTimeFormat('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      }).format(new Date()),
-    []
+  const totalChapters = useMemo(
+    () => lifeData.certifications.reduce((total, cert) => total + cert.chaptersCompleted, 0),
+    [lifeData.certifications]
   );
+  const totalTargetChapters = useMemo(
+    () => lifeData.certifications.reduce((total, cert) => total + cert.chapterCount, 0),
+    [lifeData.certifications]
+  );
+  const selectedCert = lifeData.certifications.find((cert) => cert.id === selectedCertId) ?? lifeData.certifications[0];
+  const certLogs = lifeData.studyLogs
+    .filter((entry) => entry.certId === selectedCert.id)
+    .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
+    .slice(0, 8);
+  const certScores = lifeData.chapterPracticeScores
+    .filter((entry) => entry.certId === selectedCert.id)
+    .sort((left, right) => {
+      if (right.chapterNumber !== left.chapterNumber) {
+        return right.chapterNumber - left.chapterNumber;
+      }
+      return right.dateKey.localeCompare(left.dateKey);
+    })
+    .slice(0, 12);
+  const averageScore =
+    certScores.length > 0 ? certScores.reduce((total, entry) => total + entry.score, 0) / certScores.length : null;
 
-  const threatLevel = formatThreatLevel(topIntel);
-  const threatColor =
-    threatLevel === 'High'
-      ? colors.danger
-      : threatLevel === 'Elevated'
-        ? colors.warning
-        : colors.accent;
-  const statusSuffix =
-    intelError && kevError
-      ? ' | Both live sources are unavailable.'
-      : intelError
-        ? ' | Intel feed unavailable.'
-        : '';
-  const kevIssueMessage = kevError
-    ? kevError.includes('403')
-      ? 'CISA blocked the app from reaching the KEV list right now.'
-      : kevError.includes('404')
-        ? 'The KEV link did not return the list.'
-        : kevError.includes('Network request failed')
-          ? 'The app could not reach the KEV site from this device.'
-          : kevError.includes('timed out')
-            ? 'The KEV site took too long to respond.'
-            : 'The app could not load the KEV list right now.'
-    : null;
-  const briefStreak = getCyberBriefStreak(briefEntries);
-  const latestBriefs = [...briefEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey)).slice(0, 4);
-  const cyberTabLabel = preferences.customTabLabels.cyber || 'Cyber';
+  const addStudySession = async () => {
+    const chapters = parsePositiveNumber(draftChapters);
+    if (!chapters) {
+      return;
+    }
 
-  const saveBrief = async () => {
-    const meta = getCyberBriefMeta();
-    const trimmed = draftBrief.trim();
     await triggerHaptic();
-    setBriefEntries((current) => {
-      const nextEntries = current.filter((entry) => entry.dateKey !== meta.dateKey);
-      const merged = trimmed ? [{ dateKey: meta.dateKey, label: meta.label, note: trimmed }, ...nextEntries] : nextEntries;
-      void writeCyberBriefs(merged);
-      return merged;
-    });
+    const todayKey = getTodayDateKey();
+    const nextEntry: StudyLogEntry = {
+      id: `${selectedCert.id}-${todayKey}-${Date.now()}`,
+      certId: selectedCert.id,
+      dateKey: todayKey,
+      label: formatDateKey(todayKey),
+      chapters,
+      note: draftStudyNote.trim() || undefined,
+    };
+
+    setLifeData((current) => ({
+      ...current,
+      certifications: current.certifications.map((cert) =>
+        cert.id === selectedCert.id
+          ? {
+              ...cert,
+              chaptersCompleted: Math.min(cert.chapterCount, cert.chaptersCompleted + chapters),
+            }
+          : cert
+      ),
+      studyLogs: [nextEntry, ...current.studyLogs],
+    }));
+
+    setDraftChapters('');
+    setDraftStudyNote('');
   };
-  const headerStatusText = intelLoading
-    ? 'Refreshing cyber intel...'
-    : kevIssueMessage && !intelError
-      ? `Live intel loaded | ${kevIssueMessage}`
-      : `${lastUpdated}${statusSuffix}`;
+
+  const addPracticeScore = async () => {
+    const chapterNumber = parsePositiveNumber(draftScoreChapter);
+    const score = parseScore(draftScoreValue);
+
+    if (!chapterNumber || !score) {
+      return;
+    }
+
+    await triggerHaptic();
+    const todayKey = getTodayDateKey();
+    const nextEntry: ChapterPracticeScore = {
+      id: `${selectedCert.id}-score-${todayKey}-${Date.now()}`,
+      certId: selectedCert.id,
+      chapterNumber,
+      score,
+      dateKey: todayKey,
+      label: formatDateKey(todayKey),
+      note: draftScoreNote.trim() || undefined,
+    };
+
+    setLifeData((current) => ({
+      ...current,
+      chapterPracticeScores: [nextEntry, ...current.chapterPracticeScores],
+    }));
+
+    setDraftScoreChapter('');
+    setDraftScoreValue('');
+    setDraftScoreNote('');
+  };
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
@@ -193,15 +195,13 @@ export default function Cyber() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              void refreshIntel({ pullToRefresh: true });
-            }}
+            onRefresh={triggerRefresh}
             tintColor={colors.accent}
             colors={[colors.accent]}
             progressBackgroundColor={colors.card}
           />
         }
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
         <View
           style={{
@@ -211,206 +211,286 @@ export default function Cyber() {
             marginBottom: 18,
           }}
         >
-          <Text
-            style={{
-              color: colors.heroSubtext,
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            {cyberTabLabel}
+          <Text style={{ color: colors.heroSubtext, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+            Cyber Trackers
           </Text>
-
-          <Text style={{ color: colors.heroText, fontSize: 26, fontWeight: '800', marginBottom: 10 }}>
-            Stay ahead of the week
+          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>
+            Track the cert grind
           </Text>
-
-          <Text style={{ color: colors.heroSubtext, fontSize: 15, marginBottom: 10 }}>
-            Keep the threat picture tight, track the most relevant intel, and move quickly on what matters.
+          <Text style={{ color: colors.heroSubtext, fontSize: 12 }}>
+            Total chapter progress: {totalChapters} / {totalTargetChapters}
           </Text>
-
-          <Text style={{ color: colors.heroSubtext, fontSize: 12, marginBottom: 12 }}>{headerStatusText}</Text>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Pill text={cyberDefaults.regionFocus} color={colors.accent} />
-            <Pill text={`Threat Level: ${threatLevel}`} color={threatColor} />
-            <Pill text={today} color={colors.accentSoft} />
-          </View>
         </View>
 
-        <SectionCard title="Operational Snapshot" emoji={'\uD83D\uDCCD'} colors={colors}>
-          <StatRow label="Primary focus" value={cyberDefaults.regionFocus} colors={colors} />
-          <StatRow label="Threat level" value={threatLevel} colors={colors} />
-          <StatRow label="Top priority" value="Identity & phishing" colors={colors} />
-          <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginTop: 12 }}>
-            {cyberDefaults.headlineSummary}
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 10 }}>
-            Threat brief streak: {briefStreak} {briefStreak === 1 ? 'day' : 'days'}
-          </Text>
+        <SectionCard title="Certifications" emoji={'🧠'} colors={colors}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {lifeData.certifications.map((cert) => {
+              const selected = cert.id === selectedCertId;
+
+              return (
+                <Pressable
+                  key={cert.id}
+                  onPress={async () => {
+                    await triggerHaptic();
+                    setSelectedCertId(cert.id);
+                  }}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderRadius: 12,
+                    backgroundColor: selected ? colors.accent : colors.card,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.accent : colors.cardBorder,
+                    marginRight: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>
+                    {cert.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </SectionCard>
 
-        <SectionCard title="Top Intel Items" emoji={'\uD83D\uDCF0'} colors={colors}>
-          {topIntel.map((item) => (
-            <View
-              key={item.title}
-              style={{
-                marginBottom: 14,
-                paddingBottom: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.cardBorder,
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
-                {item.title}
-              </Text>
+        <SectionCard title="Certification Progress" emoji={'🛡'} colors={colors}>
+          {(() => {
+            const pct =
+              selectedCert.chapterCount > 0 ? (selectedCert.chaptersCompleted / selectedCert.chapterCount) * 100 : 0;
+            const pacePct = getPacePct(selectedCert.examDate);
 
-              <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 6 }}>{item.source}</Text>
-
-              <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20, marginBottom: 8 }}>
-                {item.summary}
-              </Text>
-
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                <Pill
-                  text={item.priority}
-                  color={
-                    item.priority === 'High'
-                      ? colors.danger
-                      : item.priority === 'Medium'
-                        ? colors.warning
-                        : colors.accent
-                  }
-                />
-                {item.tags.map((tag) => (
-                  <Pill key={`${item.title}-${tag}`} text={tag} color={colors.accentSoft} />
-                ))}
-              </View>
-            </View>
-          ))}
-        </SectionCard>
-
-        <SectionCard title="Known Exploited Vulnerabilities" emoji={'\uD83D\uDEE1'} colors={colors}>
-          {kevIssueMessage ? (
-            <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 12 }}>
-              {kevIssueMessage}
-            </Text>
-          ) : null}
-          {vulnerabilities.map((item) => (
-            <View
-              key={item.cve}
-              style={{
-                marginBottom: 14,
-                paddingBottom: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.cardBorder,
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
-                {item.cve}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.text, marginBottom: 4 }}>
-                {item.product} | {item.severity}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.subtext, lineHeight: 20 }}>{item.note}</Text>
-              {item.dueDate ? (
-                <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 6 }}>
-                  CISA due date: {item.dueDate}
+            return (
+              <View
+                style={{
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.inputBackground,
+                  padding: 14,
+                }}
+              >
+                <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+                  {selectedCert.name}
                 </Text>
-              ) : null}
-            </View>
-          ))}
+                <StatRow
+                  label="Chapters complete"
+                  value={`${selectedCert.chaptersCompleted} / ${selectedCert.chapterCount}`}
+                  colors={colors}
+                />
+                {selectedCert.studyGuide ? <StatRow label="Study guide" value={selectedCert.studyGuide} colors={colors} /> : null}
+                {selectedCert.examDate ? <StatRow label="Exam target" value={selectedCert.examDate} colors={colors} /> : null}
+                <ProgressBar pct={pct} markerPct={pacePct ?? undefined} color={colors.accent} colors={colors} height={10} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {pct.toFixed(1)}%</Text>
+                  <Text style={{ fontSize: 11, color: colors.subtext }}>
+                    {pacePct !== null ? `Pace ${pacePct.toFixed(1)}%` : 'No pace line'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700' }}>
+                  Practice score average:{' '}
+                  <Text style={{ color: colors.subtext, fontWeight: '400' }}>
+                    {averageScore !== null ? `${averageScore.toFixed(1)}%` : 'No scores logged yet'}
+                  </Text>
+                </Text>
+              </View>
+            );
+          })()}
         </SectionCard>
 
-        <SectionCard title="Key Takeaways" emoji={'\uD83E\uDDE0'} colors={colors}>
-          {cyberDefaults.keyTakeaways.map((item, index) => (
-            <Text
-              key={`${index}-${item}`}
-              style={{ fontSize: 13, color: colors.text, lineHeight: 22, marginBottom: 8 }}
-            >
-              • {item}
-            </Text>
-          ))}
-        </SectionCard>
-
-        <SectionCard title="Recommended Actions" emoji={'\u2705'} colors={colors}>
-          {cyberDefaults.actions.map((item: ActionItem) => (
-            <View
-              key={item.title}
-              style={{
-                marginBottom: 12,
-                paddingBottom: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.cardBorder,
-              }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
-                {item.title}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.subtext }}>
-                Owner: {item.owner} | Due: {item.due}
-              </Text>
-            </View>
-          ))}
-        </SectionCard>
-
-        <SectionCard title="Threat Brief Log" emoji={'\u270D'} colors={colors}>
+        <SectionCard title="Log Chapter Progress" emoji={'✍'} colors={colors}>
           <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
-            Save one short readout for the day so you can look back at how the threat picture shifted over time.
+            Log chapter progress against the current study guide so the progress bars and dashboard stay honest.
           </Text>
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Selected tracker</Text>
+          <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800', marginBottom: 12 }}>{selectedCert.name}</Text>
+
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Chapters covered</Text>
           <TextInput
-            value={draftBrief}
-            onChangeText={setDraftBrief}
-            placeholder="Write today's cyber readout"
+            value={draftChapters}
+            onChangeText={setDraftChapters}
+            keyboardType="decimal-pad"
+            placeholder="1"
             placeholderTextColor={colors.subtext}
-            multiline
             style={{
-              backgroundColor: colors.inputBackground,
               borderWidth: 1,
               borderColor: colors.inputBorder,
-              borderRadius: 12,
+              borderRadius: 10,
               paddingHorizontal: 12,
-              paddingVertical: 12,
-              minHeight: 96,
+              paddingVertical: 10,
+              fontSize: 15,
               color: colors.text,
-              textAlignVertical: 'top',
+              backgroundColor: colors.inputBackground,
               marginBottom: 12,
             }}
           />
+
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Note</Text>
+          <TextInput
+            value={draftStudyNote}
+            onChangeText={setDraftStudyNote}
+            placeholder="Which chapters or topics did you cover?"
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 14,
+            }}
+          />
+
           <Pressable
             onPress={() => {
-              void saveBrief();
+              void addStudySession();
             }}
             style={{
-              alignSelf: 'flex-start',
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderRadius: 10,
+              borderRadius: 12,
               backgroundColor: colors.accent,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+            }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Log chapter progress</Text>
+          </Pressable>
+        </SectionCard>
+
+        <SectionCard title="Practice Exam Scores" emoji={'📊'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22, marginBottom: 12 }}>
+            Track the end-of-chapter practice exam scores for the current study guide.
+          </Text>
+
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Chapter number</Text>
+          <TextInput
+            value={draftScoreChapter}
+            onChangeText={setDraftScoreChapter}
+            keyboardType="number-pad"
+            placeholder="3"
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 12,
+            }}
+          />
+
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Score (%)</Text>
+          <TextInput
+            value={draftScoreValue}
+            onChangeText={setDraftScoreValue}
+            keyboardType="decimal-pad"
+            placeholder="82"
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 12,
+            }}
+          />
+
+          <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Note</Text>
+          <TextInput
+            value={draftScoreNote}
+            onChangeText={setDraftScoreNote}
+            placeholder="Weak spots, retake notes, etc."
+            placeholderTextColor={colors.subtext}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.inputBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 15,
+              color: colors.text,
+              backgroundColor: colors.inputBackground,
+              marginBottom: 14,
+            }}
+          />
+
+          <Pressable
+            onPress={() => {
+              void addPracticeScore();
+            }}
+            style={{
+              borderRadius: 12,
+              backgroundColor: colors.accent,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
               marginBottom: 14,
             }}
           >
-            <Text style={{ color: 'white', fontWeight: '800' }}>Save today&apos;s brief</Text>
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800' }}>Log practice score</Text>
           </Pressable>
 
-          {latestBriefs.map((entry) => (
-            <View
-              key={entry.dateKey}
-              style={{
-                backgroundColor: colors.inputBackground,
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 10,
-                borderWidth: 1,
-                borderColor: colors.cardBorder,
-              }}
-            >
-              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800', marginBottom: 4 }}>{entry.label}</Text>
-              <Text style={{ color: colors.subtext, fontSize: 13, lineHeight: 20 }}>{entry.note}</Text>
-            </View>
-          ))}
+          {certScores.length > 0 ? (
+            certScores.map((entry) => (
+              <View
+                key={entry.id}
+                style={{
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.inputBackground,
+                  padding: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginBottom: 2 }}>
+                  Chapter {entry.chapterNumber}
+                </Text>
+                <Text style={{ color: colors.subtext, fontSize: 13 }}>{entry.score.toFixed(0)}% - {entry.label}</Text>
+                {entry.note ? <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 4 }}>{entry.note}</Text> : null}
+              </View>
+            ))
+          ) : (
+            <Text style={{ color: colors.subtext, fontSize: 13 }}>
+              No end-of-chapter practice scores logged yet for this certification.
+            </Text>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Recent Study Sessions" emoji={'📘'} colors={colors}>
+          {certLogs.length > 0 ? (
+            certLogs.map((entry) => (
+              <View
+                key={entry.id}
+                style={{
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.inputBackground,
+                  padding: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginBottom: 2 }}>{entry.label}</Text>
+                <Text style={{ color: colors.subtext, fontSize: 13 }}>
+                  {entry.chapters} chapter{entry.chapters === 1 ? '' : 's'}
+                </Text>
+                {entry.note ? <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 4 }}>{entry.note}</Text> : null}
+              </View>
+            ))
+          ) : (
+            <Text style={{ color: colors.subtext, fontSize: 13 }}>
+              No chapter progress logged yet for this certification.
+            </Text>
+          )}
         </SectionCard>
       </ScrollView>
     </SafeAreaView>

@@ -2,131 +2,114 @@
 
 [![Lint](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml/badge.svg)](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml)
 
-Lil Johnny is a personalized mobile dashboard built with Expo and React Native. It pulls together reminders, cyber intel, gym tracking, gaming feeds, and live OSRS progression into one app that is meant to feel more like a daily operating system than a generic utility bundle.
+Lil Johnny is a personal life-tracker app built with Expo and React Native. It is designed to keep the main lanes of life visible in one place: certification study, health progress, reminders, OSRS progress, house projects, and 2026 streak goals.
 
-## Highlights
+## What The App Tracks
 
-- Personalized dashboard with time-of-day greeting, daily plan, and focus-aware overview
-- Reminder system with real device notifications, recurrence rules, notes, and completion tracking
-- Cyber tab with live Reddit intel, CISA KEV fallback handling, and a saved daily threat brief log
-- Gym tab with workout logging, progress charts, PR trend snapshots, and estimated 1RM tracking
-- Games tab with Reddit-fed gaming news, Pokopia coverage, and a robust OSRS tracker section
-- OSRS goal tracking with hourly-rate projections, pace bars, and coaching tied to real progress since March 25, 2026
-- Theme system with `Dark`, `Light`, `Gangsta Green`, and `Silver & Black`
+- `Dashboard`: overall life overview, Bliss Score, and suggested next actions
+- `Cyber`: Linux+, PenTest+, and Cloud+ progress with chapter pacing and chapter-end practice scores
+- `Health`: gym tracking, weight entries, loop run tracking, and weekly gym pace
+- `Hobbies`: OSRS tracker, DIY to-do list, and 2026 personal streaks
+- `Reminders`: recurring reminders, notes, completion tracking, and notifications
+- `Settings`: app appearance, profile preferences, and notification controls
 
-## Tech Stack
+## Current Highlights
 
-- Expo
-- React Native
-- Expo Router
-- TypeScript
-- EAS Build / EAS Update
+- OSRS tracker with live snapshot data, pace bars, and coaching
+- Certification tracker based on real Sybex chapter counts
+- DIY task tracking inside the Hobbies lane
+- Bliss Score and suggested next actions on the dashboard
+- Real reminder notifications on supported builds
+- Theme system with `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
 
 ## Project Structure
 
 ```text
 .
 |-- app/                    # Expo Router screens and layout
-|-- components/             # Reusable UI pieces by feature
-|-- context/                # Shared app settings, persistence, notifications
-|-- data/                   # Theme data, cyber/game feeds, OSRS tracker, reminders
+|-- assets/                 # Images, icons, and startup visuals
+|-- components/             # Reusable UI and feature components
+|-- context/                # App settings, reminders, persistence
+|-- data/                   # Tracker data models and derived logic
 |-- hooks/                  # Shared screen hooks
-|-- assets/images/          # Logos, icons, and startup visuals
 |-- scripts/                # Local automation helpers
 |-- app.json                # Expo app config
 |-- eas.json                # EAS build/update config
 `-- README.md
 ```
 
-## Core Features
-
-### Dashboard
-
-- personalized greeting and daily context
-- next reminder awareness
-- favorite-focus behavior
-- daily plan blocks without surfacing Games as a home-screen focal point
-
-### Reminders
-
-- daily, weekday, or weekend schedules
-- native notification support on real builds
-- topic notes
-- completion tracking and streaks
-- wheel-based time picker
-
-### Cyber
-
-- refresh-on-focus intel flow
-- live Reddit-based threat signal
-- CISA KEV feed support with graceful fallback messaging
-- short threat-brief logging for historical context
-
-### Gym
-
-- Push / Pull / Legs workflow
-- per-exercise logging for sets, reps, weight, and notes
-- recent-entry progress charts
-- best-set logic with rep thresholds
-- estimated 1RM and PR trend view
-
-### Games
-
-- Nintendo Switch 2 and Steam / PC news
-- Pokopia tracking
-- embedded OSRS stats and goals
-- pace-check bars for Base 90, RuneFest 2250, and Max Cape
-- goal coaching based on estimated grind hours per day
-- customizable query defaults from Settings
-
 ## Local Development
 
-1. Install dependencies
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Start the app locally
+Start the app:
 
 ```bash
 npx expo start
 ```
 
-3. Run lint
+Run lint:
 
 ```bash
 cmd /c npm run lint
 ```
 
-## Android Builds
+## Android Testing
 
-Preview APK build:
+Build a preview APK:
 
 ```bash
 eas build -p android --profile preview
 ```
 
-Push a JS / asset update to the preview channel:
+Push an OTA update for JavaScript and asset changes:
 
 ```bash
 eas update --channel preview --message "Describe the change"
 ```
 
+Important:
+
+- `GitHub pushes do not update the phone app by themselves.`
+- `eas update` is enough for JS and asset changes.
+- native changes like icons, splash config, plugins, or app config need a fresh APK.
+
 ## Versioning
 
-This project uses semantic-style app versions:
+Lil Johnny now follows a simple semantic versioning policy:
 
-- `1.0.0` -> initial release
-- `1.1.0` -> feature release
-- `1.1.1` -> patch/fix release
+- `MAJOR` for structural or breaking product changes that redefine the app significantly
+- `MINOR` for new tracker lanes, major feature additions, or substantial UX expansions
+- `PATCH` for bug fixes, polish, copy cleanup, and low-risk refinements
 
-The app version is stored in:
+Examples:
+
+- `1.1.0 -> 1.2.0` for a major feature iteration
+- `1.2.0 -> 1.2.1` for follow-up fixes and polish
+- `1.2.1 -> 2.0.0` if the app changes in a way that meaningfully resets its structure or release expectations
+
+The app version lives in:
 
 - [`app.json`](./app.json)
 - [`package.json`](./package.json)
+- [`package-lock.json`](./package-lock.json)
 
-Because Expo Updates is configured with `runtimeVersion.policy = "appVersion"`, changing the app version also matters for OTA update compatibility.
+Because Expo Updates uses `runtimeVersion.policy = "appVersion"`, version changes also matter for OTA compatibility.
+
+## Current Release
+
+`1.2.0`
+
+This version reflects the shift from a dashboard/news-style app into a broader life-tracker system with:
+
+- dashboard action guidance and Bliss Score
+- Cyber chapter-based cert tracking
+- Hobbies lane with OSRS, DIY, and 2026 goals
+- broader health tracking and pacing views
 
 ## GitHub Sync
 
@@ -146,13 +129,11 @@ Daily automatic push from this PC:
 Example:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup-daily-push.ps1 -Time "19:00"
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-daily-push.ps1 -Time "12:00"
 ```
 
 ## Notes
 
 - This repo is configured for EAS builds and updates.
-- OTA app changes require `eas update`; GitHub pushes alone do not update the installed phone app.
-- Local caches and generated folders are ignored in Git.
-- Some content and branding are intentionally personal.
 - The OSRS tracker data source is maintained separately in the OSRS-Daily-Tracker repo.
+- Some content and branding are intentionally personal.

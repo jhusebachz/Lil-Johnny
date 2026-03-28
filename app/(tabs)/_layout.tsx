@@ -4,7 +4,7 @@ import { useAppSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
 
 export default function TabLayout() {
-  const { theme, preferences, trackTabVisit } = useAppSettings();
+  const { theme, trackTabVisit } = useAppSettings();
   const colors = getThemeColors(theme);
 
   return (
@@ -25,7 +25,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: preferences.customTabLabels.dashboard,
+          title: 'Dashboard',
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
         listeners={{ tabPress: () => trackTabVisit('dashboard') }}
@@ -33,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cyber"
         options={{
-          title: preferences.customTabLabels.cyber,
+          title: 'Cyber',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="shield-checkmark" size={size} color={color} />
           ),
@@ -43,7 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="gym"
         options={{
-          title: preferences.customTabLabels.gym,
+          title: 'Health',
           tabBarIcon: ({ color, size }) => <Ionicons name="barbell" size={size} color={color} />,
         }}
         listeners={{ tabPress: () => trackTabVisit('gym') }}
@@ -51,15 +51,23 @@ export default function TabLayout() {
       <Tabs.Screen
         name="games"
         options={{
-          title: preferences.customTabLabels.games,
+          href: null,
+          title: 'Games',
           tabBarIcon: ({ color, size }) => <Ionicons name="game-controller" size={size} color={color} />,
         }}
         listeners={{ tabPress: () => trackTabVisit('games') }}
       />
       <Tabs.Screen
+        name="goals"
+        options={{
+          title: 'Hobbies',
+          tabBarIcon: ({ color, size }) => <Ionicons name="construct" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="reminders"
         options={{
-          title: preferences.customTabLabels.reminders,
+          title: 'Reminders',
           tabBarIcon: ({ color, size }) => <Ionicons name="alarm" size={size} color={color} />,
         }}
         listeners={{ tabPress: () => trackTabVisit('reminders') }}
@@ -67,7 +75,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: preferences.customTabLabels.settings,
+          title: 'Settings',
           tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
         }}
         listeners={{ tabPress: () => trackTabVisit('settings') }}
