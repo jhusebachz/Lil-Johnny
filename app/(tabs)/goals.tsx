@@ -30,7 +30,7 @@ function DiyTaskCard({
   onToggle: () => Promise<void>;
 }) {
   return (
-    <SectionCard title={task.title} emoji={'ðŸ”¨'} colors={colors}>
+    <SectionCard title={task.title} emoji={'\uD83D\uDD28'} colors={colors}>
       <Text
         style={{
           fontSize: 12,
@@ -107,7 +107,7 @@ function DiyAddCard({
   addDiyTask: () => Promise<void>;
 }) {
   return (
-    <SectionCard title="Add DIY Task" emoji={'ðŸ§°'} colors={colors}>
+    <SectionCard title="Add DIY Task" emoji={'\uD83E\uDDF0'} colors={colors}>
       <TextInput
         value={draftDiyTitle}
         onChangeText={setDraftDiyTitle}
@@ -286,7 +286,7 @@ export default function Goals() {
           </Text>
         </View>
 
-        <SectionCard title="Hobbies View" emoji={'ðŸ§©'} colors={colors}>
+        <SectionCard title="Hobbies View" emoji={'\uD83E\uDDE9'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {(['osrs', 'diy'] as HobbiesView[]).map((view) => {
               const selected = view === selectedView;

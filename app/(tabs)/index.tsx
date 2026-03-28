@@ -365,7 +365,7 @@ export default function Dashboard() {
 
     if (dailyGoals.some((goal) => !goal.completedDates.includes(todayKey))) {
       candidates.push({
-        label: 'Close out todayÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s daily-check streaks before the day ends so you do not leak easy momentum.',
+        label: "Close out today's daily-check streaks before the day ends so you do not leak easy momentum.",
         urgency: 0.82,
       });
     }
@@ -520,7 +520,7 @@ export default function Dashboard() {
           </View>
         </Animated.View>
 
-        <SectionCard title="Bliss Score" emoji={'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨'} colors={colors}>
+        <SectionCard title="Bliss Score" emoji={'\u2728'} colors={colors}>
           <Text
             style={{
               fontSize: isVeryCompact ? 48 : isCompact ? 52 : 58,
@@ -612,7 +612,7 @@ export default function Dashboard() {
           )}
         </SectionCard>
 
-        <SectionCard title="Streaks" emoji={'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â'} colors={colors}>
+        <SectionCard title="Streaks" emoji={'\uD83D\uDD25'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <OverviewCard
               title="No Alcohol"
