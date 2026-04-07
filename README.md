@@ -2,14 +2,14 @@
 
 [![Lint](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml/badge.svg)](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml)
 
-Lil Johnny is a personal life-tracker app built with Expo and React Native. It is designed to keep the main lanes of life visible in one place: certification study, health progress, reminders, OSRS progress, house projects, and 2026 streak goals.
+Lil Johnny is a personal life-tracker app built with Expo and React Native. It keeps certification study, health progress, reminders, OSRS progress, house projects, and 2026 streak goals visible in one place.
 
 ## What The App Tracks
 
 - `Dashboard`: overall life overview, pace-based Bliss Score, and suggested next actions
 - `Cyber`: Linux+, PenTest+, and Cloud+ progress with chapter pacing and chapter-end practice scores
-- `Health`: gym tracking, weight entries, loop run tracking, weekly gym pace, and weight-loss pace
-- `Hobbies`: OSRS tracker and DIY to-do list
+- `Health`: set-by-set gym logging, weight entries, loop run tracking, weekly gym pace, and weight-loss pace
+- `Hobbies`: DIY to-do list first, with OSRS in a separate sub-tab
 - `Streaks`: 2026 streak tracking plus reminder alarms and notifications
 - `Settings`: app appearance and notification controls
 
@@ -19,8 +19,11 @@ Lil Johnny is a personal life-tracker app built with Expo and React Native. It i
 - Certification tracker based on real Sybex chapter counts
 - Dashboard Bliss Score now evaluates daily pace instead of raw year-to-date completion
 - Health pacing reflects the real Wednesday/Thursday/Friday gym schedule
+- Gym logging now tracks individual sets with their own reps and weight
+- Health coaching insight rotates daily and responds to current progress
 - Weight-loss pace is tracked from a `205 lb` starting point toward a `185 lb` goal
-- DIY task tracking inside the Hobbies lane
+- Streaks and reminder completions now roll over on local midnight instead of UTC
+- DIY task tracking inside the Hobbies tab
 - 2026 streak tracking and reminder alarms combined in one tab
 - Real reminder notifications on supported builds
 - Theme system with `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
@@ -86,7 +89,7 @@ Important:
 Lil Johnny now follows a simple semantic versioning policy:
 
 - `MAJOR` for structural or breaking product changes that redefine the app significantly
-- `MINOR` for new tracker lanes, major feature additions, or substantial UX expansions
+- `MINOR` for new tracker areas, major feature additions, or substantial UX expansions
 - `PATCH` for bug fixes, polish, copy cleanup, and low-risk refinements
 
 Examples:
@@ -107,13 +110,13 @@ Because Expo Updates uses `runtimeVersion.policy = "appVersion"`, version change
 
 `1.2.1`
 
-This version reflects the shift from a dashboard/news-style app into a broader life-tracker system, plus the follow-up cleanup that removed stale Games/news remnants and tightened the tracker wording:
+This version reflects the shift from a dashboard/news-style app into a broader life-tracker system, plus follow-up cleanup and tracker refinements:
 
 - dashboard action guidance and a pace-based Bliss Score
 - Cyber chapter-based cert tracking
-- Hobbies lane with OSRS and DIY
-- broader health tracking with gym, loop-run, and weight-loss pacing
-- Streaks lane with avoidance streaks and reminder alarms
+- Hobbies tab with DIY first and OSRS in a separate sub-tab
+- broader health tracking with set-by-set gym logging, loop-run tracking, rotating coaching, and weight-loss pacing
+- Streaks tab with avoidance streaks and reminder alarms that follow local-midnight rollover
 
 ## GitHub Sync
 

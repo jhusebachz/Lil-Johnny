@@ -1,8 +1,19 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { ExerciseProgressPoint, GymDay, WorkoutBlock } from '../../data/gymData';
+import { GymDay, WorkoutBlock } from '../../data/gymData';
 import { ThemeColors } from '../../data/theme';
 import SectionCard from '../SectionCard';
+
+type ProgressSummary = {
+  point: {
+    dateKey: string;
+    label: string;
+    note?: string;
+  };
+  setCount: number;
+  bestSet: { reps: number; weight: number } | null;
+  qualifyingSet: { reps: number; weight: number } | null;
+};
 
 type ExerciseProgressSectionProps = {
   bestAtTopWeight: { topWeight: number; bestReps: number } | null;
@@ -13,8 +24,8 @@ type ExerciseProgressSectionProps = {
   maxReps: number;
   oneRepMaxTrend: number | null;
   progressExerciseName: string;
-  progressPoints: ExerciseProgressPoint[];
-  qualifyingProgressPoints: ExerciseProgressPoint[];
+  progressPointSummaries: ProgressSummary[];
+  qualifyingProgressPoints: ProgressSummary[];
   selectedDay: GymDay;
   workout: WorkoutBlock;
   onExerciseSelect: (exerciseName: string) => void;
@@ -29,7 +40,7 @@ export default function ExerciseProgressSection({
   maxReps,
   oneRepMaxTrend,
   progressExerciseName,
-  progressPoints,
+  progressPointSummaries,
   qualifyingProgressPoints,
   selectedDay,
   workout,
@@ -37,7 +48,7 @@ export default function ExerciseProgressSection({
 }: ExerciseProgressSectionProps) {
   return (
     <>
-      <SectionCard title="Exercise Progress" emoji={'📊'} colors={colors}>
+      <SectionCard title="Exercise Progress" emoji={'\uD83D\uDCCA'} colors={colors}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
           {workout.exercises.map((exercise) => {
             const selected = exercise.name === progressExerciseName;
@@ -124,13 +135,19 @@ export default function ExerciseProgressSection({
             minHeight: 180,
           }}
         >
-          {progressPoints.map((point) => {
-            const barHeight = Math.max(44, Math.round((point.reps / maxReps) * 140));
-            const isTopWeight = bestAtTopWeight ? point.weight === bestAtTopWeight.topWeight : false;
+          {progressPointSummaries.map((summary) => {
+            if (!summary.bestSet) {
+              return null;
+            }
+
+            const barHeight = Math.max(44, Math.round((summary.bestSet.reps / maxReps) * 140));
+            const isTopWeight = bestAtTopWeight ? summary.qualifyingSet?.weight === bestAtTopWeight.topWeight : false;
 
             return (
-              <View key={`${selectedDay}-${progressExerciseName}-${point.dateKey}`} style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{point.reps} reps</Text>
+              <View key={`${selectedDay}-${progressExerciseName}-${summary.point.dateKey}`} style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
+                  {summary.bestSet.reps} reps
+                </Text>
                 <View
                   style={{
                     width: 28,
@@ -140,23 +157,23 @@ export default function ExerciseProgressSection({
                     marginBottom: 8,
                   }}
                 />
-                <Text style={{ color: colors.subtext, fontSize: 11, fontWeight: '700', marginBottom: 4 }}>{point.label}</Text>
-                <Text style={{ color: colors.subtext, fontSize: 10 }}>{formatWeight(point.weight)} lb</Text>
+                <Text style={{ color: colors.subtext, fontSize: 11, fontWeight: '700', marginBottom: 4 }}>{summary.point.label}</Text>
+                <Text style={{ color: colors.subtext, fontSize: 10 }}>{formatWeight(summary.bestSet.weight)} lb</Text>
               </View>
             );
           })}
         </View>
-        {progressPoints.length === 0 ? (
+        {progressPointSummaries.length === 0 ? (
           <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 14 }}>
-            No entries logged yet for this exercise. Save today&apos;s sets, reps, and weight to start the trend line.
+            No entries logged yet for this exercise. Save today&apos;s sets to start the trend line.
           </Text>
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Recent Entries" emoji={'🔍'} colors={colors}>
-        {[...qualifyingProgressPoints].reverse().map((point) => (
+      <SectionCard title="Recent Entries" emoji={'\uD83D\uDD0D'} colors={colors}>
+        {[...qualifyingProgressPoints].reverse().map((summary) => (
           <View
-            key={`${selectedDay}-detail-${progressExerciseName}-${point.dateKey}`}
+            key={`${selectedDay}-detail-${progressExerciseName}-${summary.point.dateKey}`}
             style={{
               marginBottom: 12,
               padding: 12,
@@ -166,11 +183,15 @@ export default function ExerciseProgressSection({
               borderColor: colors.cardBorder,
             }}
           >
-            <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginBottom: 4 }}>{point.label}</Text>
-            <Text style={{ color: colors.subtext, fontSize: 13, marginBottom: 2 }}>Best set: {point.reps} reps</Text>
-            <Text style={{ color: colors.subtext, fontSize: 13, marginBottom: 2 }}>Weight: {formatWeight(point.weight)} lb</Text>
-            <Text style={{ color: colors.subtext, fontSize: 13 }}>Sets logged: {point.sets}</Text>
-            {point.note ? <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 4 }}>{point.note}</Text> : null}
+            <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginBottom: 4 }}>{summary.point.label}</Text>
+            <Text style={{ color: colors.subtext, fontSize: 13, marginBottom: 2 }}>
+              Best set: {summary.qualifyingSet?.reps} reps
+            </Text>
+            <Text style={{ color: colors.subtext, fontSize: 13, marginBottom: 2 }}>
+              Weight: {formatWeight(summary.qualifyingSet?.weight ?? 0)} lb
+            </Text>
+            <Text style={{ color: colors.subtext, fontSize: 13 }}>Sets logged: {summary.setCount}</Text>
+            {summary.point.note ? <Text style={{ color: colors.subtext, fontSize: 13, marginTop: 4 }}>{summary.point.note}</Text> : null}
           </View>
         ))}
         {qualifyingProgressPoints.length === 0 ? (

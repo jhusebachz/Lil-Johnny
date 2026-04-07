@@ -10,7 +10,18 @@ import LoopRunSection from '../../components/gym/LoopRunSection';
 import WorkoutSection from '../../components/gym/WorkoutSection';
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { ExerciseProgressPoint, ExerciseLog, GymDay, GymView, getLoggedGymDateKeys, gymWorkoutTemplates } from '../../data/gymData';
+import {
+  ExerciseDraftSet,
+  ExerciseLog,
+  ExerciseProgressPoint,
+  ExerciseSet,
+  GymDay,
+  GymView,
+  createDraftExerciseSet,
+  createEmptyExerciseLog,
+  getLoggedGymDateKeys,
+  gymWorkoutTemplates,
+} from '../../data/gymData';
 import {
   GOAL_WEIGHT_LB,
   LoopRunEntry,
@@ -77,7 +88,7 @@ function getTodayEntryMeta() {
   const now = new Date();
 
   return {
-    dateKey: now.toISOString().slice(0, 10),
+    dateKey: getTodayDateKey(now),
     label: formatMonthDay(now),
     fullLabel: formatFullDate(now),
   };
@@ -87,8 +98,40 @@ function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
-  const qualifyingPoints = points.filter((point) => point.reps >= 6);
+type ExerciseProgressSummary = {
+  point: ExerciseProgressPoint;
+  setCount: number;
+  bestSet: ExerciseSet | null;
+  qualifyingSet: ExerciseSet | null;
+};
+
+function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
+  const qualifyingSets = setEntries.filter((setEntry) => setEntry.reps >= minimumReps);
+
+  if (qualifyingSets.length === 0) {
+    return null;
+  }
+
+  const topWeight = Math.max(...qualifyingSets.map((setEntry) => setEntry.weight));
+  const topWeightSets = qualifyingSets.filter((setEntry) => setEntry.weight === topWeight);
+  const bestReps = Math.max(...topWeightSets.map((setEntry) => setEntry.reps));
+
+  return { bestReps, topWeight };
+}
+
+function summarizeProgressPoint(point: ExerciseProgressPoint): ExerciseProgressSummary {
+  return {
+    point,
+    setCount: point.setEntries.length,
+    bestSet: getBestSet(point.setEntries, 0),
+    qualifyingSet: getBestSet(point.setEntries, 6),
+  };
+}
+
+function getBestAtTopWeight(points: ExerciseProgressSummary[]) {
+  const qualifyingPoints = points
+    .map((point) => point.qualifyingSet)
+    .filter((point): point is ExerciseSet => point !== null);
 
   if (qualifyingPoints.length === 0) {
     return null;
@@ -99,6 +142,60 @@ function getBestAtTopWeight(points: ExerciseProgressPoint[]) {
   const bestReps = Math.max(...topWeightPoints.map((point) => point.reps));
 
   return { bestReps, topWeight };
+}
+
+function getHealthCoachingInsight({
+  dateKey,
+  selectedDay,
+  weeklyGymVisits,
+  latestWeight,
+  bestLoopRunSeconds,
+  weeklyGymPacePct,
+  weightGoalPct,
+  weightGoalPacePct,
+  loopRunLoggedThisWeek,
+}: {
+  dateKey: string;
+  selectedDay: GymDay;
+  weeklyGymVisits: number;
+  latestWeight?: WeightEntry;
+  bestLoopRunSeconds?: number;
+  weeklyGymPacePct: number;
+  weightGoalPct: number;
+  weightGoalPacePct: number;
+  loopRunLoggedThisWeek: boolean;
+}) {
+  const rotatingPrompts = [
+    `Make ${selectedDay.toLowerCase()} day feel clean and deliberate. One honest logged session is enough to keep the week moving.`,
+    'Small clean wins count here. Log the real numbers, keep the trend honest, and let consistency do the heavy lifting.',
+    'Do not chase perfect. Get useful work in, log it cleanly, and leave yourself a clearer path for the next session.',
+    'Treat this like a long game. Clean data, steady effort, and one solid session will matter more than forcing a huge day.',
+    'Keep the health side simple today: log the session, keep the weight trend honest, and avoid letting the basics drift.',
+  ];
+
+  if (weeklyGymVisits < 3 && weeklyGymPacePct > 0) {
+    return `You are a little behind the gym pace for this week. A solid ${selectedDay.toLowerCase()} session today would put the weekly target back in a good spot.`;
+  }
+
+  if (!loopRunLoggedThisWeek) {
+    return 'You have not logged a Loop run this week yet. Even one honest time on the board will keep that goal alive and visible.';
+  }
+
+  if (latestWeight && weightGoalPct < weightGoalPacePct) {
+    return `Your weight trend is a bit behind pace toward ${GOAL_WEIGHT_LB} lb. Keep the food side tight today and log the next weigh-in so the trend stays real.`;
+  }
+
+  if (bestLoopRunSeconds && bestLoopRunSeconds > 9 * 60) {
+    return `Your best Loop run is ${formatLoopRunTime(bestLoopRunSeconds)}. Keep stacking runs and chip away at the path toward sub-9.`;
+  }
+
+  const promptIndex =
+    dateKey
+      .split('-')
+      .map(Number)
+      .reduce((total, value) => total + value, 0) % rotatingPrompts.length;
+
+  return rotatingPrompts[promptIndex];
 }
 
 export default function Gym() {
@@ -112,7 +209,7 @@ export default function Gym() {
   const [selectedDay, setSelectedDay] = useState<GymDay>('Push');
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
   const [activeExerciseKey, setActiveExerciseKey] = useState<string | null>(null);
-  const [draftLog, setDraftLog] = useState<ExerciseLog>({ sets: '', reps: '', weight: '', note: '' });
+  const [draftLog, setDraftLog] = useState<ExerciseLog>(createEmptyExerciseLog());
   const [draftWeight, setDraftWeight] = useState('');
   const [draftLoopRun, setDraftLoopRun] = useState('');
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<Record<GymDay, string>>({
@@ -138,9 +235,10 @@ export default function Gym() {
   const progressExerciseName = selectedProgressExercise[selectedDay];
   const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
   const progressPoints = [...rawProgressPoints].sort((left, right) => left.dateKey.localeCompare(right.dateKey)).slice(-10);
-  const qualifyingProgressPoints = progressPoints.filter((point) => point.reps >= 6);
-  const maxReps = Math.max(...progressPoints.map((point) => point.reps), 1);
-  const bestAtTopWeight = progressPoints.length > 0 ? getBestAtTopWeight(progressPoints) : null;
+  const progressPointSummaries = progressPoints.map(summarizeProgressPoint).filter((point) => point.bestSet !== null);
+  const qualifyingProgressPoints = progressPointSummaries.filter((point) => point.qualifyingSet !== null);
+  const maxReps = Math.max(...progressPointSummaries.map((point) => point.bestSet?.reps ?? 0), 1);
+  const bestAtTopWeight = progressPointSummaries.length > 0 ? getBestAtTopWeight(progressPointSummaries) : null;
   const estimatedOneRepMax =
     bestAtTopWeight && bestAtTopWeight.bestReps >= 1
       ? estimateOneRepMax(bestAtTopWeight.topWeight, bestAtTopWeight.bestReps)
@@ -148,12 +246,12 @@ export default function Gym() {
   const oneRepMaxTrend =
     qualifyingProgressPoints.length >= 2
       ? estimateOneRepMax(
-          qualifyingProgressPoints.at(-1)?.weight ?? 0,
-          qualifyingProgressPoints.at(-1)?.reps ?? 0
+          qualifyingProgressPoints.at(-1)?.qualifyingSet?.weight ?? 0,
+          qualifyingProgressPoints.at(-1)?.qualifyingSet?.reps ?? 0
         ) -
         estimateOneRepMax(
-          qualifyingProgressPoints.at(-2)?.weight ?? 0,
-          qualifyingProgressPoints.at(-2)?.reps ?? 0
+          qualifyingProgressPoints.at(-2)?.qualifyingSet?.weight ?? 0,
+          qualifyingProgressPoints.at(-2)?.qualifyingSet?.reps ?? 0
         )
       : null;
   const todayEntry = getTodayEntryMeta();
@@ -168,6 +266,7 @@ export default function Gym() {
     (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
     lifeData.loopRuns[0]
   );
+  const loopRunLoggedThisWeek = getUniqueWeekCount(lifeData.loopRuns.map((run) => run.dateKey)) > 0;
   const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
   const weeklyGymPacePct = getScheduledGymPacePct();
   const loopRunGoalPct = bestLoopRun
@@ -176,6 +275,17 @@ export default function Gym() {
   const weightGoalPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
   const weightGoalPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
   const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
+  const healthCoachingInsight = getHealthCoachingInsight({
+    dateKey: todayKey,
+    selectedDay,
+    weeklyGymVisits,
+    latestWeight,
+    bestLoopRunSeconds: bestLoopRun?.timeSeconds,
+    weeklyGymPacePct,
+    weightGoalPct,
+    weightGoalPacePct,
+    loopRunLoggedThisWeek,
+  });
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
@@ -184,8 +294,48 @@ export default function Gym() {
   const openExerciseLogger = async (exerciseName: string) => {
     const nextKey = `${selectedDay}-${exerciseName}`;
     await triggerHaptic();
-    setDraftLog(exerciseLogs[nextKey] ?? { sets: '', reps: '', weight: '', note: '' });
+    const existingLog = exerciseLogs[nextKey];
+    setDraftLog(existingLog && existingLog.setEntries.length > 0 ? existingLog : createEmptyExerciseLog());
     setActiveExerciseKey(nextKey);
+  };
+
+  const updateDraftSet = (setId: string, field: keyof Pick<ExerciseDraftSet, 'reps' | 'weight'>, value: string) => {
+    setDraftLog((current) => ({
+      ...current,
+      setEntries: current.setEntries.map((setEntry) =>
+        setEntry.id === setId
+          ? {
+              ...setEntry,
+              [field]: value,
+            }
+          : setEntry
+      ),
+    }));
+  };
+
+  const addDraftSet = async () => {
+    await triggerHaptic();
+    setDraftLog((current) => ({
+      ...current,
+      setEntries: [...current.setEntries, createDraftExerciseSet()],
+    }));
+  };
+
+  const removeDraftSet = async (setId: string) => {
+    await triggerHaptic();
+    setDraftLog((current) => {
+      if (current.setEntries.length <= 1) {
+        return {
+          ...current,
+          setEntries: [createDraftExerciseSet()],
+        };
+      }
+
+      return {
+        ...current,
+        setEntries: current.setEntries.filter((setEntry) => setEntry.id !== setId),
+      };
+    });
   };
 
   const saveExerciseLogger = async () => {
@@ -194,43 +344,69 @@ export default function Gym() {
     }
 
     await triggerHaptic();
-    setExerciseLogs((current) => ({
-      ...current,
-      [activeExerciseKey]: draftLog,
-    }));
+    const trimmedNote = draftLog.note?.trim() ? draftLog.note.trim() : undefined;
+    const sanitizedDraftSets = draftLog.setEntries.filter((setEntry) => setEntry.reps.trim() || setEntry.weight.trim());
+    const parsedSets = sanitizedDraftSets
+      .map((setEntry) => {
+        const reps = parseNumber(setEntry.reps);
+        const weight = parseNumber(setEntry.weight);
 
-    const parsedSets = parseNumber(draftLog.sets);
-    const parsedReps = parseNumber(draftLog.reps);
-    const parsedWeight = parseNumber(draftLog.weight);
+        if (reps === null || reps <= 0 || weight === null || weight <= 0) {
+          return null;
+        }
 
-    if (parsedSets !== null && parsedReps !== null && parsedWeight !== null) {
-      setExerciseHistory((current) => {
-        const dayHistory = current[selectedDay];
-        const exerciseName = activeExercise.name;
-        const existingPoints = dayHistory[exerciseName] ?? [];
+        return { reps, weight };
+      })
+      .filter((setEntry): setEntry is ExerciseSet => setEntry !== null);
+
+    setExerciseLogs((current) => {
+      if (sanitizedDraftSets.length === 0 && !trimmedNote) {
+        const nextLogs = { ...current };
+        delete nextLogs[activeExerciseKey];
+        return nextLogs;
+      }
+
+      return {
+        ...current,
+        [activeExerciseKey]: {
+          setEntries: sanitizedDraftSets.length > 0 ? sanitizedDraftSets : [createDraftExerciseSet()],
+          note: trimmedNote ?? '',
+        },
+      };
+    });
+
+    setExerciseHistory((current) => {
+      const dayHistory = current[selectedDay];
+      const exerciseName = activeExercise.name;
+      const existingPoints = dayHistory[exerciseName] ?? [];
+      const existingIndex = existingPoints.findIndex((point) => point.dateKey === todayEntry.dateKey);
+
+      let nextPoints = existingPoints;
+
+      if (parsedSets.length > 0) {
         const updatedPoint = {
           dateKey: todayEntry.dateKey,
           label: todayEntry.label,
-          sets: parsedSets,
-          reps: parsedReps,
-          weight: parsedWeight,
-          note: draftLog.note?.trim() ? draftLog.note.trim() : undefined,
+          setEntries: parsedSets,
+          note: trimmedNote,
         };
-        const existingIndex = existingPoints.findIndex((point) => point.dateKey === todayEntry.dateKey);
-        const nextPoints =
+
+        nextPoints =
           existingIndex >= 0
             ? existingPoints.map((point, index) => (index === existingIndex ? updatedPoint : point))
             : [...existingPoints, updatedPoint];
+      } else if (existingIndex >= 0) {
+        nextPoints = existingPoints.filter((_, index) => index !== existingIndex);
+      }
 
-        return {
-          ...current,
-          [selectedDay]: {
-            ...dayHistory,
-            [exerciseName]: nextPoints,
-          },
-        };
-      });
-    }
+      return {
+        ...current,
+        [selectedDay]: {
+          ...dayHistory,
+          [exerciseName]: nextPoints,
+        },
+      };
+    });
 
     setActiveExerciseKey(null);
   };
@@ -308,6 +484,10 @@ export default function Gym() {
             Preferred split: {preferences.preferredWorkoutSplit} | {weeklyGymVisits}/3 gym visits this week
           </Text>
         </View>
+
+        <SectionCard title="Coaching Insight" emoji={'\uD83C\uDFAF'} colors={colors}>
+          <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{healthCoachingInsight}</Text>
+        </SectionCard>
 
         <GymPaceSection
           colors={colors}
@@ -406,19 +586,19 @@ export default function Gym() {
             }}
           />
         ) : (
-          <ExerciseProgressSection
-            bestAtTopWeight={bestAtTopWeight}
-            colors={colors}
-            estimatedOneRepMax={estimatedOneRepMax}
-            formatWeight={formatWeight}
-            isCompact={isCompact}
-            maxReps={maxReps}
-            oneRepMaxTrend={oneRepMaxTrend}
-            progressExerciseName={progressExerciseName}
-            progressPoints={progressPoints}
-            qualifyingProgressPoints={qualifyingProgressPoints}
-            selectedDay={selectedDay}
-            workout={workout}
+        <ExerciseProgressSection
+          bestAtTopWeight={bestAtTopWeight}
+          colors={colors}
+          estimatedOneRepMax={estimatedOneRepMax}
+          formatWeight={formatWeight}
+          isCompact={isCompact}
+          maxReps={maxReps}
+          oneRepMaxTrend={oneRepMaxTrend}
+          progressExerciseName={progressExerciseName}
+          progressPointSummaries={progressPointSummaries}
+          qualifyingProgressPoints={qualifyingProgressPoints}
+          selectedDay={selectedDay}
+          workout={workout}
             onExerciseSelect={async (exerciseName) => {
               await triggerHaptic();
               setSelectedProgressExercise((current) => ({
@@ -448,16 +628,23 @@ export default function Gym() {
         ) : null}
       </ScrollView>
 
-      <ExerciseLogModal
-        activeExercise={activeExercise}
-        colors={colors}
-        draftLog={draftLog}
-        todayLabel={todayEntry.fullLabel}
-        onClose={() => setActiveExerciseKey(null)}
-        onDraftLogChange={(updates) => setDraftLog((current) => ({ ...current, ...updates }))}
-        onSave={() => {
-          void saveExerciseLogger();
-        }}
+        <ExerciseLogModal
+          activeExercise={activeExercise}
+          colors={colors}
+          draftLog={draftLog}
+          todayLabel={todayEntry.fullLabel}
+          onClose={() => setActiveExerciseKey(null)}
+          onAddSet={() => {
+            void addDraftSet();
+          }}
+          onDraftLogChange={(updates) => setDraftLog((current) => ({ ...current, ...updates }))}
+          onDraftSetChange={updateDraftSet}
+          onRemoveSet={(setId) => {
+            void removeDraftSet(setId);
+          }}
+          onSave={() => {
+            void saveExerciseLogger();
+          }}
       />
     </SafeAreaView>
   );

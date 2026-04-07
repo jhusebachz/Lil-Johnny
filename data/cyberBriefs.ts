@@ -15,8 +15,9 @@ const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-cyber-brie
 const WEB_STORAGE_KEY = 'lil-johnny-cyber-briefs';
 
 export function getCyberBriefMeta(date = new Date()) {
+  const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   return {
-    dateKey: date.toISOString().slice(0, 10),
+    dateKey,
     label: new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       month: 'short',
@@ -32,7 +33,7 @@ export function getCyberBriefStreak(entries: CyberBriefEntry[], now = new Date()
   for (let offset = 0; offset < 60; offset += 1) {
     const candidate = new Date(now);
     candidate.setDate(candidate.getDate() - offset);
-    const dateKey = candidate.toISOString().slice(0, 10);
+    const dateKey = `${candidate.getFullYear()}-${String(candidate.getMonth() + 1).padStart(2, '0')}-${String(candidate.getDate()).padStart(2, '0')}`;
 
     if (!entrySet.has(dateKey)) {
       break;

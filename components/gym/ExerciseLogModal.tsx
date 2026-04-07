@@ -1,6 +1,6 @@
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { ExerciseLog, WorkoutExercise } from '../../data/gymData';
+import { ExerciseDraftSet, ExerciseLog, WorkoutExercise } from '../../data/gymData';
 import { ThemeColors } from '../../data/theme';
 
 type ExerciseLogModalProps = {
@@ -8,8 +8,11 @@ type ExerciseLogModalProps = {
   colors: ThemeColors;
   draftLog: ExerciseLog;
   todayLabel: string;
+  onAddSet: () => void;
   onClose: () => void;
   onDraftLogChange: (updates: Partial<ExerciseLog>) => void;
+  onDraftSetChange: (setId: string, field: keyof Pick<ExerciseDraftSet, 'reps' | 'weight'>, value: string) => void;
+  onRemoveSet: (setId: string) => void;
   onSave: () => void;
 };
 
@@ -18,8 +21,11 @@ export default function ExerciseLogModal({
   colors,
   draftLog,
   todayLabel,
+  onAddSet,
   onClose,
   onDraftLogChange,
+  onDraftSetChange,
+  onRemoveSet,
   onSave,
 }: ExerciseLogModalProps) {
   return (
@@ -47,120 +53,168 @@ export default function ExerciseLogModal({
                 borderColor: colors.cardBorder,
               }}
             >
-              <Text style={{ fontSize: 12, color: colors.subtext, textTransform: 'uppercase', marginBottom: 6 }}>Exercise Log</Text>
-              <Text style={{ fontSize: 22, color: colors.text, fontWeight: '800', marginBottom: 6 }}>{activeExercise.name}</Text>
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 14 }}>{todayLabel}</Text>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={{ maxHeight: 560 }}
+                contentContainerStyle={{ paddingBottom: 4 }}
+              >
+                <Text style={{ fontSize: 12, color: colors.subtext, textTransform: 'uppercase', marginBottom: 6 }}>
+                  Exercise Log
+                </Text>
+                <Text style={{ fontSize: 22, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
+                  {activeExercise.name}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 14 }}>{todayLabel}</Text>
 
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Sets</Text>
-              <TextInput
-                value={draftLog.sets}
-                onChangeText={(text) => onDraftLogChange({ sets: text })}
-                keyboardType="number-pad"
-                placeholder="4"
-                placeholderTextColor={colors.subtext}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 15,
-                  color: colors.text,
-                  backgroundColor: colors.inputBackground,
-                  marginBottom: 12,
-                }}
-              />
+                {draftLog.setEntries.map((setEntry, index) => (
+                  <View
+                    key={setEntry.id}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.cardBorder,
+                      borderRadius: 14,
+                      backgroundColor: colors.inputBackground,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800' }}>Set {index + 1}</Text>
+                      <Pressable
+                        onPress={() => onRemoveSet(setEntry.id)}
+                        style={{
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 10,
+                          backgroundColor: colors.card,
+                          borderWidth: 1,
+                          borderColor: colors.cardBorder,
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>Remove</Text>
+                      </Pressable>
+                    </View>
 
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Reps</Text>
-              <TextInput
-                value={draftLog.reps}
-                onChangeText={(text) => onDraftLogChange({ reps: text })}
-                keyboardType="number-pad"
-                placeholder="8"
-                placeholderTextColor={colors.subtext}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 15,
-                  color: colors.text,
-                  backgroundColor: colors.inputBackground,
-                  marginBottom: 12,
-                }}
-              />
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Reps</Text>
+                        <TextInput
+                          value={setEntry.reps}
+                          onChangeText={(text) => onDraftSetChange(setEntry.id, 'reps', text)}
+                          keyboardType="number-pad"
+                          placeholder="8"
+                          placeholderTextColor={colors.subtext}
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.inputBorder,
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            paddingVertical: 10,
+                            fontSize: 15,
+                            color: colors.text,
+                            backgroundColor: colors.card,
+                          }}
+                        />
+                      </View>
 
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Weight</Text>
-              <TextInput
-                value={draftLog.weight}
-                onChangeText={(text) => onDraftLogChange({ weight: text })}
-                keyboardType="decimal-pad"
-                placeholder="185"
-                placeholderTextColor={colors.subtext}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 15,
-                  color: colors.text,
-                  backgroundColor: colors.inputBackground,
-                  marginBottom: 16,
-                }}
-              />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Weight</Text>
+                        <TextInput
+                          value={setEntry.weight}
+                          onChangeText={(text) => onDraftSetChange(setEntry.id, 'weight', text)}
+                          keyboardType="decimal-pad"
+                          placeholder="185"
+                          placeholderTextColor={colors.subtext}
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.inputBorder,
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            paddingVertical: 10,
+                            fontSize: 15,
+                            color: colors.text,
+                            backgroundColor: colors.card,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ))}
 
-              <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Notes</Text>
-              <TextInput
-                value={draftLog.note ?? ''}
-                onChangeText={(text) => onDraftLogChange({ note: text })}
-                placeholder="How did it feel today?"
-                placeholderTextColor={colors.subtext}
-                multiline
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.inputBorder,
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 15,
-                  color: colors.text,
-                  backgroundColor: colors.inputBackground,
-                  marginBottom: 16,
-                  minHeight: 76,
-                  textAlignVertical: 'top',
-                }}
-              />
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable
-                  onPress={onClose}
+                  onPress={onAddSet}
                   style={{
-                    flex: 1,
-                    paddingVertical: 12,
                     borderRadius: 12,
                     backgroundColor: colors.inputBackground,
                     borderWidth: 1,
                     borderColor: colors.inputBorder,
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: colors.text, fontWeight: '800' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={onSave}
-                  style={{
-                    flex: 1,
                     paddingVertical: 12,
-                    borderRadius: 12,
-                    backgroundColor: colors.accent,
+                    paddingHorizontal: 14,
                     alignItems: 'center',
+                    marginBottom: 16,
                   }}
                 >
-                  <Text style={{ color: 'white', fontWeight: '800' }}>Save</Text>
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>Add another set</Text>
                 </Pressable>
-              </View>
+
+                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Notes</Text>
+                <TextInput
+                  value={draftLog.note ?? ''}
+                  onChangeText={(text) => onDraftLogChange({ note: text })}
+                  placeholder="How did it feel today?"
+                  placeholderTextColor={colors.subtext}
+                  multiline
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.inputBorder,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 15,
+                    color: colors.text,
+                    backgroundColor: colors.inputBackground,
+                    marginBottom: 16,
+                    minHeight: 76,
+                    textAlignVertical: 'top',
+                  }}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Pressable
+                    onPress={onClose}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: colors.inputBackground,
+                      borderWidth: 1,
+                      borderColor: colors.inputBorder,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: '800' }}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onSave}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: colors.accent,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: 'white', fontWeight: '800' }}>Save Sets</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
             </View>
           </KeyboardAvoidingView>
         ) : null}

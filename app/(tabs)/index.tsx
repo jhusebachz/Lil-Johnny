@@ -127,7 +127,6 @@ export default function Dashboard() {
   const haloPulse = useState(() => new Animated.Value(0.94))[0];
   const isCompact = width < 430;
   const isVeryCompact = width < 380;
-  const overviewCardWidth = Math.min(Math.max(width - 120, 238), 300);
 
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
@@ -234,6 +233,7 @@ export default function Dashboard() {
   const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal) : 0;
   const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal) : 0;
   const now = new Date();
+  const currentDay = now.getDay();
   const todayLabel = formatLongDate(now);
   const greeting = `${getGreetingForTime(now)}, ${preferences.profileName || 'John'}!`;
   const currentCertPct = currentCert
@@ -246,6 +246,11 @@ export default function Dashboard() {
   const currentCertStartLabel = currentCert?.startDate
     ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${currentCert.startDate}T12:00:00`))
     : null;
+  const currentCertHasActiveWindow =
+    !!currentCert?.startDate &&
+    !!currentCert?.examDate &&
+    now >= new Date(`${currentCert.startDate}T00:00:00`) &&
+    now <= new Date(`${currentCert.examDate}T23:59:59`);
   const currentWeekKeys = new Set(getCurrentWeekDateKeys());
   const weeklyGymPacePct = getScheduledGymPacePct();
   const weeklyGymActualPct = clamp01(gymVisitCount / 3) * 100;
@@ -279,7 +284,7 @@ export default function Dashboard() {
     {
       label: currentCert
         ? `${currentCert.name}${currentCertStartLabel ? ` starts ${currentCertStartLabel}` : ''}`
-        : 'No certification lane set',
+        : 'No certification schedule set',
       showCheck: false,
     },
     {
@@ -326,7 +331,7 @@ export default function Dashboard() {
   const suggestedActions = useMemo(() => {
     const candidates: { label: string; urgency: number }[] = [];
 
-    if (lowestCert) {
+    if (lowestCert && currentCertHasActiveWindow) {
       const certPct = lowestCert.chaptersCompleted / Math.max(lowestCert.chapterCount, 1);
       candidates.push({
         label: `Move ${lowestCert.name} forward. It is the furthest behind its study-guide chapter target right now.`,
@@ -335,9 +340,17 @@ export default function Dashboard() {
     }
 
     if (gymVisitCount < 3) {
+      const gymUrgency = currentDay < 3 ? 0.26 : (3 - gymVisitCount) / 3;
       candidates.push({
         label: `Get ${3 - gymVisitCount} more gym visit${3 - gymVisitCount === 1 ? '' : 's'} in this week to stay on the health target.`,
-        urgency: (3 - gymVisitCount) / 3,
+        urgency: gymUrgency,
+      });
+    }
+
+    if (!loopRunLoggedThisWeek) {
+      candidates.push({
+        label: 'Log a Loop run this week so the health progress stays honest and current.',
+        urgency: 0.72,
       });
     }
 
@@ -345,6 +358,13 @@ export default function Dashboard() {
       candidates.push({
         label: `OSRS base 90 is ${tracker.goalProjections.base90.status.toLowerCase()}. Give the highest-pressure skill some time soon.`,
         urgency: tracker.goalProjections.base90.status === 'Off track' ? 0.88 : 0.74,
+      });
+    }
+
+    if (tracker.goalProjections.runefest.status !== 'On track') {
+      candidates.push({
+        label: `2250 total by RuneFest is ${tracker.goalProjections.runefest.status.toLowerCase()}. Put some focused OSRS time into the total-level path.`,
+        urgency: tracker.goalProjections.runefest.status === 'Off track' ? 0.84 : 0.69,
       });
     }
 
@@ -357,12 +377,12 @@ export default function Dashboard() {
 
     if (!latestWeight) {
       candidates.push({
-        label: 'Log a weight entry so the health lane has a real body-metrics baseline to work from.',
+        label: 'Log a weight entry so the health progress has a real body-metrics baseline to work from.',
         urgency: 0.7,
       });
     } else if (Math.abs(latestWeight.weight - GOAL_WEIGHT_LB) > 1) {
       candidates.push({
-        label: `Keep the weight lane moving toward ${GOAL_WEIGHT_LB} lb. You are currently ${Math.abs(
+        label: `Keep the weight progress moving toward ${GOAL_WEIGHT_LB} lb. You are currently ${Math.abs(
           latestWeight.weight - GOAL_WEIGHT_LB
         ).toFixed(1)} lb ${latestWeight.weight > GOAL_WEIGHT_LB ? 'above' : 'below'} target.`,
         urgency: Math.min(Math.abs(latestWeight.weight - GOAL_WEIGHT_LB) / 10, 0.78),
@@ -370,7 +390,17 @@ export default function Dashboard() {
     }
 
     return candidates.sort((left, right) => right.urgency - left.urgency).slice(0, 3);
-  }, [gymVisitCount, hobbiesOpenTasks, latestWeight, lowestCert, tracker.goalProjections.base90.status]);
+  }, [
+    currentCertHasActiveWindow,
+    gymVisitCount,
+    hobbiesOpenTasks,
+    latestWeight,
+    loopRunLoggedThisWeek,
+    lowestCert,
+    currentDay,
+    tracker.goalProjections.base90.status,
+    tracker.goalProjections.runefest.status,
+  ]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>

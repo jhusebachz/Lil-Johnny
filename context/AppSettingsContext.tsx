@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+import { getTodayDateKey } from '../data/lifeTrackerData';
 import { readPersistedSettings, writePersistedSettings } from './appSettingsStorage';
 import {
   createWebReminderPoller,
@@ -263,7 +264,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     return nextReminder;
   };
 
-  const toggleReminderCompletion = (id: string, dateKey = new Date().toISOString().slice(0, 10)) => {
+  const toggleReminderCompletion = (id: string, dateKey = getTodayDateKey()) => {
     setReminders((current) =>
       current.map((item) => {
         if (item.id !== id) {

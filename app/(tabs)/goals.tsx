@@ -161,7 +161,7 @@ export default function Goals() {
   const { theme } = useThemeSettings();
   const { triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
-  const [selectedView, setSelectedView] = useState<HobbiesView>('osrs');
+  const [selectedView, setSelectedView] = useState<HobbiesView>('diy');
   const [runescapeRefreshToken, setRunescapeRefreshToken] = useState(0);
   const { lifeData, setLifeData } = useLifeTrackerData();
   const [draftDiyTitle, setDraftDiyTitle] = useState('');
@@ -250,7 +250,7 @@ export default function Goals() {
 
         <SectionCard title="Hobbies View" emoji={'\uD83E\uDDE9'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {(['osrs', 'diy'] as HobbiesView[]).map((view) => {
+            {(['diy', 'osrs'] as HobbiesView[]).map((view) => {
               const selected = view === selectedView;
               const label = view === 'osrs' ? 'OSRS' : 'DIY To-Do';
 

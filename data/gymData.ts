@@ -22,16 +22,23 @@ export type WorkoutBlock = {
 export type ExerciseProgressPoint = {
   dateKey: string;
   label: string;
-  sets: number;
-  reps: number;
-  weight: number;
+  setEntries: ExerciseSet[];
   note?: string;
 };
 
-export type ExerciseLog = {
-  sets: string;
+export type ExerciseSet = {
+  reps: number;
+  weight: number;
+};
+
+export type ExerciseDraftSet = {
+  id: string;
   reps: string;
   weight: string;
+};
+
+export type ExerciseLog = {
+  setEntries: ExerciseDraftSet[];
   note?: string;
 };
 
@@ -72,6 +79,27 @@ function exercise(
   note?: string
 ): WorkoutExercise {
   return { name, category, sets, reps, note };
+}
+
+function createDraftSetId() {
+  return `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function createDraftExerciseSet(
+  initial: Partial<Pick<ExerciseDraftSet, 'reps' | 'weight'>> = {}
+): ExerciseDraftSet {
+  return {
+    id: createDraftSetId(),
+    reps: initial.reps ?? '',
+    weight: initial.weight ?? '',
+  };
+}
+
+export function createEmptyExerciseLog(): ExerciseLog {
+  return {
+    setEntries: [createDraftExerciseSet()],
+    note: '',
+  };
 }
 
 export const gymWorkoutTemplates: Record<GymDay, WorkoutBlock> = {
@@ -159,6 +187,89 @@ function normalizeExerciseName(day: GymDay, name: string) {
   return EXERCISE_ALIASES[day]?.[name] ?? name;
 }
 
+function createRepeatedSetEntries(setCount: number, reps: number, weight: number) {
+  const count = Math.max(1, Math.round(setCount || 1));
+  return Array.from({ length: count }, () => ({ reps, weight }));
+}
+
+function normalizeProgressPoint(point: any): ExerciseProgressPoint | null {
+  const normalizedSetEntries = Array.isArray(point?.setEntries)
+    ? point.setEntries
+        .map((setEntry: any) => {
+          const reps = Number(setEntry?.reps);
+          const weight = Number(setEntry?.weight);
+
+          if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(weight) || weight <= 0) {
+            return null;
+          }
+
+          return { reps, weight };
+        })
+        .filter(Boolean) as ExerciseSet[]
+    : [];
+
+  if (normalizedSetEntries.length > 0) {
+    return {
+      dateKey: point.dateKey,
+      label: point.label,
+      setEntries: normalizedSetEntries,
+      note: point.note,
+    };
+  }
+
+  const reps = Number(point?.reps);
+  const weight = Number(point?.weight);
+  const setCount = Number(point?.sets);
+
+  if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(weight) || weight <= 0) {
+    return null;
+  }
+
+  return {
+    dateKey: point.dateKey,
+    label: point.label,
+    setEntries: createRepeatedSetEntries(setCount, reps, weight),
+    note: point.note,
+  };
+}
+
+function normalizeExerciseLog(value: any): ExerciseLog {
+  const setEntries = Array.isArray(value?.setEntries)
+    ? value.setEntries
+        .map((setEntry: any) => ({
+          id: typeof setEntry?.id === 'string' ? setEntry.id : createDraftSetId(),
+          reps: typeof setEntry?.reps === 'string' ? setEntry.reps : String(setEntry?.reps ?? ''),
+          weight: typeof setEntry?.weight === 'string' ? setEntry.weight : String(setEntry?.weight ?? ''),
+        }))
+        .filter((setEntry: ExerciseDraftSet) => setEntry.reps.trim() || setEntry.weight.trim())
+    : [];
+
+  if (setEntries.length > 0) {
+    return {
+      setEntries,
+      note: typeof value?.note === 'string' ? value.note : '',
+    };
+  }
+
+  const reps = value?.reps;
+  const weight = value?.weight;
+  const setCount = Number(value?.sets);
+
+  if ((reps ?? '').toString().trim() || (weight ?? '').toString().trim()) {
+    return {
+      setEntries: Array.from({ length: Math.max(1, Math.round(setCount || 1)) }, () =>
+        createDraftExerciseSet({
+          reps: String(reps ?? ''),
+          weight: String(weight ?? ''),
+        })
+      ),
+      note: typeof value?.note === 'string' ? value.note : '',
+    };
+  }
+
+  return createEmptyExerciseLog();
+}
+
 function normalizePersistedGymData(data: PersistedGymData): PersistedGymData {
   const exerciseHistory = createEmptyGymProgressHistory();
 
@@ -168,7 +279,10 @@ function normalizePersistedGymData(data: PersistedGymData): PersistedGymData {
     Object.entries(dayHistory).forEach(([exerciseName, points]) => {
       const normalizedName = normalizeExerciseName(day, exerciseName);
       const existing = exerciseHistory[day][normalizedName] ?? [];
-      exerciseHistory[day][normalizedName] = [...existing, ...points];
+      const normalizedPoints = Array.isArray(points)
+        ? points.map((point) => normalizeProgressPoint(point)).filter(Boolean) as ExerciseProgressPoint[]
+        : [];
+      exerciseHistory[day][normalizedName] = [...existing, ...normalizedPoints];
     });
   });
 
@@ -184,7 +298,7 @@ function normalizePersistedGymData(data: PersistedGymData): PersistedGymData {
       const exerciseName = key.slice(separatorIndex + 1);
       const normalizedName = normalizeExerciseName(day, exerciseName);
 
-      return [`${day}-${normalizedName}`, value];
+      return [`${day}-${normalizedName}`, normalizeExerciseLog(value)];
     })
   );
 

@@ -88,12 +88,19 @@ export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
 export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const defaultLifeTrackerData: LifeTrackerData = {
   certifications: [
     {
       id: 'linux-plus',
       name: 'Linux+',
-      chapterCount: 31,
+      chapterCount: 26,
       chaptersCompleted: 0,
       startDate: '2026-06-20',
       examDate: '2026-09-15',
@@ -149,7 +156,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
 };
 
 export function getTodayDateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return toLocalDateKey(date);
 }
 
 export function formatTrackerDate(date = new Date()) {
@@ -400,7 +407,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         studyGuide: fallback.studyGuide,
         startDate: fallback.startDate,
         examDate: fallback.examDate,
-        chapterCount: cert.chapterCount ?? legacyTarget ?? fallback.chapterCount,
+        chapterCount: fallback.chapterCount,
         chaptersCompleted: cert.chaptersCompleted ?? legacyCompleted ?? fallback.chaptersCompleted,
       };
     }),

@@ -21,6 +21,8 @@ export default function WorkoutExerciseCard({
   colors,
   onPress,
 }: WorkoutExerciseCardProps) {
+  const loggedSets = exerciseLog?.setEntries.filter((setEntry) => setEntry.reps.trim() && setEntry.weight.trim()) ?? [];
+
   return (
     <Pressable
       onPress={onPress}
@@ -50,9 +52,14 @@ export default function WorkoutExerciseCard({
           <Text style={{ fontSize: 11, color: colors.subtext, textTransform: 'uppercase', marginBottom: 4 }}>
             Logged for today
           </Text>
-          <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700' }}>
-            {exerciseLog.sets} sets | {exerciseLog.reps} reps | {exerciseLog.weight} lb
+          <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700', marginBottom: loggedSets.length ? 8 : 0 }}>
+            {loggedSets.length} set{loggedSets.length === 1 ? '' : 's'} logged
           </Text>
+          {loggedSets.map((setEntry, index) => (
+            <Text key={`${name}-set-${index}`} style={{ fontSize: 12, color: colors.subtext, marginBottom: 4 }}>
+              Set {index + 1}: {setEntry.reps} reps @ {setEntry.weight} lb
+            </Text>
+          ))}
           {exerciseLog.note ? (
             <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 6 }}>{exerciseLog.note}</Text>
           ) : null}
