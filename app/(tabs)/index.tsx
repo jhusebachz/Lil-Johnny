@@ -3,50 +3,29 @@ import { Animated, Easing, Image, RefreshControl, ScrollView, Text, View, useWin
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
-import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { getLoggedGymDateKeys, readPersistedGymData } from '../../data/gymData';
 import {
+  AvoidanceGoal,
   GOAL_WEIGHT_LB,
-  LifeTrackerData,
   TRACKER_BASELINE_DATE,
   WEIGHT_GOAL_TARGET_DATE,
-  defaultLifeTrackerData,
   getDateRangePacePct,
   getAvoidanceStreak,
   getCurrentWeekDateKeys,
-  getDailyCheckStreak,
+  getGreetingForTime,
   getScheduledGymPacePct,
-  getTodayDateKey,
   getUniqueWeekCount,
   getWeightLossProgressPct,
-  readPersistedLifeTrackerData,
+  formatLongDate,
 } from '../../data/lifeTrackerData';
 import { fetchRunescapeTrackerSnapshot, getFallbackRunescapeTracker, LiveRunescapeTracker } from '../../data/osrsTracker';
 import { getThemeColors } from '../../data/theme';
+import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
-}
-
-function getPacePct(startDate?: string, targetDate?: string) {
-  if (!startDate || !targetDate) {
-    return null;
-  }
-
-  const start = new Date(`${startDate}T12:00:00`).getTime();
-  const end = new Date(`${targetDate}T12:00:00`).getTime();
-  const now = Date.now();
-
-  if (end <= start) {
-    return 100;
-  }
-
-  if (now <= start) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, ((now - start) / (end - start)) * 100));
 }
 
 type OverviewItem = {
@@ -134,10 +113,11 @@ function OverviewCard({
 }
 
 export default function Dashboard() {
-  const { theme, preferences } = useAppSettings();
+  const { theme } = useThemeSettings();
+  const { preferences } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
-  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
+  const { lifeData, setLifeData } = useLifeTrackerData();
   const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
   const [gymVisitCount, setGymVisitCount] = useState(0);
   const { refreshing, triggerRefresh } = useTimedRefresh();
@@ -153,18 +133,16 @@ export default function Dashboard() {
     triggerRefresh();
 
     const [life, osrs, gym] = await Promise.all([
-      readPersistedLifeTrackerData().catch(() => null),
+      Promise.resolve(lifeData),
       fetchRunescapeTrackerSnapshot().catch(() => getFallbackRunescapeTracker()),
       readPersistedGymData().catch(() => null),
     ]);
 
-    if (life) {
-      setLifeData({ ...defaultLifeTrackerData, ...life });
-    }
+    setLifeData(life);
     setTracker(osrs);
 
     setGymVisitCount(getUniqueWeekCount(getLoggedGymDateKeys(gym?.exerciseHistory)));
-  }, [triggerRefresh]);
+  }, [lifeData, setLifeData, triggerRefresh]);
 
   useEffect(() => {
     void refreshDashboard();
@@ -244,27 +222,27 @@ export default function Dashboard() {
     );
   })();
   const latestWeight = [...lifeData.weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
-  const dailyGoals = useMemo(() => [] as { completedDates: string[] }[], []);
-  const todayKey = getTodayDateKey();
   const avoidanceGoals = lifeData.goals2026.filter((goal) => goal.type === 'avoidance');
   const hobbiesOpenTasks = lifeData.diyTasks.filter((task) => !task.completed);
 
-  const alcoholGoal = lifeData.goals2026.find((goal) => goal.id === 'alcohol' && goal.type === 'avoidance');
-  const stretchingGoal = lifeData.goals2026.find((goal) => goal.id === 'stretching');
+  const alcoholGoal = lifeData.goals2026.find(
+    (goal): goal is AvoidanceGoal => goal.id === 'alcohol' && goal.type === 'avoidance'
+  );
+  const stretchingGoal = lifeData.goals2026.find(
+    (goal): goal is AvoidanceGoal => goal.id === 'stretching' && goal.type === 'avoidance'
+  );
   const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal) : 0;
-  const stretchingStreak = stretchingGoal
-    ? stretchingGoal.type === 'avoidance'
-      ? getAvoidanceStreak(stretchingGoal)
-      : getDailyCheckStreak(stretchingGoal)
-    : 0;
-  const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
-  const greeting = `${
-    new Intl.DateTimeFormat('en-US', { hour: 'numeric' }).format(new Date()).includes('AM') ? 'Good morning' : 'Good evening'
-  }, ${preferences.profileName || 'John'}!`;
+  const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal) : 0;
+  const now = new Date();
+  const todayLabel = formatLongDate(now);
+  const greeting = `${getGreetingForTime(now)}, ${preferences.profileName || 'John'}!`;
   const currentCertPct = currentCert
     ? Math.round((currentCert.chaptersCompleted / Math.max(currentCert.chapterCount, 1)) * 100)
     : 0;
-  const currentCertPacePct = currentCert ? getPacePct(currentCert.startDate, currentCert.examDate) : null;
+  const currentCertPacePct =
+    currentCert?.startDate && currentCert.examDate
+      ? getDateRangePacePct(currentCert.startDate, currentCert.examDate)
+      : null;
   const currentCertStartLabel = currentCert?.startDate
     ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${currentCert.startDate}T12:00:00`))
     : null;
@@ -363,13 +341,6 @@ export default function Dashboard() {
       });
     }
 
-    if (dailyGoals.some((goal) => !goal.completedDates.includes(todayKey))) {
-      candidates.push({
-        label: "Close out today's daily-check streaks before the day ends so you do not leak easy momentum.",
-        urgency: 0.82,
-      });
-    }
-
     if (tracker.goalProjections.base90.status !== 'On track') {
       candidates.push({
         label: `OSRS base 90 is ${tracker.goalProjections.base90.status.toLowerCase()}. Give the highest-pressure skill some time soon.`,
@@ -399,7 +370,7 @@ export default function Dashboard() {
     }
 
     return candidates.sort((left, right) => right.urgency - left.urgency).slice(0, 3);
-  }, [dailyGoals, gymVisitCount, hobbiesOpenTasks, latestWeight, lowestCert, todayKey, tracker.goalProjections.base90.status]);
+  }, [gymVisitCount, hobbiesOpenTasks, latestWeight, lowestCert, tracker.goalProjections.base90.status]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>

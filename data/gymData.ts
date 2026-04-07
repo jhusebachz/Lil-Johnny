@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 export type GymDay = 'Push' | 'Pull' | 'Legs';
 export type GymView = 'Workout' | 'Progress';
 
-type WorkoutExercise = {
+export type WorkoutExercise = {
   name: string;
   category?: string;
   sets: string;
@@ -12,7 +12,7 @@ type WorkoutExercise = {
   note?: string;
 };
 
-type WorkoutBlock = {
+export type WorkoutBlock = {
   title: string;
   focus: string;
   coaching: string;
@@ -37,7 +37,7 @@ export type ExerciseLog = {
 
 export type GymExerciseHistory = Record<GymDay, Record<string, ExerciseProgressPoint[]>>;
 
-type PersistedGymData = {
+export type PersistedGymData = {
   exerciseLogs: Record<string, ExerciseLog>;
   exerciseHistory: GymExerciseHistory;
 };

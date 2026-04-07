@@ -17,16 +17,12 @@ import ReminderCard from '../../components/reminders/ReminderCard';
 import ReminderTimeWheel from '../../components/reminders/ReminderTimeWheel';
 import SectionCard from '../../components/SectionCard';
 import StreakGoalCard from '../../components/streaks/StreakGoalCard';
-import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
-  LifeTrackerData,
   YearGoal,
-  defaultLifeTrackerData,
   getAvoidanceStreak,
   getTodayDateKey,
-  readPersistedLifeTrackerData,
-  writePersistedLifeTrackerData,
 } from '../../data/lifeTrackerData';
 import {
   formatUpcomingReminder,
@@ -34,67 +30,34 @@ import {
   isReminderCompleteOnDate,
 } from '../../data/reminders';
 import { getThemeColors } from '../../data/theme';
+import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 
 type StreaksView = 'streaks' | 'alarms';
 
 export default function Reminders() {
+  const { theme } = useThemeSettings();
   const {
     reminders,
     addReminder,
     updateReminder,
     toggleReminderCompletion,
-    theme,
+  } = useReminderSettings();
+  const {
     notificationAccess,
     requestNotificationAccess,
     triggerHaptic,
-  } = useAppSettings();
+  } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const nextReminderEntry = getNextReminder(reminders);
   const enabledReminderCount = reminders.filter((reminder) => reminder.enabled).length;
   const [selectedView, setSelectedView] = useState<StreaksView>('streaks');
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null);
   const [draftReminderTime, setDraftReminderTime] = useState<string | null>(null);
-  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
-  const [hydrated, setHydrated] = useState(false);
+  const { lifeData, setLifeData } = useLifeTrackerData();
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const heroOpacity = useState(() => new Animated.Value(0))[0];
   const heroLift = useState(() => new Animated.Value(18))[0];
   const expandedReminder = reminders.find((reminder) => reminder.id === expandedReminderId) ?? null;
-
-  useEffect(() => {
-    let mounted = true;
-
-    const hydrate = async () => {
-      const persisted = await readPersistedLifeTrackerData().catch(() => null);
-      if (!mounted) {
-        return;
-      }
-
-      if (persisted) {
-        setLifeData({
-          ...defaultLifeTrackerData,
-          ...persisted,
-          goals2026: persisted.goals2026?.length ? persisted.goals2026 : defaultLifeTrackerData.goals2026,
-          diyTasks: persisted.diyTasks?.length ? persisted.diyTasks : defaultLifeTrackerData.diyTasks,
-        });
-      }
-      setHydrated(true);
-    };
-
-    void hydrate();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
-    void writePersistedLifeTrackerData(lifeData);
-  }, [hydrated, lifeData]);
 
   useEffect(() => {
     const reveal = Animated.parallel([

@@ -6,7 +6,7 @@ import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppSettingsProvider, useAppSettings } from '../context/AppSettingsContext';
+import { AppSettingsProvider, useThemeSettings } from '../context/AppSettingsContext';
 import { getThemeColors } from '../data/theme';
 import { getNotificationsModule } from '../utils/notifications';
 
@@ -26,7 +26,7 @@ if (Notifications) {
 }
 
 function AppShell() {
-  const { theme } = useAppSettings();
+  const { theme } = useThemeSettings();
   const colors = getThemeColors(theme);
   const statusBarStyle = theme === 'light' ? 'dark' : 'light';
   const [showIntro, setShowIntro] = useState(true);

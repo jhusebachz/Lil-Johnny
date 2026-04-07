@@ -2,7 +2,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
-import { ThemeMode, useAppSettings } from '../../context/AppSettingsContext';
+import { ThemeMode, usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
@@ -67,15 +67,14 @@ function SettingToggle({
 }
 
 export default function Settings() {
+  const { theme, setTheme } = useThemeSettings();
   const {
-    theme,
-    setTheme,
     preferences,
     updatePreferences,
     notificationAccess,
     requestNotificationAccess,
     triggerHaptic,
-  } = useAppSettings();
+  } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const currentThemeLabel = themeOptions.find((option) => option.value === theme)?.label ?? theme;

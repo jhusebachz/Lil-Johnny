@@ -160,8 +160,36 @@ export function formatTrackerDate(date = new Date()) {
   }).format(date);
 }
 
+export function formatMonthDay(date = new Date()) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
 export function formatDateKey(dateKey: string) {
   return formatTrackerDate(new Date(`${dateKey}T12:00:00`));
+}
+
+export function formatFullDate(date = new Date()) {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+export function formatLongDate(date = new Date()) {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+}
+
+export function getGreetingForTime(date = new Date()) {
+  return date.getHours() < 12 ? 'Good morning' : 'Good evening';
 }
 
 export function formatLoopRunTime(totalSeconds: number) {
@@ -295,6 +323,10 @@ export async function writePersistedLifeTrackerData(data: LifeTrackerData) {
   }
 
   await FileSystem.writeAsStringAsync(STORAGE_FILE, raw);
+}
+
+export function mergeLifeTrackerData(data?: Partial<LifeTrackerData> | null): LifeTrackerData {
+  return normalizeLifeTrackerData(data ?? {});
 }
 
 function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerData {

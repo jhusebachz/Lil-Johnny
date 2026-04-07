@@ -1,21 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import RunescapeSection from '../../components/games/RunescapeSection';
 import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
-import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import {
   DiyTask,
-  LifeTrackerData,
-  defaultLifeTrackerData,
   formatTrackerDate,
   getTodayDateKey,
-  readPersistedLifeTrackerData,
-  writePersistedLifeTrackerData,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 type HobbiesView = 'osrs' | 'diy';
@@ -161,50 +158,15 @@ function DiyAddCard({
 }
 
 export default function Goals() {
-  const { theme, triggerHaptic } = useAppSettings();
+  const { theme } = useThemeSettings();
+  const { triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const [selectedView, setSelectedView] = useState<HobbiesView>('osrs');
   const [runescapeRefreshToken, setRunescapeRefreshToken] = useState(0);
-  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
-  const [hydrated, setHydrated] = useState(false);
+  const { lifeData, setLifeData } = useLifeTrackerData();
   const [draftDiyTitle, setDraftDiyTitle] = useState('');
   const [draftDiyNote, setDraftDiyNote] = useState('');
   const { refreshing, triggerRefresh } = useTimedRefresh();
-
-  useEffect(() => {
-    let mounted = true;
-
-    const hydrate = async () => {
-      const persisted = await readPersistedLifeTrackerData().catch(() => null);
-      if (!mounted) {
-        return;
-      }
-
-      if (persisted) {
-        setLifeData({
-          ...defaultLifeTrackerData,
-          ...persisted,
-          goals2026: persisted.goals2026?.length ? persisted.goals2026 : defaultLifeTrackerData.goals2026,
-          diyTasks: persisted.diyTasks?.length ? persisted.diyTasks : defaultLifeTrackerData.diyTasks,
-        });
-      }
-      setHydrated(true);
-    };
-
-    void hydrate();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
-    void writePersistedLifeTrackerData(lifeData);
-  }, [hydrated, lifeData]);
 
   const toggleDiyTask = async (taskId: string) => {
     await triggerHaptic();

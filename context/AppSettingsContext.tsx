@@ -56,6 +56,21 @@ type AppSettingsContextType = {
 };
 
 const AppSettingsContext = createContext<AppSettingsContextType | undefined>(undefined);
+const ThemeSettingsContext = createContext<Pick<AppSettingsContextType, 'theme' | 'setTheme'> | undefined>(undefined);
+const ReminderSettingsContext = createContext<
+  Pick<AppSettingsContextType, 'reminders' | 'addReminder' | 'updateReminder' | 'toggleReminderCompletion'> | undefined
+>(undefined);
+const PreferenceSettingsContext = createContext<
+  Pick<
+    AppSettingsContextType,
+    | 'preferences'
+    | 'updatePreferences'
+    | 'notificationAccess'
+    | 'requestNotificationAccess'
+    | 'triggerHaptic'
+    | 'triggerTabHaptic'
+  > | undefined
+>(undefined);
 
 const initialReminders: ReminderItem[] = [
   {
@@ -158,7 +173,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
 
     const hydrate = async () => {
       try {
-        const persisted = await readPersistedSettings();
+        const persisted = await readPersistedSettings<PersistedSettings>();
 
         if (persisted && mounted) {
           const normalized = normalizePersistedSettings(persisted);
@@ -315,7 +330,45 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     [notificationAccess, preferences, reminders, theme]
   );
 
-  return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>;
+  const themeValue = useMemo(
+    () => ({
+      theme,
+      setTheme,
+    }),
+    [theme]
+  );
+
+  const reminderValue = useMemo(
+    () => ({
+      reminders,
+      addReminder,
+      updateReminder,
+      toggleReminderCompletion,
+    }),
+    [reminders]
+  );
+
+  const preferenceValue = useMemo(
+    () => ({
+      preferences,
+      updatePreferences,
+      notificationAccess,
+      requestNotificationAccess,
+      triggerHaptic,
+      triggerTabHaptic,
+    }),
+    [notificationAccess, preferences]
+  );
+
+  return (
+    <AppSettingsContext.Provider value={value}>
+      <ThemeSettingsContext.Provider value={themeValue}>
+        <ReminderSettingsContext.Provider value={reminderValue}>
+          <PreferenceSettingsContext.Provider value={preferenceValue}>{children}</PreferenceSettingsContext.Provider>
+        </ReminderSettingsContext.Provider>
+      </ThemeSettingsContext.Provider>
+    </AppSettingsContext.Provider>
+  );
 }
 
 export function useAppSettings() {
@@ -323,6 +376,36 @@ export function useAppSettings() {
 
   if (!context) {
     throw new Error('useAppSettings must be used inside AppSettingsProvider');
+  }
+
+  return context;
+}
+
+export function useThemeSettings() {
+  const context = useContext(ThemeSettingsContext);
+
+  if (!context) {
+    throw new Error('useThemeSettings must be used inside AppSettingsProvider');
+  }
+
+  return context;
+}
+
+export function useReminderSettings() {
+  const context = useContext(ReminderSettingsContext);
+
+  if (!context) {
+    throw new Error('useReminderSettings must be used inside AppSettingsProvider');
+  }
+
+  return context;
+}
+
+export function usePreferenceSettings() {
+  const context = useContext(PreferenceSettingsContext);
+
+  if (!context) {
+    throw new Error('usePreferenceSettings must be used inside AppSettingsProvider');
   }
 
   return context;

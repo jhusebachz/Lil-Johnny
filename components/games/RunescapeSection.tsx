@@ -214,7 +214,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
                   {item.remainingXp.toLocaleString()} xp left
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>
-                  {item.hoursLeft !== null
+                  {item.hoursLeft != null
                     ? `${item.hoursLeft.toFixed(1)}h @ ${item.xpPerHour?.toLocaleString()} xp/hr`
                     : 'Manual estimate'}
                 </Text>

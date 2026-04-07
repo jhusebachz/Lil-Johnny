@@ -5,18 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
-import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import {
   ChapterPracticeScore,
-  LifeTrackerData,
-  StudyLogEntry,
-  defaultLifeTrackerData,
   formatDateKey,
+  getDateRangePacePct,
   getTodayDateKey,
-  readPersistedLifeTrackerData,
-  writePersistedLifeTrackerData,
+  StudyLogEntry,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 function parsePositiveNumber(value: string) {
@@ -29,36 +27,12 @@ function parseScore(value: string) {
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
 }
 
-function clampPct(value: number) {
-  return Math.max(0, Math.min(100, value));
-}
-
-function getPacePct(startDate?: string, targetDate?: string) {
-  if (!startDate || !targetDate) {
-    return null;
-  }
-
-  const start = new Date(`${startDate}T12:00:00`).getTime();
-  const end = new Date(`${targetDate}T12:00:00`).getTime();
-  const now = Date.now();
-
-  if (end <= start) {
-    return 100;
-  }
-
-  if (now <= start) {
-    return 0;
-  }
-
-  return clampPct(((now - start) / (end - start)) * 100);
-}
-
 export default function Cyber() {
-  const { theme, triggerHaptic } = useAppSettings();
+  const { theme } = useThemeSettings();
+  const { triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
-  const [lifeData, setLifeData] = useState<LifeTrackerData>(defaultLifeTrackerData);
-  const [hydrated, setHydrated] = useState(false);
-  const [selectedCertId, setSelectedCertId] = useState(defaultLifeTrackerData.certifications[0].id);
+  const { lifeData, setLifeData } = useLifeTrackerData();
+  const [selectedCertId, setSelectedCertId] = useState(lifeData.certifications[0].id);
   const [draftChapters, setDraftChapters] = useState('');
   const [draftStudyNote, setDraftStudyNote] = useState('');
   const [draftScoreChapter, setDraftScoreChapter] = useState('');
@@ -67,40 +41,10 @@ export default function Cyber() {
   const { refreshing, triggerRefresh } = useTimedRefresh();
 
   useEffect(() => {
-    let mounted = true;
-
-    void readPersistedLifeTrackerData()
-      .then((persisted) => {
-        if (!mounted || !persisted) {
-          return;
-        }
-
-        setLifeData({
-          ...defaultLifeTrackerData,
-          ...persisted,
-          certifications: persisted.certifications?.length ? persisted.certifications : defaultLifeTrackerData.certifications,
-          studyLogs: persisted.studyLogs ?? [],
-          chapterPracticeScores: persisted.chapterPracticeScores ?? [],
-        });
-      })
-      .finally(() => {
-        if (mounted) {
-          setHydrated(true);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
-    void writePersistedLifeTrackerData(lifeData);
-  }, [hydrated, lifeData]);
+    setSelectedCertId((current) =>
+      lifeData.certifications.some((cert) => cert.id === current) ? current : lifeData.certifications[0].id
+    );
+  }, [lifeData.certifications]);
 
   const selectedCert = lifeData.certifications.find((cert) => cert.id === selectedCertId) ?? lifeData.certifications[0];
   const certLogs = lifeData.studyLogs
@@ -157,7 +101,7 @@ export default function Cyber() {
     const chapterNumber = parsePositiveNumber(draftScoreChapter);
     const score = parseScore(draftScoreValue);
 
-    if (!chapterNumber || !score) {
+    if (chapterNumber === null || score === null) {
       return;
     }
 
@@ -282,7 +226,10 @@ export default function Cyber() {
           {(() => {
             const pct =
               selectedCert.chapterCount > 0 ? (selectedCert.chaptersCompleted / selectedCert.chapterCount) * 100 : 0;
-            const pacePct = getPacePct(selectedCert.startDate, selectedCert.examDate);
+            const pacePct =
+              selectedCert.startDate && selectedCert.examDate
+                ? getDateRangePacePct(selectedCert.startDate, selectedCert.examDate)
+                : null;
 
             return (
               <View

@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useAppSettings } from '../../context/AppSettingsContext';
+import { useThemeSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
 
 export default function TabLayout() {
-  const { theme } = useAppSettings();
+  const { theme } = useThemeSettings();
   const colors = getThemeColors(theme);
 
   return (
