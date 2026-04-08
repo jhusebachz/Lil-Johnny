@@ -54,6 +54,14 @@ type GoalProjection = {
   pacePct: number;
 };
 
+type PassiveCombatRatios = Partial<Record<SkillName, number>>;
+
+type ProjectedSkillState = {
+  skill: SkillName;
+  level: number;
+  experience: number;
+};
+
 export type OsrsSkillStat = {
   metric: string;
   experience: number;
@@ -181,6 +189,8 @@ const GOAL_PROGRESS_BASELINE: Record<SkillName | 'overall', Pick<OsrsSkillStat, 
   sailing: { level: 98, experience: 12303326 },
 };
 
+const PASSIVE_COMBAT_SKILLS: readonly SkillName[] = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'magic'];
+
 function formatSkillName(skill: string) {
   if (skill === 'runecraft') {
     return 'Runecraft';
@@ -294,6 +304,7 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
     };
   }
 
+  const passiveCombatRatios = buildPassiveCombatRatios(GOAL_PROGRESS_BASELINE, skills);
   const projectedSkills = skills.map((skill) => ({
     skill: skill.skill,
     level: skill.level,
@@ -339,6 +350,9 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
     chosenSkill.experience = xpForLevel(chosenSkill.level);
     hoursLeft += bestHours;
     xpLeft += xpNeededForChosenLevel;
+    if (chosenSkill.skill === 'slayer') {
+      applyPassiveCombatXp(projectedSkills, xpNeededForChosenLevel, passiveCombatRatios);
+    }
     remainingLevels -= 1;
   }
 
@@ -347,6 +361,60 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
     xpLeft,
     unestimatedSkills: [...unestimatedSkills],
   };
+}
+
+function buildPassiveCombatRatios(
+  baselineSkills: Record<SkillName | 'overall', Pick<OsrsSkillStat, 'level' | 'experience'>>,
+  currentSkills: (OsrsSkillStat & { skill: SkillName })[]
+): PassiveCombatRatios {
+  const currentSkillMap = Object.fromEntries(currentSkills.map((skill) => [skill.skill, skill])) as Record<SkillName, OsrsSkillStat & { skill: SkillName }>;
+  const slayerXpGained = Math.max(currentSkillMap.slayer.experience - baselineSkills.slayer.experience, 0);
+
+  if (slayerXpGained <= 0) {
+    return {};
+  }
+
+  return PASSIVE_COMBAT_SKILLS.reduce<PassiveCombatRatios>((ratios, skill) => {
+    const baselineXp = baselineSkills[skill].experience;
+    const currentXp = currentSkillMap[skill].experience;
+    const gainedXp = Math.max(currentXp - baselineXp, 0);
+    const ratio = gainedXp / slayerXpGained;
+
+    if (ratio > 0) {
+      ratios[skill] = ratio;
+    }
+
+    return ratios;
+  }, {});
+}
+
+function syncProjectedSkillLevel(projectedSkill: ProjectedSkillState) {
+  while (projectedSkill.level < 99 && projectedSkill.experience >= xpForLevel(projectedSkill.level + 1)) {
+    projectedSkill.level += 1;
+  }
+}
+
+function applyPassiveCombatXp(
+  projectedSkills: ProjectedSkillState[],
+  slayerXpGain: number,
+  passiveCombatRatios: PassiveCombatRatios
+) {
+  PASSIVE_COMBAT_SKILLS.forEach((skillName) => {
+    const ratio = passiveCombatRatios[skillName] ?? 0;
+
+    if (ratio <= 0) {
+      return;
+    }
+
+    const projectedSkill = projectedSkills.find((skill) => skill.skill === skillName);
+
+    if (!projectedSkill || projectedSkill.level >= 99) {
+      return;
+    }
+
+    projectedSkill.experience += slayerXpGain * ratio;
+    syncProjectedSkillLevel(projectedSkill);
+  });
 }
 
 function buildTargetProgress(
