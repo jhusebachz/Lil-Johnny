@@ -257,6 +257,8 @@ export default function Dashboard() {
   const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;
   const loopRunLoggedThisWeek = lifeData.loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
   const cyberOnPace = currentCertPacePct !== null ? currentCertPct >= currentCertPacePct : false;
+  const base90OnPace = tracker.goalProjections.base90.progressPct >= tracker.goalProjections.base90.pacePct;
+  const runefestOnPace = tracker.goalProjections.runefest.progressPct >= tracker.goalProjections.runefest.pacePct;
   const weightLossActualPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
   const weightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
   const weightLossOnPace = weightLossActualPct >= weightLossPacePct;
@@ -269,8 +271,8 @@ export default function Dashboard() {
       ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal) / 30), 0) / avoidanceGoals.length
       : 1;
   const hobbiesScore = [
-    tracker.goalProjections.base90.status === 'On track' ? 1 : 0,
-    tracker.goalProjections.runefest.status === 'On track' ? 1 : 0,
+    base90OnPace ? 1 : 0,
+    runefestOnPace ? 1 : 0,
   ].reduce((total, value) => total + value, 0) / 2;
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissScore = Math.round(((cyberScore + healthScore + hobbiesScore + streaksScore) / 4) * 100);
@@ -317,7 +319,7 @@ export default function Dashboard() {
     },
     {
       label: 'On Pace',
-      complete: tracker.goalProjections.base90.status === 'On track',
+      complete: base90OnPace,
     },
     {
       label: '2250 Total Level by RuneFest',
@@ -325,7 +327,7 @@ export default function Dashboard() {
     },
     {
       label: 'On Pace',
-      complete: tracker.goalProjections.runefest.status === 'On track',
+      complete: runefestOnPace,
     },
   ];
   const suggestedActions = useMemo(() => {
@@ -354,17 +356,17 @@ export default function Dashboard() {
       });
     }
 
-    if (tracker.goalProjections.base90.status !== 'On track') {
+    if (!base90OnPace) {
       candidates.push({
-        label: `OSRS base 90 is ${tracker.goalProjections.base90.status.toLowerCase()}. Give the highest-pressure skill some time soon.`,
-        urgency: tracker.goalProjections.base90.status === 'Off track' ? 0.88 : 0.74,
+        label: 'OSRS base 90 is behind pace. Give the highest-pressure skill some time soon.',
+        urgency: tracker.goalProjections.base90.progressPct + 8 < tracker.goalProjections.base90.pacePct ? 0.88 : 0.74,
       });
     }
 
-    if (tracker.goalProjections.runefest.status !== 'On track') {
+    if (!runefestOnPace) {
       candidates.push({
-        label: `2250 total by RuneFest is ${tracker.goalProjections.runefest.status.toLowerCase()}. Put some focused OSRS time into the total-level path.`,
-        urgency: tracker.goalProjections.runefest.status === 'Off track' ? 0.84 : 0.69,
+        label: '2250 total by RuneFest is behind pace. Put some focused OSRS time into the total-level path.',
+        urgency: tracker.goalProjections.runefest.progressPct + 8 < tracker.goalProjections.runefest.pacePct ? 0.84 : 0.69,
       });
     }
 
@@ -398,8 +400,12 @@ export default function Dashboard() {
     loopRunLoggedThisWeek,
     lowestCert,
     currentDay,
-    tracker.goalProjections.base90.status,
-    tracker.goalProjections.runefest.status,
+    base90OnPace,
+    runefestOnPace,
+    tracker.goalProjections.base90.pacePct,
+    tracker.goalProjections.base90.progressPct,
+    tracker.goalProjections.runefest.pacePct,
+    tracker.goalProjections.runefest.progressPct,
   ]);
 
   return (

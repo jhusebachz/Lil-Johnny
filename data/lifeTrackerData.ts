@@ -262,7 +262,7 @@ export function getScheduledGymVisitsByToday(
   targetDays: readonly number[] = WEEKLY_GYM_TARGET_DAYS
 ) {
   const currentDay = now.getDay();
-  return targetDays.filter((day) => day <= currentDay).length;
+  return targetDays.filter((day) => day < currentDay).length;
 }
 
 export function getScheduledGymPacePct(
