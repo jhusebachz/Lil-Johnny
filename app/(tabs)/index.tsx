@@ -565,59 +565,29 @@ export default function Dashboard() {
         </SectionCard>
 
         <SectionCard title="Overview" emoji={'\uD83E\uDDE9'} colors={colors}>
-          {isCompact ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              snapToInterval={overviewCardWidth + 12}
-              snapToAlignment="start"
-              contentContainerStyle={{ paddingRight: 4 }}
-            >
-              <OverviewCard
-                title="Cyber"
-                items={cyberOverviewItems}
-                colors={colors}
-                align="left"
-                fixedWidth={overviewCardWidth}
-              />
-              <OverviewCard
-                title="Health"
-                items={healthOverviewItems}
-                colors={colors}
-                align="left"
-                fixedWidth={overviewCardWidth}
-              />
-              <OverviewCard
-                title="Hobbies"
-                items={hobbiesOverviewItems}
-                colors={colors}
-                align="left"
-                fixedWidth={overviewCardWidth}
-              />
-            </ScrollView>
-          ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              <OverviewCard
-                title="Cyber"
-                items={cyberOverviewItems}
-                colors={colors}
-                align="left"
-              />
-              <OverviewCard
-                title="Health"
-                items={healthOverviewItems}
-                colors={colors}
-                align="left"
-              />
-              <OverviewCard
-                title="Hobbies"
-                items={hobbiesOverviewItems}
-                colors={colors}
-                align="left"
-              />
-            </View>
-          )}
+          <View style={{ flexDirection: isCompact ? 'column' : 'row', flexWrap: 'wrap', gap: 12 }}>
+            <OverviewCard
+              title="Cyber"
+              items={cyberOverviewItems}
+              colors={colors}
+              align="left"
+              fullWidth={isCompact}
+            />
+            <OverviewCard
+              title="Health"
+              items={healthOverviewItems}
+              colors={colors}
+              align="left"
+              fullWidth={isCompact}
+            />
+            <OverviewCard
+              title="Hobbies"
+              items={hobbiesOverviewItems}
+              colors={colors}
+              align="left"
+              fullWidth={isCompact}
+            />
+          </View>
         </SectionCard>
 
         <SectionCard title="Streaks" emoji={'\uD83D\uDD25'} colors={colors}>

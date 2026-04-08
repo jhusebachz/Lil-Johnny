@@ -31,6 +31,7 @@ import {
   WeightEntry,
   formatDateKey,
   formatFullDate,
+  formatLoopRunTime,
   formatMonthDay,
   getDateRangePacePct,
   getScheduledGymPacePct,
@@ -101,9 +102,11 @@ function clampPct(value: number) {
 type ExerciseProgressSummary = {
   point: ExerciseProgressPoint;
   setCount: number;
-  bestSet: ExerciseSet | null;
-  qualifyingSet: ExerciseSet | null;
+  bestSet: BestLoggedSet | null;
+  qualifyingSet: BestLoggedSet | null;
 };
+
+type BestLoggedSet = Pick<ExerciseSet, 'reps' | 'weight'>;
 
 function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
   const qualifyingSets = setEntries.filter((setEntry) => setEntry.reps >= minimumReps);
@@ -116,7 +119,7 @@ function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
   const topWeightSets = qualifyingSets.filter((setEntry) => setEntry.weight === topWeight);
   const bestReps = Math.max(...topWeightSets.map((setEntry) => setEntry.reps));
 
-  return { bestReps, topWeight };
+  return { reps: bestReps, weight: topWeight };
 }
 
 function summarizeProgressPoint(point: ExerciseProgressPoint): ExerciseProgressSummary {
@@ -131,7 +134,7 @@ function summarizeProgressPoint(point: ExerciseProgressPoint): ExerciseProgressS
 function getBestAtTopWeight(points: ExerciseProgressSummary[]) {
   const qualifyingPoints = points
     .map((point) => point.qualifyingSet)
-    .filter((point): point is ExerciseSet => point !== null);
+    .filter((point): point is BestLoggedSet => point !== null);
 
   if (qualifyingPoints.length === 0) {
     return null;
