@@ -2,31 +2,31 @@
 
 [![Lint](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml/badge.svg)](https://github.com/jhusebachz/Lil-Johnny/actions/workflows/lint.yml)
 
-Lil Johnny is a personal life-tracker app built with Expo and React Native. It keeps certification study, health progress, reminders, OSRS progress, house projects, and 2026 streak goals visible in one place.
+Lil Johnny is a personal tracker app built with Expo and React Native. It keeps your day-to-day pace visible across certifications, health, hobbies, streaks, reminder alarms, and long-term OSRS goals.
 
 ## What The App Tracks
 
-- `Dashboard`: overall life overview, pace-based Bliss Score, and suggested next actions
-- `Cyber`: Linux+, PenTest+, and Cloud+ progress with chapter pacing and chapter-end practice scores
-- `Health`: set-by-set gym logging, weight entries, loop run tracking, weekly gym pace, and weight-loss pace
-- `Hobbies`: DIY to-do list first, with OSRS in a separate sub-tab
-- `Streaks`: 2026 streak tracking plus reminder alarms and notifications
-- `Settings`: app appearance and notification controls
+- `Dashboard`: pace-based Bliss Score, simplified overview cards, and suggested next actions based on what is currently behind
+- `Cyber`: Linux+, PenTest+, and Cloud+ tracking with separate chapter counts, timed cert windows, study logs, and chapter-end practice scores
+- `Health`: set-by-set gym logging, weekly gym pace, weight tracking, weight-loss pace, loop-run tracking, and daily coaching insight
+- `Hobbies`: DIY to-do tracking first, with OSRS as a separate sub-view
+- `Streaks`: avoidance streaks plus reminder alarms in the same tab
+- `Settings`: appearance and notification controls
 
 ## Current Highlights
 
-- OSRS tracker with live snapshot data, pace bars, and coaching
-- Certification tracker based on real Sybex chapter counts
-- Dashboard Bliss Score now evaluates daily pace instead of raw year-to-date completion
-- Health pacing reflects the real Wednesday/Thursday/Friday gym schedule
-- Gym logging now tracks individual sets with their own reps and weight
-- Health coaching insight rotates daily and responds to current progress
-- Weight-loss pace is tracked from a `205 lb` starting point toward a `185 lb` goal
-- Streaks and reminder completions now roll over on local midnight instead of UTC
-- DIY task tracking inside the Hobbies tab
-- 2026 streak tracking and reminder alarms combined in one tab
-- Real reminder notifications on supported builds
-- Theme system with `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
+- Dashboard overview now checks whether each major area is on pace today instead of relying on raw totals
+- Bliss Score is a daily pace score driven by Cyber, Health, Hobbies, and Streaks
+- Certification tracking is based on current Sybex guide chapter counts and cert-specific study timelines
+- Health pacing follows the real Wednesday/Thursday/Friday gym schedule without penalizing you too early in the week
+- Gym logging is set-by-set, so each exercise can record multiple sets with different reps and weight
+- Weight tracking starts from a `205 lb` baseline and measures progress toward a `185 lb` goal
+- Loop runs are tracked by time with a sub-9 target
+- Health coaching insight changes daily and reacts to what is actually behind
+- OSRS tracker uses live tracker snapshots, goal pace bars, and a more realistic Slayer-to-combat projection model for long-term pacing
+- DIY tasks are tracked as their own cards with explicit completion buttons
+- Avoidance streaks and reminder alarms share one tab, while streak timing follows local midnight
+- Theme system includes `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
 
 ## Project Structure
 
@@ -83,6 +83,7 @@ Important:
 - `GitHub pushes do not update the phone app by themselves.`
 - `eas update` is enough for JS and asset changes.
 - native changes like icons, splash config, plugins, or app config need a fresh APK.
+- when runtime-breaking fixes land, pushing an OTA promptly matters because the installed preview build will only see GitHub changes after `eas update`
 
 ## Versioning
 
@@ -110,13 +111,14 @@ Because Expo Updates uses `runtimeVersion.policy = "appVersion"`, version change
 
 `1.2.1`
 
-This version reflects the shift from a dashboard/news-style app into a broader life-tracker system, plus follow-up cleanup and tracker refinements:
+This version reflects the shift from a dashboard/news-style app into a pace-based personal tracker, plus follow-up cleanup and tracker refinements:
 
-- dashboard action guidance and a pace-based Bliss Score
-- Cyber chapter-based cert tracking
+- dashboard action guidance and a daily pace-based Bliss Score
+- Cyber chapter-based cert tracking with certification windows
 - Hobbies tab with DIY first and OSRS in a separate sub-tab
 - broader health tracking with set-by-set gym logging, loop-run tracking, rotating coaching, and weight-loss pacing
 - Streaks tab with avoidance streaks and reminder alarms that follow local-midnight rollover
+- OSRS pace tracking that no longer assumes combat stats magically become 99 just because Slayer is zero-time
 
 ## GitHub Sync
 
