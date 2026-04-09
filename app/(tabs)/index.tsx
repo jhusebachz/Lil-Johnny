@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useGymData } from '../../context/GymDataContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
-import { getLoggedGymDateKeys, readPersistedGymData } from '../../data/gymData';
+import { getLoggedGymDateKeys } from '../../data/gymData';
 import {
   AvoidanceGoal,
   GOAL_WEIGHT_LB,
@@ -118,8 +119,8 @@ export default function Dashboard() {
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
   const { lifeData } = useLifeTrackerData();
+  const { exerciseHistory } = useGymData();
   const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
-  const [gymVisitCount, setGymVisitCount] = useState(0);
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const heroOpacity = useState(() => new Animated.Value(0))[0];
   const heroLift = useState(() => new Animated.Value(18))[0];
@@ -131,14 +132,11 @@ export default function Dashboard() {
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
 
-    const [osrs, gym] = await Promise.all([
+    const [osrs] = await Promise.all([
       fetchRunescapeTrackerSnapshot().catch(() => getFallbackRunescapeTracker()),
-      readPersistedGymData().catch(() => null),
     ]);
 
     setTracker(osrs);
-
-    setGymVisitCount(getUniqueWeekCount(getLoggedGymDateKeys(gym?.exerciseHistory)));
   }, [triggerRefresh]);
 
   useEffect(() => {
@@ -250,6 +248,7 @@ export default function Dashboard() {
     now >= new Date(`${currentCert.startDate}T00:00:00`) &&
     now <= new Date(`${currentCert.examDate}T23:59:59`);
   const currentWeekKeys = new Set(getCurrentWeekDateKeys());
+  const gymVisitCount = useMemo(() => getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory)), [exerciseHistory]);
   const weeklyGymPacePct = getScheduledGymPacePct();
   const weeklyGymActualPct = clamp01(gymVisitCount / 3) * 100;
   const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;

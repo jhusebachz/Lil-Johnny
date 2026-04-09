@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppSettingsProvider, useThemeSettings } from '../context/AppSettingsContext';
+import { GymDataProvider } from '../context/GymDataContext';
 import { LifeTrackerProvider } from '../context/LifeTrackerContext';
 import { getThemeColors } from '../data/theme';
 import { getNotificationsModule } from '../utils/notifications';
@@ -181,7 +182,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AppSettingsProvider>
         <LifeTrackerProvider>
-          <AppShell />
+          <GymDataProvider>
+            <AppShell />
+          </GymDataProvider>
         </LifeTrackerProvider>
       </AppSettingsProvider>
     </SafeAreaProvider>
