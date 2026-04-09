@@ -26,23 +26,20 @@ export default function WorkoutSection({
 }: WorkoutSectionProps) {
   return (
     <SectionCard title={workout.title} emoji={'🏋'} colors={colors}>
-      <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 6 }}>
-        Focus: <Text style={{ color: colors.text, fontWeight: '700' }}>{workout.focus}</Text>
-      </Text>
-      <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 14 }}>
-        {todayLabel} | {workout.exercises.length} exercises
+      <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 12 }}>
+        {workout.focus} • {todayLabel} • {workout.exercises.length} exercises
       </Text>
 
       {groupedWorkoutExercises.map(([category, exercises]) => (
-        <View key={`${selectedDay}-${category}`} style={{ marginBottom: 8 }}>
+        <View key={`${selectedDay}-${category}`} style={{ marginBottom: 6 }}>
           <Text
             style={{
-              fontSize: 12,
+              fontSize: 11,
               color: colors.subtext,
               fontWeight: '800',
               textTransform: 'uppercase',
               letterSpacing: 0.8,
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
             {category}

@@ -7,11 +7,13 @@ export default function StreakGoalCard({
   goal,
   colors,
   streak,
+  bestStreak,
   onMarkFailure,
 }: {
   goal: YearGoal;
   colors: ReturnType<typeof getThemeColors>;
   streak: number;
+  bestStreak: number;
   onMarkFailure: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
@@ -40,6 +42,10 @@ export default function StreakGoalCard({
           <Text style={{ fontSize: 16, color: colors.subtext }}>
             Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
             {streak === 1 ? 'day' : 'days'}
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.subtext, marginTop: 4 }}>
+            All-time best: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
+            {bestStreak === 1 ? 'day' : 'days'}
           </Text>
         </View>
 

@@ -36,6 +36,7 @@ export type AvoidanceGoal = {
   type: 'avoidance';
   startedAt: string;
   lastFailureDate?: string | null;
+  bestStreakDays?: number;
 };
 
 type LegacyDailyCheckGoal = {
@@ -129,11 +130,11 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   studyLogs: [],
   chapterPracticeScores: [],
   goals2026: [
-    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
-    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
-    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
-    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
-    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
+    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
   ],
   weightEntries: [
     {
@@ -215,6 +216,10 @@ export function getAvoidanceStreak(goal: AvoidanceGoal, now = new Date()) {
   const today = new Date(`${getTodayDateKey(now)}T12:00:00`);
   const diffDays = Math.max(Math.round((today.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
   return goal.lastFailureDate ? diffDays : diffDays;
+}
+
+export function getAvoidanceBestStreak(goal: AvoidanceGoal, now = new Date()) {
+  return Math.max(goal.bestStreakDays ?? 0, getAvoidanceStreak(goal, now));
 }
 
 export function getCurrentWeekDateKeys(now = new Date()) {
@@ -337,6 +342,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         type: 'avoidance' as const,
         startedAt: AVOIDANCE_STREAK_START_DATE,
         lastFailureDate: null,
+        bestStreakDays: 0,
       };
     }
 
@@ -355,6 +361,14 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
             ? AVOIDANCE_STREAK_START_DATE
             : persistedGoal.startedAt ?? fallback.startedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
+          bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, getAvoidanceStreak({
+            ...fallback,
+            ...persistedGoal,
+            startedAt: shouldResetLegacyBaseline
+              ? AVOIDANCE_STREAK_START_DATE
+              : persistedGoal.startedAt ?? fallback.startedAt,
+            lastFailureDate: persistedGoal.lastFailureDate ?? null,
+          })),
         };
       }
 

@@ -21,6 +21,7 @@ import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '..
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
+  getAvoidanceBestStreak,
   YearGoal,
   getAvoidanceStreak,
   getTodayDateKey,
@@ -93,6 +94,7 @@ export default function Reminders() {
         .map((goal) => ({
           goal,
           streak: getAvoidanceStreak(goal),
+          bestStreak: getAvoidanceBestStreak(goal),
         })),
     [lifeData.goals2026]
   );
@@ -179,15 +181,17 @@ export default function Reminders() {
           {selectedView === 'streaks' ? (
             <>
               <SectionCard title="Streaks" emoji={'🔥'} colors={colors}>
-                {avoidanceGoals.map(({ goal, streak }) => (
+                {avoidanceGoals.map(({ goal, streak, bestStreak }) => (
                   <StreakGoalCard
                     key={goal.id}
                     goal={goal}
                     colors={colors}
                     streak={streak}
+                    bestStreak={bestStreak}
                     onMarkFailure={async () => {
                       await updateGoal(goal.id, (currentGoal) => ({
                         ...currentGoal,
+                        bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),
                         lastFailureDate: getTodayDateKey(),
                       }));
                     }}
