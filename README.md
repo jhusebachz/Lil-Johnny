@@ -20,6 +20,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 - Certification tracking is based on current Sybex guide chapter counts and cert-specific study timelines
 - Health pacing follows the real Wednesday/Thursday/Friday gym schedule without penalizing you too early in the week
 - Gym logging is set-by-set, so each exercise can record multiple sets with different reps and weight
+- The workout list in Health is more compact now, so long Push / Pull / Legs days are faster to scroll through on mobile
 - Weight tracking starts from a `205 lb` baseline and measures progress toward a `185 lb` goal
 - Loop runs are tracked by time with a sub-9 target
 - Health coaching insight changes daily and reacts to what is actually behind
@@ -27,6 +28,8 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 - DIY tasks are tracked as their own cards with explicit completion buttons
 - Avoidance streaks and reminder alarms share one tab, while streak timing follows local midnight
 - Life-tracker data now lives in a shared app-level context so Health, Cyber, Hobbies, Dashboard, and Streaks stop overwriting each other across tabs
+- Gym data also lives in shared app-level state now, so Health and Dashboard stay in sync
+- Streaks now track both current streak and all-time best streak for each item
 - Theme system includes `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
 
 ## Project Structure
@@ -121,6 +124,7 @@ This version reflects the shift from a dashboard/news-style app into a pace-base
 - Streaks tab with avoidance streaks and reminder alarms that follow local-midnight rollover
 - OSRS pace tracking that no longer assumes combat stats magically become 99 just because Slayer is zero-time
 - shared life-tracker persistence across tabs so saved Health and tracker data stays consistent
+- shared gym persistence across Health and Dashboard, plus all-time-best streak tracking
 
 ## GitHub Sync
 
