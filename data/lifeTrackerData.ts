@@ -83,6 +83,7 @@ export type LifeTrackerData = {
 const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-life-trackers.json`;
 const WEB_STORAGE_KEY = 'lil-johnny-life-trackers';
 export const TRACKER_BASELINE_DATE = '2026-03-28';
+export const AVOIDANCE_STREAK_START_DATE = '2026-04-08';
 export const GOAL_WEIGHT_LB = 185;
 export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
@@ -128,11 +129,11 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   studyLogs: [],
   chapterPracticeScores: [],
   goals2026: [
-    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
-    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: TRACKER_BASELINE_DATE, lastFailureDate: null },
+    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
+    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
+    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
+    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
+    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null },
   ],
   weightEntries: [
     {
@@ -352,20 +353,25 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         id: fallback.id,
         title: fallback.title,
         type: 'avoidance' as const,
-        startedAt: TRACKER_BASELINE_DATE,
+        startedAt: AVOIDANCE_STREAK_START_DATE,
         lastFailureDate: null,
       };
     }
 
     if (fallback.type === 'avoidance') {
       if (persistedGoal.type === 'avoidance') {
+        const shouldResetLegacyBaseline =
+          persistedGoal.startedAt === TRACKER_BASELINE_DATE && (persistedGoal.lastFailureDate ?? null) === null;
+
         return {
           ...fallback,
           ...persistedGoal,
           id: fallback.id,
           title: fallback.title,
           type: 'avoidance' as const,
-          startedAt: persistedGoal.startedAt ?? fallback.startedAt,
+          startedAt: shouldResetLegacyBaseline
+            ? AVOIDANCE_STREAK_START_DATE
+            : persistedGoal.startedAt ?? fallback.startedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
         };
       }
