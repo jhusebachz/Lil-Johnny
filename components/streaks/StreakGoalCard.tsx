@@ -1,24 +1,20 @@
 import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import { YearGoal, getTodayDateKey } from '../../data/lifeTrackerData';
+import { YearGoal } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
 
 export default function StreakGoalCard({
   goal,
   colors,
   streak,
-  onToggleToday,
   onMarkFailure,
 }: {
   goal: YearGoal;
   colors: ReturnType<typeof getThemeColors>;
   streak: number;
-  onToggleToday: () => Promise<void>;
   onMarkFailure: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
-  const todayKey = getTodayDateKey();
-  const dailyCompleted = goal.type === 'daily-check' ? goal.completedDates.includes(todayKey) : false;
   const isCompact = width < 430;
 
   return (
@@ -47,46 +43,25 @@ export default function StreakGoalCard({
           </Text>
         </View>
 
-        {goal.type === 'daily-check' ? (
-          <Pressable
-            onPress={() => {
-              void onToggleToday();
-            }}
-            style={{
-              width: isCompact ? '100%' : 76,
-              height: isCompact ? 54 : 76,
-              borderRadius: 18,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: dailyCompleted ? colors.success : colors.accent,
-              paddingHorizontal: 8,
-            }}
-          >
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
-              {dailyCompleted ? 'Done' : 'Mark'}
-            </Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={() => {
-              void onMarkFailure();
-            }}
-            style={{
-              minWidth: isCompact ? 0 : 112,
-              width: isCompact ? '100%' : undefined,
-              height: isCompact ? 54 : 76,
-              borderRadius: 18,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: colors.danger,
-              paddingHorizontal: 10,
-            }}
-          >
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
-              I broke this streak
-            </Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => {
+            void onMarkFailure();
+          }}
+          style={{
+            minWidth: isCompact ? 0 : 112,
+            width: isCompact ? '100%' : undefined,
+            height: isCompact ? 54 : 76,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.danger,
+            paddingHorizontal: 10,
+          }}
+        >
+          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
+            I broke this streak
+          </Text>
+        </Pressable>
       </View>
     </View>
   );

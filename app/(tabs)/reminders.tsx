@@ -112,10 +112,6 @@ export default function Reminders() {
     setDraftReminderTime(null);
   };
 
-  const refreshReminders = () => {
-    triggerRefresh();
-  };
-
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
@@ -127,7 +123,7 @@ export default function Reminders() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={refreshReminders}
+              onRefresh={triggerRefresh}
               tintColor={colors.accent}
               colors={[colors.accent]}
               progressBackgroundColor={colors.card}
@@ -189,16 +185,11 @@ export default function Reminders() {
                     goal={goal}
                     colors={colors}
                     streak={streak}
-                    onToggleToday={async () => Promise.resolve()}
                     onMarkFailure={async () => {
-                      await updateGoal(goal.id, (currentGoal) =>
-                        currentGoal.type === 'avoidance'
-                          ? {
-                              ...currentGoal,
-                              lastFailureDate: getTodayDateKey(),
-                            }
-                          : currentGoal
-                      );
+                      await updateGoal(goal.id, (currentGoal) => ({
+                        ...currentGoal,
+                        lastFailureDate: getTodayDateKey(),
+                      }));
                     }}
                   />
                 ))}

@@ -38,14 +38,14 @@ export type AvoidanceGoal = {
   lastFailureDate?: string | null;
 };
 
-export type DailyCheckGoal = {
+type LegacyDailyCheckGoal = {
   id: string;
   title: string;
   type: 'daily-check';
   completedDates: string[];
 };
 
-export type YearGoal = AvoidanceGoal | DailyCheckGoal;
+export type YearGoal = AvoidanceGoal;
 
 export type WeightEntry = {
   id: string;
@@ -217,25 +217,6 @@ export function getAvoidanceStreak(goal: AvoidanceGoal, now = new Date()) {
   return goal.lastFailureDate ? diffDays : diffDays;
 }
 
-export function getDailyCheckStreak(goal: DailyCheckGoal, now = new Date()) {
-  const completed = new Set(goal.completedDates);
-  let streak = 0;
-
-  for (let offset = 0; offset < 366; offset += 1) {
-    const checkDate = new Date(now);
-    checkDate.setDate(now.getDate() - offset);
-    const key = getTodayDateKey(checkDate);
-
-    if (!completed.has(key)) {
-      break;
-    }
-
-    streak += 1;
-  }
-
-  return streak;
-}
-
 export function getCurrentWeekDateKeys(now = new Date()) {
   const current = new Date(now);
   const day = current.getDay();
@@ -341,8 +322,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const persistedCertifications = new Map(
     (data.certifications ?? []).map((cert) => [cert.id === 'pnpt' ? 'cloud-plus' : cert.id, cert])
   );
+  const persistedGoals2026 = (data.goals2026 ?? []) as Array<AvoidanceGoal | LegacyDailyCheckGoal>;
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
-    const persistedGoal = data.goals2026?.find((goal) => goal.id === fallback.id);
+    const persistedGoal = persistedGoals2026.find((goal) => goal.id === fallback.id);
 
     if (!persistedGoal) {
       return fallback;
@@ -377,17 +359,6 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
       }
 
       return fallback;
-    }
-
-    if (persistedGoal.type === 'daily-check') {
-      return {
-        ...fallback,
-        ...persistedGoal,
-        id: fallback.id,
-        title: fallback.title,
-        type: 'daily-check' as const,
-        completedDates: persistedGoal.completedDates ?? [],
-      };
     }
 
     return fallback;
