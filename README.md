@@ -26,6 +26,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 - OSRS tracker uses live tracker snapshots, goal pace bars, and a more realistic Slayer-to-combat projection model for long-term pacing
 - DIY tasks are tracked as their own cards with explicit completion buttons
 - Avoidance streaks and reminder alarms share one tab, while streak timing follows local midnight
+- Life-tracker data now lives in a shared app-level context so Health, Cyber, Hobbies, Dashboard, and Streaks stop overwriting each other across tabs
 - Theme system includes `Light`, `Dark`, `Gangsta Green`, and `Silver & Black`
 
 ## Project Structure
@@ -35,7 +36,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 |-- app/                    # Expo Router screens and layout
 |-- assets/                 # Images, icons, and startup visuals
 |-- components/             # Reusable UI and feature components
-|-- context/                # App settings, reminders, persistence
+|-- context/                # App settings, reminder logic, and shared tracker state
 |-- data/                   # Tracker data models and derived logic
 |-- hooks/                  # Shared screen hooks
 |-- scripts/                # Local automation helpers
@@ -119,6 +120,7 @@ This version reflects the shift from a dashboard/news-style app into a pace-base
 - broader health tracking with set-by-set gym logging, loop-run tracking, rotating coaching, and weight-loss pacing
 - Streaks tab with avoidance streaks and reminder alarms that follow local-midnight rollover
 - OSRS pace tracking that no longer assumes combat stats magically become 99 just because Slayer is zero-time
+- shared life-tracker persistence across tabs so saved Health and tracker data stays consistent
 
 ## GitHub Sync
 
