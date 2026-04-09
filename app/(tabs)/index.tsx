@@ -117,7 +117,7 @@ export default function Dashboard() {
   const { preferences } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
-  const { lifeData, setLifeData } = useLifeTrackerData();
+  const { lifeData } = useLifeTrackerData();
   const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
   const [gymVisitCount, setGymVisitCount] = useState(0);
   const { refreshing, triggerRefresh } = useTimedRefresh();
@@ -131,17 +131,15 @@ export default function Dashboard() {
   const refreshDashboard = useCallback(async () => {
     triggerRefresh();
 
-    const [life, osrs, gym] = await Promise.all([
-      Promise.resolve(lifeData),
+    const [osrs, gym] = await Promise.all([
       fetchRunescapeTrackerSnapshot().catch(() => getFallbackRunescapeTracker()),
       readPersistedGymData().catch(() => null),
     ]);
 
-    setLifeData(life);
     setTracker(osrs);
 
     setGymVisitCount(getUniqueWeekCount(getLoggedGymDateKeys(gym?.exerciseHistory)));
-  }, [lifeData, setLifeData, triggerRefresh]);
+  }, [triggerRefresh]);
 
   useEffect(() => {
     void refreshDashboard();
