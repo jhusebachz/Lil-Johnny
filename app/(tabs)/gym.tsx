@@ -10,6 +10,7 @@ import LoopRunSection from '../../components/gym/LoopRunSection';
 import WorkoutSection from '../../components/gym/WorkoutSection';
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import {
   ExerciseDraftSet,
   ExerciseLog,
@@ -41,7 +42,6 @@ import {
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
 import { useGymData } from '../../hooks/use-gym-data';
-import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 const gymDays: GymDay[] = ['Push', 'Pull', 'Legs'];

@@ -18,6 +18,7 @@ import ReminderTimeWheel from '../../components/reminders/ReminderTimeWheel';
 import SectionCard from '../../components/SectionCard';
 import StreakGoalCard from '../../components/streaks/StreakGoalCard';
 import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
   YearGoal,
@@ -30,7 +31,6 @@ import {
   isReminderCompleteOnDate,
 } from '../../data/reminders';
 import { getThemeColors } from '../../data/theme';
-import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 
 type StreaksView = 'streaks' | 'alarms';
 

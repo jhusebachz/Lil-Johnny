@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { getLoggedGymDateKeys, readPersistedGymData } from '../../data/gymData';
 import {
   AvoidanceGoal,
@@ -21,7 +22,6 @@ import {
 } from '../../data/lifeTrackerData';
 import { fetchRunescapeTrackerSnapshot, getFallbackRunescapeTracker, LiveRunescapeTracker } from '../../data/osrsTracker';
 import { getThemeColors } from '../../data/theme';
-import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 function clamp01(value: number) {

@@ -6,13 +6,13 @@ import RunescapeSection from '../../components/games/RunescapeSection';
 import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import {
   DiyTask,
   formatTrackerDate,
   getTodayDateKey,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
-import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 type HobbiesView = 'osrs' | 'diy';

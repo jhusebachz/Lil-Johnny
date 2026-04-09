@@ -6,6 +6,7 @@ import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
+import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import {
   ChapterPracticeScore,
   formatDateKey,
@@ -14,7 +15,6 @@ import {
   StudyLogEntry,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
-import { useLifeTrackerData } from '../../hooks/use-life-tracker-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 function parsePositiveNumber(value: string) {
