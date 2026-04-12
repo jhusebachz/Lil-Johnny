@@ -102,15 +102,17 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
                 : 'Live snapshot loaded. Deltas begin after two saved snapshots.'}
         </Text>
 
-        <View style={{ marginTop: 14 }}>
-          {tracker.topSkills.map((item) => (
-            <Text key={item.skill} style={{ color: colors.heroSubtext, fontSize: 13, marginBottom: 4 }}>
-              <Text style={{ fontWeight: '700' }}>{item.skill}</Text>
-              {tracker.mode === 'delta' ? ': +' : ': '}
-              {item.xp.toLocaleString()} xp
-            </Text>
-          ))}
-        </View>
+        {tracker.topSkills.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            {tracker.topSkills.map((item) => (
+              <Text key={item.skill} style={{ color: colors.heroSubtext, fontSize: 13, marginBottom: 4 }}>
+                <Text style={{ fontWeight: '700' }}>{item.skill}</Text>
+                {tracker.mode === 'delta' ? ': +' : ': '}
+                {item.xp.toLocaleString()} xp
+              </Text>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <SectionCard
@@ -145,22 +147,23 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
               )}
               {even && <Pill text="Dead even" color={colors.warning} />}
 
-              <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8, marginBottom: 4 }}>
-                {tracker.mode === 'delta' ? 'Top gains:' : 'Top skills:'}
-              </Text>
-
               {friend.topSkills.length > 0 ? (
-                friend.topSkills.map((gain) => (
-                  <Text
-                    key={`${friend.name}-${gain.skill}`}
-                    style={{ fontSize: 12, color: colors.text, marginBottom: 3 }}
-                  >
-                    {'\u2022'} {gain.skill}: {gain.xp.toLocaleString()} xp (Lv{gain.level})
+                <>
+                  <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8, marginBottom: 4 }}>
+                    {tracker.mode === 'delta' ? 'Top gains:' : 'Top skills:'}
                   </Text>
-                ))
-              ) : (
-                <Text style={{ fontSize: 12, color: colors.subtext }}>No skill data available</Text>
-              )}
+                  {friend.topSkills.map((gain) => (
+                    <Text
+                      key={`${friend.name}-${gain.skill}`}
+                      style={{ fontSize: 12, color: colors.text, marginBottom: 3 }}
+                    >
+                      {'\u2022'} {gain.skill}: {gain.xp.toLocaleString()} xp (Lv{gain.level})
+                    </Text>
+                  ))}
+                </>
+              ) : tracker.mode === 'snapshot' ? (
+                <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>No skill data available</Text>
+              ) : null}
             </View>
           );
         })}

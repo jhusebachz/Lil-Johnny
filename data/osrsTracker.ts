@@ -671,6 +671,7 @@ export function buildLiveRunescapeTracker(
       xp: hasDelta ? getSkillDelta(player, previousPlayer, skill.skill) : skill.experience,
       level: skill.level,
     }))
+    .filter((skill) => !hasDelta || skill.xp > 0)
     .sort((left, right) => right.xp - left.xp)
     .slice(0, 5)
     .map(({ skill, xp }) => ({ skill, xp }));
@@ -696,6 +697,7 @@ export function buildLiveRunescapeTracker(
             xp: hasDelta ? getSkillDelta(stats, previousFriend, skill) : stats[skill].experience,
             level: stats[skill].level,
           }))
+          .filter((skill) => !hasDelta || skill.xp > 0)
           .sort((left, right) => right.xp - left.xp)
           .slice(0, 3)
           .map((skill) => ({
