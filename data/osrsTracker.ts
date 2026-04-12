@@ -7,7 +7,7 @@ const SNAPSHOT_HOUR = 8;
 const SNAPSHOT_MINUTE = 45;
 const SNAPSHOT_FILE = `${FileSystem.documentDirectory ?? ''}osrs-daily-snapshots.json`;
 const GOAL_PROGRESS_START = '2026-03-25';
-const FRIEND_ORDER = ['mufkr', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
+const FRIEND_ORDER = ['gwahpy', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
 
 const SKILL_ORDER = [
   'attack',
