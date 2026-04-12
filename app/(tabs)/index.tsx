@@ -272,7 +272,9 @@ export default function Dashboard() {
     runefestOnPace ? 1 : 0,
   ].reduce((total, value) => total + value, 0) / 2;
   const cyberScore = cyberOnPace ? 1 : 0;
-  const blissScore = Math.round(((cyberScore + healthScore + hobbiesScore + streaksScore) / 4) * 100);
+  const blissScore = Math.round(
+    (cyberScore * 0.3 + healthScore * 0.4 + streaksScore * 0.25 + hobbiesScore * 0.05) * 100
+  );
   const blissBreakdown = [
     `Cyber: ${Math.round(cyberScore * 100)}`,
     `Health: ${Math.round(healthScore * 100)}`,
