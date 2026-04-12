@@ -326,10 +326,13 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
         return;
       }
 
+      if (isSlayerTrackedSkill(skill.skill)) {
+        return;
+      }
+
       const nextLevel = skill.level + 1;
       const remainingXp = Math.max(xpForLevel(nextLevel) - skill.experience, 0);
-      const levelHours =
-        trainingPlan.xpPerHour > 0 || !isSlayerTrackedSkill(skill.skill) ? remainingXp / Math.max(trainingPlan.xpPerHour, 1) : 0;
+      const levelHours = remainingXp / Math.max(trainingPlan.xpPerHour, 1);
 
       if (remainingXp > 0 && levelHours < bestHours) {
         bestHours = levelHours;
