@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,29 +39,43 @@ export default function Cyber() {
   const [draftScoreValue, setDraftScoreValue] = useState('');
   const [draftScoreNote, setDraftScoreNote] = useState('');
   const { refreshing, triggerRefresh } = useTimedRefresh();
+  const certifications = lifeData.certifications;
 
   useEffect(() => {
     setSelectedCertId((current) =>
-      lifeData.certifications.some((cert) => cert.id === current) ? current : lifeData.certifications[0].id
+      certifications.some((cert) => cert.id === current) ? current : certifications[0].id
     );
-  }, [lifeData.certifications]);
+  }, [certifications]);
 
-  const selectedCert = lifeData.certifications.find((cert) => cert.id === selectedCertId) ?? lifeData.certifications[0];
-  const certLogs = lifeData.studyLogs
-    .filter((entry) => entry.certId === selectedCert.id)
-    .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
-    .slice(0, 8);
-  const certScores = lifeData.chapterPracticeScores
-    .filter((entry) => entry.certId === selectedCert.id)
-    .sort((left, right) => {
-      if (right.chapterNumber !== left.chapterNumber) {
-        return right.chapterNumber - left.chapterNumber;
-      }
-      return right.dateKey.localeCompare(left.dateKey);
-    })
-    .slice(0, 12);
-  const averageScore =
-    certScores.length > 0 ? certScores.reduce((total, entry) => total + entry.score, 0) / certScores.length : null;
+  const selectedCert = useMemo(
+    () => certifications.find((cert) => cert.id === selectedCertId) ?? certifications[0],
+    [certifications, selectedCertId]
+  );
+  const certLogs = useMemo(
+    () =>
+      lifeData.studyLogs
+        .filter((entry) => entry.certId === selectedCert.id)
+        .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
+        .slice(0, 8),
+    [lifeData.studyLogs, selectedCert.id]
+  );
+  const certScores = useMemo(
+    () =>
+      lifeData.chapterPracticeScores
+        .filter((entry) => entry.certId === selectedCert.id)
+        .sort((left, right) => {
+          if (right.chapterNumber !== left.chapterNumber) {
+            return right.chapterNumber - left.chapterNumber;
+          }
+          return right.dateKey.localeCompare(left.dateKey);
+        })
+        .slice(0, 12),
+    [lifeData.chapterPracticeScores, selectedCert.id]
+  );
+  const averageScore = useMemo(
+    () => (certScores.length > 0 ? certScores.reduce((total, entry) => total + entry.score, 0) / certScores.length : null),
+    [certScores]
+  );
 
   const addStudySession = async () => {
     const chapters = parsePositiveNumber(draftChapters);

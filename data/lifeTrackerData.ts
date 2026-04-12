@@ -161,6 +161,12 @@ export function getTodayDateKey(date = new Date()) {
   return toLocalDateKey(date);
 }
 
+export function getRelativeDateKey(offsetDays: number, date = new Date()) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + offsetDays);
+  return toLocalDateKey(nextDate);
+}
+
 export function formatTrackerDate(date = new Date()) {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -379,8 +385,6 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   });
 
   return {
-    ...defaultLifeTrackerData,
-    ...data,
     certifications: defaultLifeTrackerData.certifications.map((fallback) => {
       const cert = persistedCertifications.get(fallback.id);
       const legacyTarget = (cert as CertificationTracker & { targetHours?: number } | undefined)?.targetHours;

@@ -24,6 +24,7 @@ import {
   getAvoidanceBestStreak,
   YearGoal,
   getAvoidanceStreak,
+  getRelativeDateKey,
   getTodayDateKey,
 } from '../../data/lifeTrackerData';
 import {
@@ -188,7 +189,14 @@ export default function Reminders() {
                     colors={colors}
                     streak={streak}
                     bestStreak={bestStreak}
-                    onMarkFailure={async () => {
+                    onMarkFailureYesterday={async () => {
+                      await updateGoal(goal.id, (currentGoal) => ({
+                        ...currentGoal,
+                        bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),
+                        lastFailureDate: getRelativeDateKey(-1),
+                      }));
+                    }}
+                    onMarkFailureToday={async () => {
                       await updateGoal(goal.id, (currentGoal) => ({
                         ...currentGoal,
                         bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),

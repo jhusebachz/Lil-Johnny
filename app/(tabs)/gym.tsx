@@ -7,6 +7,7 @@ import ExerciseLogModal from '../../components/gym/ExerciseLogModal';
 import ExerciseProgressSection from '../../components/gym/ExerciseProgressSection';
 import GymPaceSection from '../../components/gym/GymPaceSection';
 import LoopRunSection from '../../components/gym/LoopRunSection';
+import MobilityRoutineSection from '../../components/gym/MobilityRoutineSection';
 import WorkoutSection from '../../components/gym/WorkoutSection';
 import SectionCard from '../../components/SectionCard';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
@@ -236,48 +237,108 @@ export default function Gym() {
   }, [workout]);
 
   const progressExerciseName = selectedProgressExercise[selectedDay];
-  const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
-  const progressPoints = [...rawProgressPoints].sort((left, right) => left.dateKey.localeCompare(right.dateKey)).slice(-10);
-  const progressPointSummaries = progressPoints.map(summarizeProgressPoint).filter((point) => point.bestSet !== null);
-  const qualifyingProgressPoints = progressPointSummaries.filter((point) => point.qualifyingSet !== null);
-  const maxReps = Math.max(...progressPointSummaries.map((point) => point.bestSet?.reps ?? 0), 1);
-  const bestAtTopWeight = progressPointSummaries.length > 0 ? getBestAtTopWeight(progressPointSummaries) : null;
-  const estimatedOneRepMax =
-    bestAtTopWeight && bestAtTopWeight.bestReps >= 1
-      ? estimateOneRepMax(bestAtTopWeight.topWeight, bestAtTopWeight.bestReps)
-      : null;
-  const oneRepMaxTrend =
-    qualifyingProgressPoints.length >= 2
-      ? estimateOneRepMax(
-          qualifyingProgressPoints.at(-1)?.qualifyingSet?.weight ?? 0,
-          qualifyingProgressPoints.at(-1)?.qualifyingSet?.reps ?? 0
-        ) -
-        estimateOneRepMax(
-          qualifyingProgressPoints.at(-2)?.qualifyingSet?.weight ?? 0,
-          qualifyingProgressPoints.at(-2)?.qualifyingSet?.reps ?? 0
-        )
-      : null;
+  const {
+    bestAtTopWeight,
+    estimatedOneRepMax,
+    maxReps,
+    oneRepMaxTrend,
+    progressPointSummaries,
+    qualifyingProgressPoints,
+  } = useMemo(() => {
+    const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
+    const progressPoints = [...rawProgressPoints]
+      .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+      .slice(-10);
+    const progressPointSummaries = progressPoints
+      .map(summarizeProgressPoint)
+      .filter((point) => point.bestSet !== null);
+    const qualifyingProgressPoints = progressPointSummaries.filter((point) => point.qualifyingSet !== null);
+    const maxReps = Math.max(...progressPointSummaries.map((point) => point.bestSet?.reps ?? 0), 1);
+    const bestAtTopWeight = progressPointSummaries.length > 0 ? getBestAtTopWeight(progressPointSummaries) : null;
+    const estimatedOneRepMax =
+      bestAtTopWeight && bestAtTopWeight.bestReps >= 1
+        ? estimateOneRepMax(bestAtTopWeight.topWeight, bestAtTopWeight.bestReps)
+        : null;
+    const oneRepMaxTrend =
+      qualifyingProgressPoints.length >= 2
+        ? estimateOneRepMax(
+            qualifyingProgressPoints.at(-1)?.qualifyingSet?.weight ?? 0,
+            qualifyingProgressPoints.at(-1)?.qualifyingSet?.reps ?? 0
+          ) -
+          estimateOneRepMax(
+            qualifyingProgressPoints.at(-2)?.qualifyingSet?.weight ?? 0,
+            qualifyingProgressPoints.at(-2)?.qualifyingSet?.reps ?? 0
+          )
+        : null;
+
+    return {
+      bestAtTopWeight,
+      estimatedOneRepMax,
+      maxReps,
+      oneRepMaxTrend,
+      progressPointSummaries,
+      qualifyingProgressPoints,
+    };
+  }, [exerciseHistory, progressExerciseName, selectedDay]);
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
-  const weeklyGymVisits = useMemo(() => getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory)), [exerciseHistory]);
-  const recentWeights = [...lifeData.weightEntries].sort((left, right) => left.dateKey.localeCompare(right.dateKey)).slice(-30);
-  const latestWeight = recentWeights.at(-1);
-  const weightMin = recentWeights.length > 0 ? Math.min(...recentWeights.map((entry) => entry.weight)) : 0;
-  const weightMax = recentWeights.length > 0 ? Math.max(...recentWeights.map((entry) => entry.weight)) : 1;
-  const recentLoopRuns = [...lifeData.loopRuns].sort((left, right) => right.dateKey.localeCompare(left.dateKey)).slice(0, 10);
-  const bestLoopRun = lifeData.loopRuns.reduce(
-    (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
-    lifeData.loopRuns[0]
-  );
-  const loopRunLoggedThisWeek = getUniqueWeekCount(lifeData.loopRuns.map((run) => run.dateKey)) > 0;
-  const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
-  const weeklyGymPacePct = getScheduledGymPacePct();
-  const loopRunGoalPct = bestLoopRun
-    ? clampPct(((12 * 60 - bestLoopRun.timeSeconds) / (12 * 60 - 9 * 60)) * 100)
-    : 0;
-  const weightGoalPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
-  const weightGoalPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
-  const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
+  const {
+    bestLoopRun,
+    latestWeight,
+    loopRunGoalPct,
+    loopRunLoggedThisWeek,
+    recentLoopRuns,
+    recentWeights,
+    weeklyGymPacePct,
+    weeklyGymPct,
+    weeklyGymVisits,
+    weightGoalDelta,
+    weightGoalPacePct,
+    weightGoalPct,
+    weightMax,
+    weightMin,
+  } = useMemo(() => {
+    const weeklyGymVisits = getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory));
+    const recentWeights = [...lifeData.weightEntries]
+      .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+      .slice(-30);
+    const latestWeight = recentWeights.at(-1);
+    const weightMin = recentWeights.length > 0 ? Math.min(...recentWeights.map((entry) => entry.weight)) : 0;
+    const weightMax = recentWeights.length > 0 ? Math.max(...recentWeights.map((entry) => entry.weight)) : 1;
+    const recentLoopRuns = [...lifeData.loopRuns]
+      .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
+      .slice(0, 10);
+    const bestLoopRun = lifeData.loopRuns.reduce(
+      (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
+      lifeData.loopRuns[0]
+    );
+    const loopRunLoggedThisWeek = getUniqueWeekCount(lifeData.loopRuns.map((run) => run.dateKey)) > 0;
+    const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
+    const weeklyGymPacePct = getScheduledGymPacePct();
+    const loopRunGoalPct = bestLoopRun
+      ? clampPct(((12 * 60 - bestLoopRun.timeSeconds) / (12 * 60 - 9 * 60)) * 100)
+      : 0;
+    const weightGoalPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
+    const weightGoalPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
+    const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
+
+    return {
+      bestLoopRun,
+      latestWeight,
+      loopRunGoalPct,
+      loopRunLoggedThisWeek,
+      recentLoopRuns,
+      recentWeights,
+      weeklyGymPacePct,
+      weeklyGymPct,
+      weeklyGymVisits,
+      weightGoalDelta,
+      weightGoalPacePct,
+      weightGoalPct,
+      weightMax,
+      weightMin,
+    };
+  }, [exerciseHistory, lifeData.loopRuns, lifeData.weightEntries]);
   const healthCoachingInsight = getHealthCoachingInsight({
     dateKey: todayKey,
     selectedDay,
@@ -629,6 +690,7 @@ export default function Gym() {
             <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{workout.coaching}</Text>
           </SectionCard>
         ) : null}
+        <MobilityRoutineSection colors={colors} />
       </ScrollView>
 
         <ExerciseLogModal

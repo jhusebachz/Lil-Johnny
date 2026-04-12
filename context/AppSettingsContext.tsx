@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { getTodayDateKey } from '../data/lifeTrackerData';
 import { readPersistedSettings, writePersistedSettings } from './appSettingsStorage';
@@ -243,13 +243,13 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     };
   }, [hasHydrated, notificationAccess, preferences.notificationsEnabled, preferences.privateNotifications, reminders]);
 
-  const updateReminder = (id: string, updates: Partial<ReminderItem>) => {
+  const updateReminder = useCallback((id: string, updates: Partial<ReminderItem>) => {
     setReminders((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
-  };
+  }, []);
 
-  const addReminder = () => {
+  const addReminder = useCallback(() => {
     const nextReminder: ReminderItem = {
       id: `${Date.now()}`,
       topic: 'New Reminder',
@@ -262,9 +262,9 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
 
     setReminders((current) => [...current, nextReminder]);
     return nextReminder;
-  };
+  }, []);
 
-  const toggleReminderCompletion = (id: string, dateKey = getTodayDateKey()) => {
+  const toggleReminderCompletion = useCallback((id: string, dateKey = getTodayDateKey()) => {
     setReminders((current) =>
       current.map((item) => {
         if (item.id !== id) {
@@ -281,19 +281,21 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
         };
       })
     );
-  };
+  }, []);
 
-  const updatePreferences = (updates: AppPreferencesUpdate) => {
+  const updatePreferences = useCallback((updates: AppPreferencesUpdate) => {
     setPreferences((current) => ({
       ...current,
       ...updates,
     }));
-  };
+  }, []);
 
-  const requestNotificationAccess = async () =>
-    requestReminderNotificationAccess(reminders, preferences, setNotificationAccess);
+  const requestNotificationAccess = useCallback(
+    async () => requestReminderNotificationAccess(reminders, preferences, setNotificationAccess),
+    [preferences, reminders]
+  );
 
-  const triggerHaptic = async (force = false) => {
+  const triggerHaptic = useCallback(async (force = false) => {
     if (Platform.OS === 'web') {
       return;
     }
@@ -303,15 +305,15 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     }
 
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-  };
+  }, [preferences.hapticsEnabled]);
 
-  const triggerTabHaptic = async () => {
+  const triggerTabHaptic = useCallback(async () => {
     if (Platform.OS === 'web' || !preferences.hapticsEnabled) {
       return;
     }
 
     await Haptics.selectionAsync();
-  };
+  }, [preferences.hapticsEnabled]);
 
   const value = useMemo(
     () => ({
@@ -328,7 +330,19 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       triggerHaptic,
       triggerTabHaptic,
     }),
-    [notificationAccess, preferences, reminders, theme]
+    [
+      addReminder,
+      notificationAccess,
+      preferences,
+      reminders,
+      requestNotificationAccess,
+      theme,
+      toggleReminderCompletion,
+      triggerHaptic,
+      triggerTabHaptic,
+      updatePreferences,
+      updateReminder,
+    ]
   );
 
   const themeValue = useMemo(
@@ -346,7 +360,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       updateReminder,
       toggleReminderCompletion,
     }),
-    [reminders]
+    [addReminder, reminders, toggleReminderCompletion, updateReminder]
   );
 
   const preferenceValue = useMemo(
@@ -358,7 +372,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       triggerHaptic,
       triggerTabHaptic,
     }),
-    [notificationAccess, preferences]
+    [notificationAccess, preferences, requestNotificationAccess, triggerHaptic, triggerTabHaptic, updatePreferences]
   );
 
   return (

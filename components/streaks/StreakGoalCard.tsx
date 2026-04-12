@@ -8,13 +8,15 @@ export default function StreakGoalCard({
   colors,
   streak,
   bestStreak,
-  onMarkFailure,
+  onMarkFailureToday,
+  onMarkFailureYesterday,
 }: {
   goal: YearGoal;
   colors: ReturnType<typeof getThemeColors>;
   streak: number;
   bestStreak: number;
-  onMarkFailure: () => Promise<void>;
+  onMarkFailureToday: () => Promise<void>;
+  onMarkFailureYesterday: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
   const isCompact = width < 430;
@@ -49,25 +51,50 @@ export default function StreakGoalCard({
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => {
-            void onMarkFailure();
-          }}
+        <View
           style={{
-            minWidth: isCompact ? 0 : 112,
-            width: isCompact ? '100%' : undefined,
-            height: isCompact ? 54 : 76,
-            borderRadius: 18,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.danger,
-            paddingHorizontal: 10,
+            width: isCompact ? '100%' : 176,
+            gap: 8,
           }}
         >
-          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
-            I broke this streak
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={() => {
+              void onMarkFailureYesterday();
+            }}
+            style={{
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.warning,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+            }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
+              I broke this streak yesterday
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              void onMarkFailureToday();
+            }}
+            style={{
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.danger,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+            }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '800', fontSize: 12, lineHeight: 15 }}>
+              I broke this streak today
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
