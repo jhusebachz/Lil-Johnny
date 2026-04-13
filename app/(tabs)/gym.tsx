@@ -637,7 +637,7 @@ export default function Gym() {
           </View>
         </SectionCard>
 
-        {selectedView === 'Workout' ? (
+        {false ? (
           <WorkoutSection
             colors={colors}
             exerciseLogs={exerciseLogs}
