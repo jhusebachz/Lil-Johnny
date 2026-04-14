@@ -34,7 +34,6 @@ import {
   WeightEntry,
   formatDateKey,
   formatFullDate,
-  formatLoopRunTime,
   formatMonthDay,
   getDateRangePacePct,
   getScheduledGymPacePct,
@@ -148,60 +147,6 @@ function getBestAtTopWeight(points: ExerciseProgressSummary[]) {
   return { bestReps, topWeight };
 }
 
-function getHealthCoachingInsight({
-  dateKey,
-  selectedDay,
-  weeklyGymVisits,
-  latestWeight,
-  bestLoopRunSeconds,
-  weeklyGymPacePct,
-  weightGoalPct,
-  weightGoalPacePct,
-  loopRunLoggedThisWeek,
-}: {
-  dateKey: string;
-  selectedDay: GymDay;
-  weeklyGymVisits: number;
-  latestWeight?: WeightEntry;
-  bestLoopRunSeconds?: number;
-  weeklyGymPacePct: number;
-  weightGoalPct: number;
-  weightGoalPacePct: number;
-  loopRunLoggedThisWeek: boolean;
-}) {
-  const rotatingPrompts = [
-    `Make ${selectedDay.toLowerCase()} day feel clean and deliberate. One honest logged session is enough to keep the week moving.`,
-    'Small clean wins count here. Log the real numbers, keep the trend honest, and let consistency do the heavy lifting.',
-    'Do not chase perfect. Get useful work in, log it cleanly, and leave yourself a clearer path for the next session.',
-    'Treat this like a long game. Clean data, steady effort, and one solid session will matter more than forcing a huge day.',
-    'Keep the health side simple today: log the session, keep the weight trend honest, and avoid letting the basics drift.',
-  ];
-
-  if (weeklyGymVisits < 3 && weeklyGymPacePct > 0) {
-    return `You are a little behind the gym pace for this week. A solid ${selectedDay.toLowerCase()} session today would put the weekly target back in a good spot.`;
-  }
-
-  if (!loopRunLoggedThisWeek) {
-    return 'You have not logged a Loop run this week yet. Even one honest time on the board will keep that goal alive and visible.';
-  }
-
-  if (latestWeight && weightGoalPct < weightGoalPacePct) {
-    return `Your weight trend is a bit behind pace toward ${GOAL_WEIGHT_LB} lb. Keep the food side tight today and log the next weigh-in so the trend stays real.`;
-  }
-
-  if (bestLoopRunSeconds && bestLoopRunSeconds > 9 * 60) {
-    return `Your best Loop run is ${formatLoopRunTime(bestLoopRunSeconds)}. Keep stacking runs and chip away at the path toward sub-9.`;
-  }
-
-  const promptIndex =
-    dateKey
-      .split('-')
-      .map(Number)
-      .reduce((total, value) => total + value, 0) % rotatingPrompts.length;
-
-  return rotatingPrompts[promptIndex];
-}
-
 export default function Gym() {
   const { theme } = useThemeSettings();
   const { preferences, triggerHaptic } = usePreferenceSettings();
@@ -280,13 +225,13 @@ export default function Gym() {
       qualifyingProgressPoints,
     };
   }, [exerciseHistory, progressExerciseName, selectedDay]);
+
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
   const {
     bestLoopRun,
     latestWeight,
     loopRunGoalPct,
-    loopRunLoggedThisWeek,
     recentLoopRuns,
     recentWeights,
     weeklyGymPacePct,
@@ -312,7 +257,6 @@ export default function Gym() {
       (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
       lifeData.loopRuns[0]
     );
-    const loopRunLoggedThisWeek = getUniqueWeekCount(lifeData.loopRuns.map((run) => run.dateKey)) > 0;
     const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
     const weeklyGymPacePct = getScheduledGymPacePct();
     const loopRunGoalPct = bestLoopRun
@@ -326,7 +270,6 @@ export default function Gym() {
       bestLoopRun,
       latestWeight,
       loopRunGoalPct,
-      loopRunLoggedThisWeek,
       recentLoopRuns,
       recentWeights,
       weeklyGymPacePct,
@@ -339,17 +282,7 @@ export default function Gym() {
       weightMin,
     };
   }, [exerciseHistory, lifeData.loopRuns, lifeData.weightEntries]);
-  const healthCoachingInsight = getHealthCoachingInsight({
-    dateKey: todayKey,
-    selectedDay,
-    weeklyGymVisits,
-    latestWeight,
-    bestLoopRunSeconds: bestLoopRun?.timeSeconds,
-    weeklyGymPacePct,
-    weightGoalPct,
-    weightGoalPacePct,
-    loopRunLoggedThisWeek,
-  });
+
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
@@ -549,10 +482,6 @@ export default function Gym() {
           </Text>
         </View>
 
-        <SectionCard title="Coaching Insight" emoji={'\uD83C\uDFAF'} colors={colors}>
-          <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{healthCoachingInsight}</Text>
-        </SectionCard>
-
         <GymPaceSection
           colors={colors}
           latestWeightLabel={latestWeight ? `Current ${formatWeight(latestWeight.weight)} lb` : `Baseline ${STARTING_WEIGHT_LB} lb`}
@@ -563,6 +492,20 @@ export default function Gym() {
           weightGoalPct={weightGoalPct}
           bestLoopRunSeconds={bestLoopRun?.timeSeconds}
           goalWeightLb={GOAL_WEIGHT_LB}
+        />
+
+        <MobilityRoutineSection colors={colors} />
+
+        <LoopRunSection
+          bestLoopRun={bestLoopRun}
+          colors={colors}
+          draftLoopRun={draftLoopRun}
+          recentLoopRuns={recentLoopRuns}
+          totalLoopRuns={lifeData.loopRuns.length}
+          onDraftLoopRunChange={setDraftLoopRun}
+          onLogLoopRun={() => {
+            void logLoopRun();
+          }}
         />
 
         <BodyMetricsSection
@@ -637,7 +580,7 @@ export default function Gym() {
           </View>
         </SectionCard>
 
-        {false ? (
+        {selectedView === 'Workout' ? (
           <WorkoutSection
             colors={colors}
             exerciseLogs={exerciseLogs}
@@ -650,19 +593,19 @@ export default function Gym() {
             }}
           />
         ) : (
-        <ExerciseProgressSection
-          bestAtTopWeight={bestAtTopWeight}
-          colors={colors}
-          estimatedOneRepMax={estimatedOneRepMax}
-          formatWeight={formatWeight}
-          isCompact={isCompact}
-          maxReps={maxReps}
-          oneRepMaxTrend={oneRepMaxTrend}
-          progressExerciseName={progressExerciseName}
-          progressPointSummaries={progressPointSummaries}
-          qualifyingProgressPoints={qualifyingProgressPoints}
-          selectedDay={selectedDay}
-          workout={workout}
+          <ExerciseProgressSection
+            bestAtTopWeight={bestAtTopWeight}
+            colors={colors}
+            estimatedOneRepMax={estimatedOneRepMax}
+            formatWeight={formatWeight}
+            isCompact={isCompact}
+            maxReps={maxReps}
+            oneRepMaxTrend={oneRepMaxTrend}
+            progressExerciseName={progressExerciseName}
+            progressPointSummaries={progressPointSummaries}
+            qualifyingProgressPoints={qualifyingProgressPoints}
+            selectedDay={selectedDay}
+            workout={workout}
             onExerciseSelect={async (exerciseName) => {
               await triggerHaptic();
               setSelectedProgressExercise((current) => ({
@@ -672,44 +615,25 @@ export default function Gym() {
             }}
           />
         )}
-
-        <LoopRunSection
-          bestLoopRun={bestLoopRun}
-          colors={colors}
-          draftLoopRun={draftLoopRun}
-          recentLoopRuns={recentLoopRuns}
-          totalLoopRuns={lifeData.loopRuns.length}
-          onDraftLoopRunChange={setDraftLoopRun}
-          onLogLoopRun={() => {
-            void logLoopRun();
-          }}
-        />
-
-        {selectedView === 'Workout' ? (
-          <SectionCard title="Coaching Insight" emoji={'🎯'} colors={colors}>
-            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{workout.coaching}</Text>
-          </SectionCard>
-        ) : null}
-        <MobilityRoutineSection colors={colors} />
       </ScrollView>
 
-        <ExerciseLogModal
-          activeExercise={activeExercise}
-          colors={colors}
-          draftLog={draftLog}
-          todayLabel={todayEntry.fullLabel}
-          onClose={() => setActiveExerciseKey(null)}
-          onAddSet={() => {
-            void addDraftSet();
-          }}
-          onDraftLogChange={(updates) => setDraftLog((current) => ({ ...current, ...updates }))}
-          onDraftSetChange={updateDraftSet}
-          onRemoveSet={(setId) => {
-            void removeDraftSet(setId);
-          }}
-          onSave={() => {
-            void saveExerciseLogger();
-          }}
+      <ExerciseLogModal
+        activeExercise={activeExercise}
+        colors={colors}
+        draftLog={draftLog}
+        todayLabel={todayEntry.fullLabel}
+        onClose={() => setActiveExerciseKey(null)}
+        onAddSet={() => {
+          void addDraftSet();
+        }}
+        onDraftLogChange={(updates) => setDraftLog((current) => ({ ...current, ...updates }))}
+        onDraftSetChange={updateDraftSet}
+        onRemoveSet={(setId) => {
+          void removeDraftSet(setId);
+        }}
+        onSave={() => {
+          void saveExerciseLogger();
+        }}
       />
     </SafeAreaView>
   );

@@ -8,7 +8,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 
 - `Dashboard`: pace-based Bliss Score, simplified overview cards, and suggested next actions based on what is currently behind
 - `Cyber`: Linux+, PenTest+, and Cloud+ tracking with separate chapter counts, timed cert windows, study logs, and chapter-end practice scores
-- `Health`: set-by-set gym logging, weekly gym pace, weight tracking, weight-loss pace, loop-run tracking, and daily coaching insight
+- `Health`: set-by-set gym logging, weekly gym pace, weight tracking, weight-loss pace, loop-run tracking, and a collapsible stretching guide
 - `Hobbies`: DIY to-do tracking first, with OSRS as a separate sub-view
 - `Streaks`: avoidance streaks plus reminder alarms in the same tab
 - `Settings`: appearance and notification controls
@@ -23,7 +23,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 - The workout list in Health is more compact now, so long Push / Pull / Legs days are faster to scroll through on mobile
 - Weight tracking starts from a `205 lb` baseline and measures progress toward a `185 lb` goal
 - Loop runs are tracked by time with a sub-9 target
-- Health coaching insight changes daily and reacts to what is actually behind
+- The Health tab keeps workout logging up front, with the stretching guide tucked at the bottom so it stays available without crowding the logger
 - OSRS tracker uses live tracker snapshots, goal pace bars, and a more realistic Slayer-to-combat projection model for long-term pacing
 - DIY tasks are tracked as their own cards with explicit completion buttons
 - Avoidance streaks and reminder alarms share one tab, while streak timing follows local midnight
@@ -120,7 +120,7 @@ This version reflects the shift from a dashboard/news-style app into a pace-base
 - dashboard action guidance and a daily pace-based Bliss Score
 - Cyber chapter-based cert tracking with certification windows
 - Hobbies tab with DIY first and OSRS in a separate sub-tab
-- broader health tracking with set-by-set gym logging, loop-run tracking, rotating coaching, and weight-loss pacing
+- broader health tracking with set-by-set gym logging, loop-run tracking, a guide-only stretching reference, and weight-loss pacing
 - Streaks tab with avoidance streaks and reminder alarms that follow local-midnight rollover
 - OSRS pace tracking that no longer assumes combat stats magically become 99 just because Slayer is zero-time
 - shared life-tracker persistence across tabs so saved Health and tracker data stays consistent
