@@ -229,11 +229,11 @@ export default function Gym() {
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
   const {
+    allWeights,
     bestLoopRun,
     latestWeight,
     loopRunGoalPct,
     recentLoopRuns,
-    recentWeights,
     weeklyGymPacePct,
     weeklyGymPct,
     weeklyGymVisits,
@@ -244,12 +244,10 @@ export default function Gym() {
     weightMin,
   } = useMemo(() => {
     const weeklyGymVisits = getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory));
-    const recentWeights = [...lifeData.weightEntries]
-      .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
-      .slice(-30);
-    const latestWeight = recentWeights.at(-1);
-    const weightMin = recentWeights.length > 0 ? Math.min(...recentWeights.map((entry) => entry.weight)) : 0;
-    const weightMax = recentWeights.length > 0 ? Math.max(...recentWeights.map((entry) => entry.weight)) : 1;
+    const allWeights = [...lifeData.weightEntries].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+    const latestWeight = allWeights.at(-1);
+    const weightMin = allWeights.length > 0 ? Math.min(...allWeights.map((entry) => entry.weight)) : 0;
+    const weightMax = allWeights.length > 0 ? Math.max(...allWeights.map((entry) => entry.weight)) : 1;
     const recentLoopRuns = [...lifeData.loopRuns]
       .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
       .slice(0, 10);
@@ -267,11 +265,11 @@ export default function Gym() {
     const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
 
     return {
+      allWeights,
       bestLoopRun,
       latestWeight,
       loopRunGoalPct,
       recentLoopRuns,
-      recentWeights,
       weeklyGymPacePct,
       weeklyGymPct,
       weeklyGymVisits,
@@ -514,7 +512,7 @@ export default function Gym() {
           goalWeightDelta={weightGoalDelta}
           goalWeightLb={GOAL_WEIGHT_LB}
           latestWeight={latestWeight}
-          recentWeights={recentWeights}
+          recentWeights={allWeights}
           weightMax={weightMax}
           weightMin={weightMin}
           onDraftWeightChange={setDraftWeight}

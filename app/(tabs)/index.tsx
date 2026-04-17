@@ -589,9 +589,6 @@ export default function Dashboard() {
           >
             {blissScore}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.subtext, textAlign: 'center', marginBottom: 4 }}>
-            Weighted 4-week trend with extra emphasis on the most recent weeks
-          </Text>
           <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
             {blissBreakdown.map((item) => (
               <Text
@@ -602,24 +599,6 @@ export default function Dashboard() {
               </Text>
             ))}
           </View>
-        </SectionCard>
-
-        <SectionCard title="Suggested Next Actions" emoji={'\uD83E\uDDED'} colors={colors}>
-          {suggestedActions.map((action) => (
-            <View
-              key={action.label}
-              style={{
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: colors.cardBorder,
-                backgroundColor: colors.inputBackground,
-                padding: 12,
-                marginBottom: 10,
-              }}
-            >
-              <Text style={{ color: colors.text, fontSize: 14, lineHeight: 22 }}>{action.label}</Text>
-            </View>
-          ))}
         </SectionCard>
 
         <SectionCard title="Overview" emoji={'\uD83E\uDDE9'} colors={colors}>
@@ -677,6 +656,24 @@ export default function Dashboard() {
               fullWidth={isCompact}
             />
           </View>
+        </SectionCard>
+
+        <SectionCard title="Suggested Next Actions" emoji={'\uD83E\uDDED'} colors={colors}>
+          {suggestedActions.map((action) => (
+            <View
+              key={action.label}
+              style={{
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.cardBorder,
+                backgroundColor: colors.inputBackground,
+                padding: 12,
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 14, lineHeight: 22 }}>{action.label}</Text>
+            </View>
+          ))}
         </SectionCard>
       </ScrollView>
     </SafeAreaView>

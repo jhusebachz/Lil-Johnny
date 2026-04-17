@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { WeightEntry } from '../../data/lifeTrackerData';
@@ -29,6 +30,24 @@ export default function BodyMetricsSection({
   onDraftWeightChange,
   onLogWeight,
 }: BodyMetricsSectionProps) {
+  const [chartWidth, setChartWidth] = useState(0);
+  const chartHeight = 150;
+  const pointSize = 10;
+  const chartPoints = useMemo(
+    () =>
+      recentWeights.map((entry, index) => {
+        const normalizedY = weightMax === weightMin ? 0.5 : (entry.weight - weightMin) / (weightMax - weightMin);
+        const normalizedX = recentWeights.length === 1 ? 0.5 : index / Math.max(recentWeights.length - 1, 1);
+
+        return {
+          entry,
+          x: chartWidth * normalizedX,
+          y: chartHeight - normalizedY * chartHeight,
+        };
+      }),
+    [chartWidth, recentWeights, weightMax, weightMin]
+  );
+
   return (
     <SectionCard title="Body Metrics" emoji={'⚖'} colors={colors}>
       <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800', marginBottom: 10 }}>
@@ -55,6 +74,9 @@ export default function BodyMetricsSection({
           paddingHorizontal: 12,
           paddingVertical: 12,
         }}
+        onLayout={(event) => {
+          setChartWidth(Math.max(event.nativeEvent.layout.width - 24, 0));
+        }}
       >
         {[0.2, 0.5, 0.8].map((line) => (
           <View
@@ -63,7 +85,7 @@ export default function BodyMetricsSection({
               position: 'absolute',
               left: 12,
               right: 12,
-              bottom: 12 + line * 150,
+              bottom: 12 + line * chartHeight,
               height: 1,
               backgroundColor: colors.cardBorder,
             }}
@@ -80,29 +102,47 @@ export default function BodyMetricsSection({
           }}
         />
 
-        {recentWeights.map((entry, index) => {
-          const normalizedY = weightMax === weightMin ? 0.5 : (entry.weight - weightMin) / (weightMax - weightMin);
-          const normalizedX = recentWeights.length === 1 ? 0.5 : index / Math.max(recentWeights.length - 1, 1);
+        {chartPoints.slice(1).map((point, index) => {
+          const previousPoint = chartPoints[index];
+          const deltaX = point.x - previousPoint.x;
+          const deltaY = point.y - previousPoint.y;
+          const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          const midpointX = (previousPoint.x + point.x) / 2;
+          const midpointY = (previousPoint.y + point.y) / 2;
 
           return (
             <View
-              key={entry.id}
+              key={`${previousPoint.entry.id}-${point.entry.id}`}
               style={{
                 position: 'absolute',
-                left: `${normalizedX * 100}%`,
-                bottom: 12 + normalizedY * 150,
-                marginLeft: -5,
-                marginBottom: -5,
-                width: 10,
-                height: 10,
-                borderRadius: 999,
+                left: 12 + midpointX - length / 2,
+                top: 12 + midpointY - 1,
+                width: length,
+                height: 2,
                 backgroundColor: colors.accent,
-                borderWidth: 2,
-                borderColor: colors.card,
+                borderRadius: 999,
+                transform: [{ rotate: `${(Math.atan2(deltaY, deltaX) * 180) / Math.PI}deg` }],
               }}
             />
           );
         })}
+
+        {chartPoints.map((point) => (
+          <View
+            key={point.entry.id}
+            style={{
+              position: 'absolute',
+              left: 12 + point.x - pointSize / 2,
+              top: 12 + point.y - pointSize / 2,
+              width: pointSize,
+              height: pointSize,
+              borderRadius: 999,
+              backgroundColor: colors.accent,
+              borderWidth: 2,
+              borderColor: colors.card,
+            }}
+          />
+        ))}
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
