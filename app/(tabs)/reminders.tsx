@@ -22,6 +22,7 @@ import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
   getAvoidanceBestStreak,
+  getAvoidanceStreakBeforeFailure,
   YearGoal,
   getAvoidanceStreak,
   getRelativeDateKey,
@@ -190,10 +191,18 @@ export default function Reminders() {
                     streak={streak}
                     bestStreak={bestStreak}
                     onMarkFailureYesterday={async () => {
+                      const failureDate = getRelativeDateKey(-1);
+
                       await updateGoal(goal.id, (currentGoal) => ({
                         ...currentGoal,
-                        bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),
-                        lastFailureDate: getRelativeDateKey(-1),
+                        bestStreakDays:
+                          bestStreak === streak
+                            ? getAvoidanceStreakBeforeFailure(currentGoal, failureDate)
+                            : Math.max(
+                                currentGoal.bestStreakDays ?? 0,
+                                getAvoidanceStreakBeforeFailure(currentGoal, failureDate)
+                              ),
+                        lastFailureDate: failureDate,
                       }));
                     }}
                     onMarkFailureToday={async () => {

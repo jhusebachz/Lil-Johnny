@@ -29,6 +29,18 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+const BLISS_TREND_WEEKS = 4;
+
+function getWeeksAgoDate(referenceDate: Date, weeksAgo: number) {
+  const nextDate = new Date(referenceDate);
+  nextDate.setDate(nextDate.getDate() - weeksAgo * 7);
+  return nextDate;
+}
+
+function sumWeights(count: number) {
+  return (count * (count + 1)) / 2;
+}
+
 type OverviewItem = {
   label: string;
   complete?: boolean;
@@ -256,30 +268,68 @@ export default function Dashboard() {
   const cyberOnPace = currentCertPacePct !== null ? currentCertPct >= currentCertPacePct : false;
   const base90OnPace = tracker.goalProjections.base90.progressPct >= tracker.goalProjections.base90.pacePct;
   const runefestOnPace = tracker.goalProjections.runefest.progressPct >= tracker.goalProjections.runefest.pacePct;
-  const weightLossActualPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
-  const weightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
-  const weightLossOnPace = weightLossActualPct >= weightLossPacePct;
-  const healthScore = [gymOnPace ? 1 : 0, loopRunLoggedThisWeek ? 1 : 0, weightLossOnPace ? 1 : 0].reduce(
-    (total, value) => total + value,
-    0
-  ) / 3;
-  const streaksScore =
-    avoidanceGoals.length > 0
-      ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal) / 30), 0) / avoidanceGoals.length
-      : 1;
   const hobbiesScore = [
     base90OnPace ? 1 : 0,
     runefestOnPace ? 1 : 0,
   ].reduce((total, value) => total + value, 0) / 2;
   const cyberScore = cyberOnPace ? 1 : 0;
-  const blissScore = Math.round(
-    (cyberScore * 0.3 + healthScore * 0.4 + streaksScore * 0.25 + hobbiesScore * 0.05) * 100
-  );
+  const loggedGymDateKeys = useMemo(() => getLoggedGymDateKeys(exerciseHistory), [exerciseHistory]);
+  const blissTrend = useMemo(() => {
+    const weightedScores = Array.from({ length: BLISS_TREND_WEEKS }, (_, index) => {
+      const weeksAgo = BLISS_TREND_WEEKS - index - 1;
+      const referenceDate = getWeeksAgoDate(now, weeksAgo);
+      const weight = index + 1;
+      const referenceWeekKeys = new Set(getCurrentWeekDateKeys(referenceDate));
+      const referenceGymVisitCount = getUniqueWeekCount(loggedGymDateKeys, referenceDate);
+      const referenceGymPacePct = getScheduledGymPacePct(referenceDate);
+      const referenceGymActualPct = clamp01(referenceGymVisitCount / 3) * 100;
+      const referenceGymOnPace = referenceGymVisitCount >= 3 || referenceGymActualPct >= referenceGymPacePct;
+      const referenceLoopRunLogged = lifeData.loopRuns.some((run) => referenceWeekKeys.has(run.dateKey));
+      const referenceWeightEntry = [...lifeData.weightEntries]
+        .filter((entry) => entry.dateKey <= getCurrentWeekDateKeys(referenceDate)[referenceDate.getDay()])
+        .sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
+      const referenceWeightLossActualPct = referenceWeightEntry ? getWeightLossProgressPct(referenceWeightEntry.weight) : 0;
+      const referenceWeightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE, referenceDate);
+      const referenceWeightLossOnPace = referenceWeightLossActualPct >= referenceWeightLossPacePct;
+      const referenceHealthScore = [
+        referenceGymOnPace ? 1 : 0,
+        referenceLoopRunLogged ? 1 : 0,
+        referenceWeightLossOnPace ? 1 : 0,
+      ].reduce((total, value) => total + value, 0) / 3;
+      const referenceStreaksScore =
+        avoidanceGoals.length > 0
+          ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal, referenceDate) / 30), 0) /
+            avoidanceGoals.length
+          : 1;
+      const referenceBlissScore = cyberScore * 0.3 + referenceHealthScore * 0.4 + referenceStreaksScore * 0.25 + hobbiesScore * 0.05;
+
+      return {
+        weight,
+        cyber: cyberScore,
+        health: referenceHealthScore,
+        hobbies: hobbiesScore,
+        streaks: referenceStreaksScore,
+        total: referenceBlissScore,
+      };
+    });
+    const totalWeight = sumWeights(weightedScores.length);
+    const weightedAverage = (key: 'cyber' | 'health' | 'hobbies' | 'streaks' | 'total') =>
+      weightedScores.reduce((sum, score) => sum + score[key] * score.weight, 0) / totalWeight;
+
+    return {
+      total: weightedAverage('total'),
+      cyber: weightedAverage('cyber'),
+      health: weightedAverage('health'),
+      hobbies: weightedAverage('hobbies'),
+      streaks: weightedAverage('streaks'),
+    };
+  }, [avoidanceGoals, cyberScore, hobbiesScore, lifeData.loopRuns, lifeData.weightEntries, loggedGymDateKeys, now]);
+  const blissScore = Math.round(blissTrend.total * 100);
   const blissBreakdown = [
-    `Cyber: ${Math.round(cyberScore * 100)}`,
-    `Health: ${Math.round(healthScore * 100)}`,
-    `Hobbies: ${Math.round(hobbiesScore * 100)}`,
-    `Streaks: ${Math.round(streaksScore * 100)}`,
+    `Cyber: ${Math.round(blissTrend.cyber * 100)}`,
+    `Health: ${Math.round(blissTrend.health * 100)}`,
+    `Hobbies: ${Math.round(blissTrend.hobbies * 100)}`,
+    `Streaks: ${Math.round(blissTrend.streaks * 100)}`,
   ];
   const cyberOverviewItems: OverviewItem[] = [
     {
@@ -538,6 +588,9 @@ export default function Dashboard() {
             }}
           >
             {blissScore}
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.subtext, textAlign: 'center', marginBottom: 4 }}>
+            Weighted 4-week trend with extra emphasis on the most recent weeks
           </Text>
           <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
             {blissBreakdown.map((item) => (
