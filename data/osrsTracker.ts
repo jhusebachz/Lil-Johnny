@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { daysUntilGoalDate, getGoalPacePct } from './osrsGoalMath';
 
 const TRACKER_URL =
   'https://raw.githubusercontent.com/jhusebachz/OSRS-Daily-Tracker/main/data/last_stats.json';
@@ -217,9 +218,7 @@ function percentToTarget(experience: number, targetLevel: number) {
 }
 
 function daysUntil(targetDate: string, now = new Date()) {
-  const goalDate = new Date(`${targetDate}T12:00:00-05:00`);
-  const diff = goalDate.getTime() - now.getTime();
-  return Math.max(Math.ceil(diff / (1000 * 60 * 60 * 24)), 0);
+  return daysUntilGoalDate(targetDate, now);
 }
 
 function getGoalStatus(hoursPerDay: number | null) {
@@ -260,15 +259,7 @@ function clampPct(value: number) {
 }
 
 function getPacePct(targetDate: string, now = new Date()) {
-  const start = new Date(`${GOAL_PROGRESS_START}T00:00:00-05:00`).getTime();
-  const end = new Date(`${targetDate}T23:59:59-05:00`).getTime();
-  const current = now.getTime();
-
-  if (end <= start) {
-    return 100;
-  }
-
-  return clampPct(((current - start) / (end - start)) * 100);
+  return getGoalPacePct(GOAL_PROGRESS_START, targetDate, now);
 }
 
 function buildGoalProjection(

@@ -17,6 +17,7 @@ import {
   getCurrentWeekDateKeys,
   getGreetingForTime,
   getScheduledGymPacePct,
+  getTodayDateKey,
   getUniqueWeekCount,
   getWeightLossProgressPct,
   formatLongDate,
@@ -39,6 +40,10 @@ function getWeeksAgoDate(referenceDate: Date, weeksAgo: number) {
 
 function sumWeights(count: number) {
   return (count * (count + 1)) / 2;
+}
+
+function getReferenceWeekEndDateKey(referenceDate: Date) {
+  return getCurrentWeekDateKeys(referenceDate)[referenceDate.getDay()];
 }
 
 type OverviewItem = {
@@ -215,22 +220,40 @@ export default function Dashboard() {
     };
   }, [haloPulse, heroLift, heroOpacity, logoFloat]);
 
-  const lowestCert = [...lifeData.certifications]
-    .sort(
-      (left, right) =>
-        left.chaptersCompleted / Math.max(left.chapterCount, 1) - right.chaptersCompleted / Math.max(right.chapterCount, 1)
-    )[0];
-  const currentCert = (() => {
-    const now = new Date();
-    return (
-      lifeData.certifications.find((cert) => cert.startDate && cert.examDate && now >= new Date(`${cert.startDate}T00:00:00`) && now <= new Date(`${cert.examDate}T23:59:59`)) ??
+  const todayDateKey = getTodayDateKey();
+  const now = useMemo(() => new Date(`${todayDateKey}T12:00:00`), [todayDateKey]);
+  const sortedCertifications = useMemo(
+    () =>
+      [...lifeData.certifications].sort(
+        (left, right) =>
+          left.chaptersCompleted / Math.max(left.chapterCount, 1) - right.chaptersCompleted / Math.max(right.chapterCount, 1)
+      ),
+    [lifeData.certifications]
+  );
+  const lowestCert = sortedCertifications[0];
+  const currentCert = useMemo(
+    () =>
+      lifeData.certifications.find(
+        (cert) =>
+          cert.startDate &&
+          cert.examDate &&
+          now >= new Date(`${cert.startDate}T00:00:00`) &&
+          now <= new Date(`${cert.examDate}T23:59:59`)
+      ) ??
       lifeData.certifications.find((cert) => cert.startDate && now < new Date(`${cert.startDate}T00:00:00`)) ??
-      lifeData.certifications[lifeData.certifications.length - 1]
-    );
-  })();
-  const latestWeight = [...lifeData.weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
-  const avoidanceGoals = lifeData.goals2026.filter((goal) => goal.type === 'avoidance');
-  const hobbiesOpenTasks = lifeData.diyTasks.filter((task) => !task.completed);
+      lifeData.certifications[lifeData.certifications.length - 1],
+    [lifeData.certifications, now]
+  );
+  const sortedWeightEntries = useMemo(
+    () => [...lifeData.weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey)),
+    [lifeData.weightEntries]
+  );
+  const latestWeight = sortedWeightEntries[0];
+  const avoidanceGoals = useMemo(
+    () => lifeData.goals2026.filter((goal): goal is AvoidanceGoal => goal.type === 'avoidance'),
+    [lifeData.goals2026]
+  );
+  const hobbiesOpenTasks = useMemo(() => lifeData.diyTasks.filter((task) => !task.completed), [lifeData.diyTasks]);
 
   const alcoholGoal = lifeData.goals2026.find(
     (goal): goal is AvoidanceGoal => goal.id === 'alcohol' && goal.type === 'avoidance'
@@ -238,9 +261,8 @@ export default function Dashboard() {
   const stretchingGoal = lifeData.goals2026.find(
     (goal): goal is AvoidanceGoal => goal.id === 'stretching' && goal.type === 'avoidance'
   );
-  const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal) : 0;
-  const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal) : 0;
-  const now = new Date();
+  const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal, now) : 0;
+  const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal, now) : 0;
   const currentDay = now.getDay();
   const todayLabel = formatLongDate(now);
   const greeting = `${getGreetingForTime(now)}, ${preferences.profileName || 'John'}!`;
@@ -259,9 +281,9 @@ export default function Dashboard() {
     !!currentCert?.examDate &&
     now >= new Date(`${currentCert.startDate}T00:00:00`) &&
     now <= new Date(`${currentCert.examDate}T23:59:59`);
-  const currentWeekKeys = new Set(getCurrentWeekDateKeys());
+  const currentWeekKeys = useMemo(() => new Set(getCurrentWeekDateKeys(now)), [now]);
   const gymVisitCount = useMemo(() => getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory)), [exerciseHistory]);
-  const weeklyGymPacePct = getScheduledGymPacePct();
+  const weeklyGymPacePct = getScheduledGymPacePct(now);
   const weeklyGymActualPct = clamp01(gymVisitCount / 3) * 100;
   const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;
   const loopRunLoggedThisWeek = lifeData.loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
@@ -285,9 +307,8 @@ export default function Dashboard() {
       const referenceGymActualPct = clamp01(referenceGymVisitCount / 3) * 100;
       const referenceGymOnPace = referenceGymVisitCount >= 3 || referenceGymActualPct >= referenceGymPacePct;
       const referenceLoopRunLogged = lifeData.loopRuns.some((run) => referenceWeekKeys.has(run.dateKey));
-      const referenceWeightEntry = [...lifeData.weightEntries]
-        .filter((entry) => entry.dateKey <= getCurrentWeekDateKeys(referenceDate)[referenceDate.getDay()])
-        .sort((left, right) => right.dateKey.localeCompare(left.dateKey))[0];
+      const referenceWeekEndDateKey = getReferenceWeekEndDateKey(referenceDate);
+      const referenceWeightEntry = sortedWeightEntries.find((entry) => entry.dateKey <= referenceWeekEndDateKey);
       const referenceWeightLossActualPct = referenceWeightEntry ? getWeightLossProgressPct(referenceWeightEntry.weight) : 0;
       const referenceWeightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE, referenceDate);
       const referenceWeightLossOnPace = referenceWeightLossActualPct >= referenceWeightLossPacePct;
@@ -323,7 +344,7 @@ export default function Dashboard() {
       hobbies: weightedAverage('hobbies'),
       streaks: weightedAverage('streaks'),
     };
-  }, [avoidanceGoals, cyberScore, hobbiesScore, lifeData.loopRuns, lifeData.weightEntries, loggedGymDateKeys, now]);
+  }, [avoidanceGoals, cyberScore, hobbiesScore, lifeData.loopRuns, loggedGymDateKeys, now, sortedWeightEntries]);
   const blissScore = Math.round(blissTrend.total * 100);
   const blissBreakdown = [
     `Cyber: ${Math.round(blissTrend.cyber * 100)}`,

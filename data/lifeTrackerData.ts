@@ -221,14 +221,15 @@ export function getAvoidanceStreak(goal: AvoidanceGoal, now = new Date()) {
   const anchor = goal.lastFailureDate ? new Date(`${goal.lastFailureDate}T12:00:00`) : new Date(`${goal.startedAt}T12:00:00`);
   const today = new Date(`${getTodayDateKey(now)}T12:00:00`);
   const diffDays = Math.max(Math.round((today.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
-  return goal.lastFailureDate ? diffDays : diffDays;
+  return goal.lastFailureDate ? Math.max(diffDays - 1, 0) : diffDays;
 }
 
 export function getAvoidanceStreakBeforeFailure(goal: AvoidanceGoal, failureDate: string) {
   const anchorDateKey = goal.lastFailureDate ?? goal.startedAt;
   const anchor = new Date(`${anchorDateKey}T12:00:00`);
   const failure = new Date(`${failureDate}T12:00:00`);
-  return Math.max(Math.round((failure.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
+  const diffDays = Math.max(Math.round((failure.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
+  return goal.lastFailureDate ? Math.max(diffDays - 1, 0) : diffDays;
 }
 
 export function getAvoidanceBestStreak(goal: AvoidanceGoal, now = new Date()) {

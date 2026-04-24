@@ -3,13 +3,22 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, Tex
 import { ExerciseDraftSet, ExerciseLog, WorkoutExercise } from '../../data/gymData';
 import { ThemeColors } from '../../data/theme';
 
+type LogDateOption = {
+  dateKey: string;
+  shortLabel: string;
+  fullLabel: string;
+};
+
 type ExerciseLogModalProps = {
   activeExercise: WorkoutExercise | null;
   colors: ThemeColors;
+  dateOptions: LogDateOption[];
+  selectedDateKey: string;
   draftLog: ExerciseLog;
-  todayLabel: string;
+  selectedDateLabel: string;
   onAddSet: () => void;
   onClose: () => void;
+  onDateSelect: (dateKey: string) => void;
   onDraftLogChange: (updates: Partial<ExerciseLog>) => void;
   onDraftSetChange: (setId: string, field: keyof Pick<ExerciseDraftSet, 'reps' | 'weight'>, value: string) => void;
   onRemoveSet: (setId: string) => void;
@@ -19,10 +28,13 @@ type ExerciseLogModalProps = {
 export default function ExerciseLogModal({
   activeExercise,
   colors,
+  dateOptions,
+  selectedDateKey,
   draftLog,
-  todayLabel,
+  selectedDateLabel,
   onAddSet,
   onClose,
+  onDateSelect,
   onDraftLogChange,
   onDraftSetChange,
   onRemoveSet,
@@ -64,7 +76,35 @@ export default function ExerciseLogModal({
                 <Text style={{ fontSize: 22, color: colors.text, fontWeight: '800', marginBottom: 6 }}>
                   {activeExercise.name}
                 </Text>
-                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 14 }}>{todayLabel}</Text>
+                <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 10 }}>{selectedDateLabel}</Text>
+
+                <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 8 }}>Log date</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 }}>
+                  {dateOptions.map((option) => {
+                    const selected = option.dateKey === selectedDateKey;
+
+                    return (
+                      <Pressable
+                        key={option.dateKey}
+                        onPress={() => onDateSelect(option.dateKey)}
+                        style={{
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 999,
+                          backgroundColor: selected ? colors.accent : colors.inputBackground,
+                          borderWidth: 1,
+                          borderColor: selected ? colors.accent : colors.inputBorder,
+                          marginRight: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text style={{ color: selected ? 'white' : colors.text, fontSize: 12, fontWeight: '700' }}>
+                          {option.shortLabel}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
                 {draftLog.setEntries.map((setEntry, index) => (
                   <View

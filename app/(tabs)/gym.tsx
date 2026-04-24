@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +36,7 @@ import {
   formatFullDate,
   formatMonthDay,
   getDateRangePacePct,
+  getRelativeDateKey,
   getScheduledGymPacePct,
   getTodayDateKey,
   getUniqueWeekCount,
@@ -108,6 +109,12 @@ type ExerciseProgressSummary = {
 
 type BestLoggedSet = Pick<ExerciseSet, 'reps' | 'weight'>;
 
+type LogDateOption = {
+  dateKey: string;
+  shortLabel: string;
+  fullLabel: string;
+};
+
 function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
   const qualifyingSets = setEntries.filter((setEntry) => setEntry.reps >= minimumReps);
 
@@ -120,6 +127,35 @@ function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
   const bestReps = Math.max(...topWeightSets.map((setEntry) => setEntry.reps));
 
   return { reps: bestReps, weight: topWeight };
+}
+
+function createDraftLogFromProgressPoint(point: ExerciseProgressPoint): ExerciseLog {
+  return {
+    setEntries:
+      point.setEntries.length > 0
+        ? point.setEntries.map((setEntry) =>
+            createDraftExerciseSet({
+              reps: String(setEntry.reps),
+              weight: String(setEntry.weight),
+            })
+          )
+        : [createDraftExerciseSet()],
+    note: point.note ?? '',
+  };
+}
+
+function getRecentLogDateOptions(referenceDate = new Date(), count = 7): LogDateOption[] {
+  return Array.from({ length: count }, (_, index) => {
+    const offset = -index;
+    const dateKey = offset === 0 ? getTodayDateKey(referenceDate) : getRelativeDateKey(offset, referenceDate);
+    const date = new Date(`${dateKey}T12:00:00`);
+
+    return {
+      dateKey,
+      shortLabel: index === 0 ? 'Today' : index === 1 ? 'Yesterday' : formatMonthDay(date),
+      fullLabel: formatFullDate(date),
+    };
+  });
 }
 
 function summarizeProgressPoint(point: ExerciseProgressPoint): ExerciseProgressSummary {
@@ -157,6 +193,7 @@ export default function Gym() {
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const [selectedDay, setSelectedDay] = useState<GymDay>('Push');
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
+  const [selectedLogDateKey, setSelectedLogDateKey] = useState(() => getTodayDateKey());
   const [activeExerciseKey, setActiveExerciseKey] = useState<string | null>(null);
   const [draftLog, setDraftLog] = useState<ExerciseLog>(createEmptyExerciseLog());
   const [draftWeight, setDraftWeight] = useState('');
@@ -228,6 +265,13 @@ export default function Gym() {
 
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
+  const logDateOptions = useMemo(() => getRecentLogDateOptions(), []);
+  const selectedLogDate =
+    logDateOptions.find((option) => option.dateKey === selectedLogDateKey) ?? {
+      dateKey: selectedLogDateKey,
+      shortLabel: formatMonthDay(new Date(`${selectedLogDateKey}T12:00:00`)),
+      fullLabel: formatFullDate(new Date(`${selectedLogDateKey}T12:00:00`)),
+    };
   const {
     allWeights,
     bestLoopRun,
@@ -289,10 +333,26 @@ export default function Gym() {
   const openExerciseLogger = async (exerciseName: string) => {
     const nextKey = `${selectedDay}-${exerciseName}`;
     await triggerHaptic();
-    const existingLog = exerciseLogs[nextKey];
-    setDraftLog(existingLog && existingLog.setEntries.length > 0 ? existingLog : createEmptyExerciseLog());
     setActiveExerciseKey(nextKey);
   };
+
+  useEffect(() => {
+    if (!activeExercise || !activeExerciseKey) {
+      return;
+    }
+
+    const existingPoint = exerciseHistory[selectedDay][activeExercise.name]?.find(
+      (point) => point.dateKey === selectedLogDateKey
+    );
+    const existingLog = exerciseLogs[activeExerciseKey];
+
+    if (existingPoint) {
+      setDraftLog(createDraftLogFromProgressPoint(existingPoint));
+      return;
+    }
+
+    setDraftLog(existingLog && existingLog.setEntries.length > 0 ? existingLog : createEmptyExerciseLog());
+  }, [activeExercise, activeExerciseKey, exerciseHistory, exerciseLogs, selectedDay, selectedLogDateKey]);
 
   const updateDraftSet = (setId: string, field: keyof Pick<ExerciseDraftSet, 'reps' | 'weight'>, value: string) => {
     setDraftLog((current) => ({
@@ -374,14 +434,14 @@ export default function Gym() {
       const dayHistory = current[selectedDay];
       const exerciseName = activeExercise.name;
       const existingPoints = dayHistory[exerciseName] ?? [];
-      const existingIndex = existingPoints.findIndex((point) => point.dateKey === todayEntry.dateKey);
+      const existingIndex = existingPoints.findIndex((point) => point.dateKey === selectedLogDate.dateKey);
 
       let nextPoints = existingPoints;
 
       if (parsedSets.length > 0) {
         const updatedPoint = {
-          dateKey: todayEntry.dateKey,
-          label: todayEntry.label,
+          dateKey: selectedLogDate.dateKey,
+          label: formatMonthDay(new Date(`${selectedLogDate.dateKey}T12:00:00`)),
           setEntries: parsedSets,
           note: trimmedNote,
         };
@@ -618,11 +678,17 @@ export default function Gym() {
       <ExerciseLogModal
         activeExercise={activeExercise}
         colors={colors}
+        dateOptions={logDateOptions}
+        selectedDateKey={selectedLogDate.dateKey}
         draftLog={draftLog}
-        todayLabel={todayEntry.fullLabel}
+        selectedDateLabel={selectedLogDate.fullLabel}
         onClose={() => setActiveExerciseKey(null)}
         onAddSet={() => {
           void addDraftSet();
+        }}
+        onDateSelect={async (dateKey) => {
+          await triggerHaptic();
+          setSelectedLogDateKey(dateKey);
         }}
         onDraftLogChange={(updates) => setDraftLog((current) => ({ ...current, ...updates }))}
         onDraftSetChange={updateDraftSet}
