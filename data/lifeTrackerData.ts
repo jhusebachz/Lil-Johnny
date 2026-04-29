@@ -376,29 +376,28 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
       if (persistedGoal.type === 'avoidance') {
         const shouldResetLegacyBaseline =
           persistedGoal.startedAt === TRACKER_BASELINE_DATE && (persistedGoal.lastFailureDate ?? null) === null;
-        const shouldResetNewlyAddedGoal =
+        const shouldResetNewlyAddedGoalStart =
           NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
           (persistedGoal.lastFailureDate ?? null) === null &&
-          (
-            persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE ||
-            (
-              persistedGoal.startedAt === todayDateKey &&
-              (persistedGoal.bestStreakDays ?? 0) > 0
-            )
-          );
-        const normalizedStartedAt = shouldResetNewlyAddedGoal
+          persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE;
+        const normalizedStartedAt = shouldResetNewlyAddedGoalStart
           ? todayDateKey
           : shouldResetLegacyBaseline
             ? AVOIDANCE_STREAK_START_DATE
             : persistedGoal.startedAt ?? fallback.startedAt;
-        const normalizedBestStreakDays = shouldResetNewlyAddedGoal
-          ? 0
-          : Math.max(persistedGoal.bestStreakDays ?? 0, getAvoidanceStreak({
-              ...fallback,
-              ...persistedGoal,
-              startedAt: normalizedStartedAt,
-              lastFailureDate: persistedGoal.lastFailureDate ?? null,
-            }));
+        const normalizedCurrentStreak = getAvoidanceStreak({
+          ...fallback,
+          ...persistedGoal,
+          startedAt: normalizedStartedAt,
+          lastFailureDate: persistedGoal.lastFailureDate ?? null,
+        });
+        const shouldResetNewlyAddedGoalBest =
+          NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
+          (persistedGoal.lastFailureDate ?? null) === null &&
+          (persistedGoal.bestStreakDays ?? 0) > normalizedCurrentStreak;
+        const normalizedBestStreakDays = shouldResetNewlyAddedGoalBest
+          ? normalizedCurrentStreak
+          : Math.max(persistedGoal.bestStreakDays ?? 0, normalizedCurrentStreak);
 
         return {
           ...fallback,
