@@ -89,6 +89,7 @@ export const GOAL_WEIGHT_LB = 185;
 export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
 export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
+const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -343,10 +344,20 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     (data.certifications ?? []).map((cert) => [cert.id === 'pnpt' ? 'cloud-plus' : cert.id, cert])
   );
   const persistedGoals2026 = (data.goals2026 ?? []) as Array<AvoidanceGoal | LegacyDailyCheckGoal>;
+  const todayDateKey = getTodayDateKey();
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
     const persistedGoal = persistedGoals2026.find((goal) => goal.id === fallback.id);
 
     if (!persistedGoal) {
+      if (NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id)) {
+        return {
+          ...fallback,
+          startedAt: todayDateKey,
+          lastFailureDate: null,
+          bestStreakDays: 0,
+        };
+      }
+
       return fallback;
     }
 
@@ -365,6 +376,16 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
       if (persistedGoal.type === 'avoidance') {
         const shouldResetLegacyBaseline =
           persistedGoal.startedAt === TRACKER_BASELINE_DATE && (persistedGoal.lastFailureDate ?? null) === null;
+        const shouldResetNewlyAddedGoal =
+          NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
+          persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE &&
+          (persistedGoal.lastFailureDate ?? null) === null &&
+          (persistedGoal.bestStreakDays ?? 0) === 0;
+        const normalizedStartedAt = shouldResetNewlyAddedGoal
+          ? todayDateKey
+          : shouldResetLegacyBaseline
+            ? AVOIDANCE_STREAK_START_DATE
+            : persistedGoal.startedAt ?? fallback.startedAt;
 
         return {
           ...fallback,
@@ -372,16 +393,12 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           id: fallback.id,
           title: fallback.title,
           type: 'avoidance' as const,
-          startedAt: shouldResetLegacyBaseline
-            ? AVOIDANCE_STREAK_START_DATE
-            : persistedGoal.startedAt ?? fallback.startedAt,
+          startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
           bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, getAvoidanceStreak({
             ...fallback,
             ...persistedGoal,
-            startedAt: shouldResetLegacyBaseline
-              ? AVOIDANCE_STREAK_START_DATE
-              : persistedGoal.startedAt ?? fallback.startedAt,
+            startedAt: normalizedStartedAt,
             lastFailureDate: persistedGoal.lastFailureDate ?? null,
           })),
         };

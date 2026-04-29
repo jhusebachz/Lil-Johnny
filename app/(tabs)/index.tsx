@@ -173,7 +173,6 @@ export default function Dashboard() {
     greeting,
     healthOverviewItems,
     hobbiesOverviewItems,
-    snacksStreak,
     stretchingStreak,
     suggestedActions,
     todayLabel,
@@ -375,19 +374,6 @@ export default function Dashboard() {
               items={[
                 {
                   label: `Current streak: ${stretchingStreak} day${stretchingStreak === 1 ? '' : 's'}`,
-                  showCheck: false,
-                },
-              ]}
-              colors={colors}
-              align="center"
-              minWidth={220}
-              fullWidth={isCompact}
-            />
-            <OverviewCard
-              title="No Snacks or Sweets"
-              items={[
-                {
-                  label: `Current streak: ${snacksStreak} day${snacksStreak === 1 ? '' : 's'}`,
                   showCheck: false,
                 },
               ]}
