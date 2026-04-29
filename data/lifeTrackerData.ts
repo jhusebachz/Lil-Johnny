@@ -379,13 +379,20 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         const shouldResetNewlyAddedGoal =
           NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
           persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE &&
-          (persistedGoal.lastFailureDate ?? null) === null &&
-          (persistedGoal.bestStreakDays ?? 0) === 0;
+          (persistedGoal.lastFailureDate ?? null) === null;
         const normalizedStartedAt = shouldResetNewlyAddedGoal
           ? todayDateKey
           : shouldResetLegacyBaseline
             ? AVOIDANCE_STREAK_START_DATE
             : persistedGoal.startedAt ?? fallback.startedAt;
+        const normalizedBestStreakDays = shouldResetNewlyAddedGoal
+          ? 0
+          : Math.max(persistedGoal.bestStreakDays ?? 0, getAvoidanceStreak({
+              ...fallback,
+              ...persistedGoal,
+              startedAt: normalizedStartedAt,
+              lastFailureDate: persistedGoal.lastFailureDate ?? null,
+            }));
 
         return {
           ...fallback,
@@ -395,12 +402,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           type: 'avoidance' as const,
           startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
-          bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, getAvoidanceStreak({
-            ...fallback,
-            ...persistedGoal,
-            startedAt: normalizedStartedAt,
-            lastFailureDate: persistedGoal.lastFailureDate ?? null,
-          })),
+          bestStreakDays: normalizedBestStreakDays,
         };
       }
 
