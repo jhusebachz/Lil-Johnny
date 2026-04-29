@@ -378,8 +378,14 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           persistedGoal.startedAt === TRACKER_BASELINE_DATE && (persistedGoal.lastFailureDate ?? null) === null;
         const shouldResetNewlyAddedGoal =
           NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
-          persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE &&
-          (persistedGoal.lastFailureDate ?? null) === null;
+          (persistedGoal.lastFailureDate ?? null) === null &&
+          (
+            persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE ||
+            (
+              persistedGoal.startedAt === todayDateKey &&
+              (persistedGoal.bestStreakDays ?? 0) > 0
+            )
+          );
         const normalizedStartedAt = shouldResetNewlyAddedGoal
           ? todayDateKey
           : shouldResetLegacyBaseline
