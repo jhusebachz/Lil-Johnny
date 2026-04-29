@@ -1,12 +1,17 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import { daysUntilGoalDate, getGoalPacePct } from './osrsGoalMath';
+import {
+  findLatestSnapshotKey,
+  findPreviousSnapshotKey,
+  readSnapshotStore,
+  SnapshotStore,
+  writeSnapshotStore,
+} from './osrsSnapshotStore';
 
 const TRACKER_URL =
   'https://raw.githubusercontent.com/jhusebachz/OSRS-Daily-Tracker/main/data/last_stats.json';
 const TRACKER_TIME_ZONE = 'America/New_York';
 const SNAPSHOT_HOUR = 8;
 const SNAPSHOT_MINUTE = 45;
-const SNAPSHOT_FILE = `${FileSystem.documentDirectory ?? ''}osrs-daily-snapshots.json`;
 const GOAL_PROGRESS_START = '2026-03-25';
 const FRIEND_ORDER = ['gwahpy', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
 
@@ -76,10 +81,6 @@ export type OsrsPlayerStats = {
 } & Record<SkillName, OsrsSkillStat>;
 
 export type OsrsApiResponse = Record<string, OsrsPlayerStats>;
-
-type SnapshotStore = {
-  snapshots: Record<string, OsrsApiResponse>;
-};
 
 export type TrackerSummaryItem = {
   skill: string;
@@ -503,30 +504,6 @@ function formatSnapshotDate(snapshotKey: string) {
   }).format(date);
 }
 
-async function readSnapshotStore(): Promise<SnapshotStore> {
-  const fileInfo = await FileSystem.getInfoAsync(SNAPSHOT_FILE);
-
-  if (!fileInfo.exists) {
-    return { snapshots: {} };
-  }
-
-  const raw = await FileSystem.readAsStringAsync(SNAPSHOT_FILE);
-
-  if (!raw.trim()) {
-    return { snapshots: {} };
-  }
-
-  try {
-    return JSON.parse(raw) as SnapshotStore;
-  } catch {
-    return { snapshots: {} };
-  }
-}
-
-async function writeSnapshotStore(store: SnapshotStore) {
-  await FileSystem.writeAsStringAsync(SNAPSHOT_FILE, JSON.stringify(store));
-}
-
 async function fetchRawRunescapeData() {
   const response = await fetch(TRACKER_URL);
 
@@ -535,17 +512,6 @@ async function fetchRawRunescapeData() {
   }
 
   return (await response.json()) as OsrsApiResponse;
-}
-
-function findLatestSnapshotKey(store: SnapshotStore) {
-  return Object.keys(store.snapshots).sort().at(-1) ?? null;
-}
-
-function findPreviousSnapshotKey(store: SnapshotStore, currentKey: string) {
-  return Object.keys(store.snapshots)
-    .filter((key) => key < currentKey)
-    .sort()
-    .at(-1) ?? null;
 }
 
 function fallbackTracker(): LiveRunescapeTracker {

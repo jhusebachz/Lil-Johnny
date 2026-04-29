@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import RunescapeSection from '../../components/games/RunescapeSection';
 import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
+import AppScreenShell from '../../components/ui/AppScreenShell';
+import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import {
@@ -214,24 +215,20 @@ export default function Goals() {
 
   const openDiyCount = lifeData.diyTasks.filter((task) => !task.completed).length;
   const completedDiyCount = lifeData.diyTasks.length - openDiyCount;
+  const hobbiesViewOptions: { label: string; value: HobbiesView }[] = [
+    { label: 'DIY To-Do', value: 'diy' },
+    { label: 'OSRS', value: 'osrs' },
+  ];
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              triggerRefresh();
-              setRunescapeRefreshToken((current) => current + 1);
-            }}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
-        }
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-      >
+    <AppScreenShell
+      colors={colors}
+      refreshing={refreshing}
+      onRefresh={() => {
+        triggerRefresh();
+        setRunescapeRefreshToken((current) => current + 1);
+      }}
+      hero={
         <View
           style={{
             backgroundColor: colors.hero,
@@ -247,36 +244,19 @@ export default function Goals() {
             Open DIY tasks: {openDiyCount} | {formatTrackerDate()}
           </Text>
         </View>
+      }
+    >
 
         <SectionCard title="Hobbies View" emoji={'\uD83E\uDDE9'} colors={colors}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {(['diy', 'osrs'] as HobbiesView[]).map((view) => {
-              const selected = view === selectedView;
-              const label = view === 'osrs' ? 'OSRS' : 'DIY To-Do';
-
-              return (
-                <Pressable
-                  key={view}
-                  onPress={async () => {
-                    await triggerHaptic();
-                    setSelectedView(view);
-                  }}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                    backgroundColor: selected ? colors.accent : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.cardBorder,
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedToggleRow
+            colors={colors}
+            options={hobbiesViewOptions}
+            selectedValue={selectedView}
+            onSelect={async (view) => {
+              await triggerHaptic();
+              setSelectedView(view);
+            }}
+          />
         </SectionCard>
 
         {selectedView === 'osrs' ? <RunescapeSection colors={colors} refreshToken={runescapeRefreshToken} /> : null}
@@ -322,7 +302,6 @@ export default function Goals() {
             ))}
           </>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+    </AppScreenShell>
   );
 }

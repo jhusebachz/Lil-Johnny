@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import Pill from '../Pill';
 import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
-import {
-  LiveRunescapeTracker,
-  fetchRunescapeTrackerSnapshot,
-  getFallbackRunescapeTracker,
-} from '../../data/osrsTracker';
 import { ThemeColors } from '../../data/theme';
+import { useRunescapeTracker } from '../../hooks/use-runescape-tracker';
 
 type RunescapeSectionProps = {
   colors: ThemeColors;
@@ -17,41 +12,7 @@ type RunescapeSectionProps = {
 };
 
 export default function RunescapeSection({ colors, refreshToken }: RunescapeSectionProps) {
-  const [tracker, setTracker] = useState<LiveRunescapeTracker>(getFallbackRunescapeTracker());
-  const [trackerLoading, setTrackerLoading] = useState(true);
-  const [trackerError, setTrackerError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadTracker = async () => {
-      setTrackerLoading(true);
-      setTrackerError(null);
-
-      try {
-        const liveTracker = await fetchRunescapeTrackerSnapshot();
-
-        if (mounted) {
-          setTracker(liveTracker);
-        }
-      } catch (error) {
-        if (mounted) {
-          setTracker(getFallbackRunescapeTracker());
-          setTrackerError(error instanceof Error ? error.message : 'Unable to load live OSRS stats.');
-        }
-      } finally {
-        if (mounted) {
-          setTrackerLoading(false);
-        }
-      }
-    };
-
-    void loadTracker();
-
-    return () => {
-      mounted = false;
-    };
-  }, [refreshToken]);
+  const { tracker, trackerError, trackerLoading } = useRunescapeTracker(refreshToken);
 
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - tracker.totalLevel, 0);

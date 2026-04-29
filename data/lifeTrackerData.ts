@@ -132,6 +132,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   goals2026: [
     { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
     { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'snacks-sweets', title: 'No snacks or sweets', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
     { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
     { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
     { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },

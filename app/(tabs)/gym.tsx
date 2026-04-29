@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, View, useWindowDimensions } from 'react-native';
 
 import BodyMetricsSection from '../../components/gym/BodyMetricsSection';
 import ExerciseLogModal from '../../components/gym/ExerciseLogModal';
@@ -10,6 +9,8 @@ import LoopRunSection from '../../components/gym/LoopRunSection';
 import MobilityRoutineSection from '../../components/gym/MobilityRoutineSection';
 import WorkoutSection from '../../components/gym/WorkoutSection';
 import SectionCard from '../../components/SectionCard';
+import AppScreenShell from '../../components/ui/AppScreenShell';
+import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useGymData } from '../../context/GymDataContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
@@ -22,27 +23,21 @@ import {
   GymView,
   createDraftExerciseSet,
   createEmptyExerciseLog,
-  getLoggedGymDateKeys,
   gymWorkoutTemplates,
 } from '../../data/gymData';
 import {
   GOAL_WEIGHT_LB,
   LoopRunEntry,
   STARTING_WEIGHT_LB,
-  TRACKER_BASELINE_DATE,
-  WEIGHT_GOAL_TARGET_DATE,
   WeightEntry,
   formatDateKey,
   formatFullDate,
   formatMonthDay,
-  getDateRangePacePct,
   getRelativeDateKey,
-  getScheduledGymPacePct,
   getTodayDateKey,
-  getUniqueWeekCount,
-  getWeightLossProgressPct,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useGymProgressMetrics } from '../../hooks/use-gym-progress-metrics';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 const gymDays: GymDay[] = ['Push', 'Pull', 'Legs'];
@@ -61,10 +56,6 @@ function parseNumber(value: string) {
 
 function formatWeight(weight: number) {
   return Number.isInteger(weight) ? String(weight) : weight.toFixed(1);
-}
-
-function estimateOneRepMax(weight: number, reps: number) {
-  return weight * (1 + reps / 30);
 }
 
 function parseSeconds(value: string) {
@@ -96,38 +87,11 @@ function getTodayEntryMeta() {
   };
 }
 
-function clampPct(value: number) {
-  return Math.max(0, Math.min(100, value));
-}
-
-type ExerciseProgressSummary = {
-  point: ExerciseProgressPoint;
-  setCount: number;
-  bestSet: BestLoggedSet | null;
-  qualifyingSet: BestLoggedSet | null;
-};
-
-type BestLoggedSet = Pick<ExerciseSet, 'reps' | 'weight'>;
-
 type LogDateOption = {
   dateKey: string;
   shortLabel: string;
   fullLabel: string;
 };
-
-function getBestSet(setEntries: ExerciseSet[], minimumReps = 0) {
-  const qualifyingSets = setEntries.filter((setEntry) => setEntry.reps >= minimumReps);
-
-  if (qualifyingSets.length === 0) {
-    return null;
-  }
-
-  const topWeight = Math.max(...qualifyingSets.map((setEntry) => setEntry.weight));
-  const topWeightSets = qualifyingSets.filter((setEntry) => setEntry.weight === topWeight);
-  const bestReps = Math.max(...topWeightSets.map((setEntry) => setEntry.reps));
-
-  return { reps: bestReps, weight: topWeight };
-}
 
 function createDraftLogFromProgressPoint(point: ExerciseProgressPoint): ExerciseLog {
   return {
@@ -156,31 +120,6 @@ function getRecentLogDateOptions(referenceDate = new Date(), count = 7): LogDate
       fullLabel: formatFullDate(date),
     };
   });
-}
-
-function summarizeProgressPoint(point: ExerciseProgressPoint): ExerciseProgressSummary {
-  return {
-    point,
-    setCount: point.setEntries.length,
-    bestSet: getBestSet(point.setEntries, 0),
-    qualifyingSet: getBestSet(point.setEntries, 6),
-  };
-}
-
-function getBestAtTopWeight(points: ExerciseProgressSummary[]) {
-  const qualifyingPoints = points
-    .map((point) => point.qualifyingSet)
-    .filter((point): point is BestLoggedSet => point !== null);
-
-  if (qualifyingPoints.length === 0) {
-    return null;
-  }
-
-  const topWeight = Math.max(...qualifyingPoints.map((point) => point.weight));
-  const topWeightPoints = qualifyingPoints.filter((point) => point.weight === topWeight);
-  const bestReps = Math.max(...topWeightPoints.map((point) => point.reps));
-
-  return { bestReps, topWeight };
 }
 
 export default function Gym() {
@@ -221,47 +160,30 @@ export default function Gym() {
   const progressExerciseName = selectedProgressExercise[selectedDay];
   const {
     bestAtTopWeight,
+    allWeights,
+    bestLoopRun,
     estimatedOneRepMax,
+    latestWeight,
+    loopRunGoalPct,
     maxReps,
     oneRepMaxTrend,
     progressPointSummaries,
     qualifyingProgressPoints,
-  } = useMemo(() => {
-    const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
-    const progressPoints = [...rawProgressPoints]
-      .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
-      .slice(-10);
-    const progressPointSummaries = progressPoints
-      .map(summarizeProgressPoint)
-      .filter((point) => point.bestSet !== null);
-    const qualifyingProgressPoints = progressPointSummaries.filter((point) => point.qualifyingSet !== null);
-    const maxReps = Math.max(...progressPointSummaries.map((point) => point.bestSet?.reps ?? 0), 1);
-    const bestAtTopWeight = progressPointSummaries.length > 0 ? getBestAtTopWeight(progressPointSummaries) : null;
-    const estimatedOneRepMax =
-      bestAtTopWeight && bestAtTopWeight.bestReps >= 1
-        ? estimateOneRepMax(bestAtTopWeight.topWeight, bestAtTopWeight.bestReps)
-        : null;
-    const oneRepMaxTrend =
-      qualifyingProgressPoints.length >= 2
-        ? estimateOneRepMax(
-            qualifyingProgressPoints.at(-1)?.qualifyingSet?.weight ?? 0,
-            qualifyingProgressPoints.at(-1)?.qualifyingSet?.reps ?? 0
-          ) -
-          estimateOneRepMax(
-            qualifyingProgressPoints.at(-2)?.qualifyingSet?.weight ?? 0,
-            qualifyingProgressPoints.at(-2)?.qualifyingSet?.reps ?? 0
-          )
-        : null;
-
-    return {
-      bestAtTopWeight,
-      estimatedOneRepMax,
-      maxReps,
-      oneRepMaxTrend,
-      progressPointSummaries,
-      qualifyingProgressPoints,
-    };
-  }, [exerciseHistory, progressExerciseName, selectedDay]);
+    recentLoopRuns,
+    weeklyGymPacePct,
+    weeklyGymPct,
+    weeklyGymVisits,
+    weightGoalDelta,
+    weightGoalPacePct,
+    weightGoalPct,
+    weightMax,
+    weightMin,
+  } = useGymProgressMetrics({
+    exerciseHistory,
+    lifeData,
+    progressExerciseName,
+    selectedDay,
+  });
 
   const todayEntry = getTodayEntryMeta();
   const todayKey = getTodayDateKey();
@@ -272,63 +194,12 @@ export default function Gym() {
       shortLabel: formatMonthDay(new Date(`${selectedLogDateKey}T12:00:00`)),
       fullLabel: formatFullDate(new Date(`${selectedLogDateKey}T12:00:00`)),
     };
-  const {
-    allWeights,
-    bestLoopRun,
-    latestWeight,
-    loopRunGoalPct,
-    recentLoopRuns,
-    weeklyGymPacePct,
-    weeklyGymPct,
-    weeklyGymVisits,
-    weightGoalDelta,
-    weightGoalPacePct,
-    weightGoalPct,
-    weightMax,
-    weightMin,
-  } = useMemo(() => {
-    const weeklyGymVisits = getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory));
-    const allWeights = [...lifeData.weightEntries].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
-    const latestWeight = allWeights.at(-1);
-    const weightMin = allWeights.length > 0 ? Math.min(...allWeights.map((entry) => entry.weight)) : 0;
-    const weightMax = allWeights.length > 0 ? Math.max(...allWeights.map((entry) => entry.weight)) : 1;
-    const recentLoopRuns = [...lifeData.loopRuns]
-      .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
-      .slice(0, 10);
-    const bestLoopRun = lifeData.loopRuns.reduce(
-      (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
-      lifeData.loopRuns[0]
-    );
-    const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
-    const weeklyGymPacePct = getScheduledGymPacePct();
-    const loopRunGoalPct = bestLoopRun
-      ? clampPct(((12 * 60 - bestLoopRun.timeSeconds) / (12 * 60 - 9 * 60)) * 100)
-      : 0;
-    const weightGoalPct = latestWeight ? getWeightLossProgressPct(latestWeight.weight) : 0;
-    const weightGoalPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE);
-    const weightGoalDelta = latestWeight ? latestWeight.weight - GOAL_WEIGHT_LB : null;
-
-    return {
-      allWeights,
-      bestLoopRun,
-      latestWeight,
-      loopRunGoalPct,
-      recentLoopRuns,
-      weeklyGymPacePct,
-      weeklyGymPct,
-      weeklyGymVisits,
-      weightGoalDelta,
-      weightGoalPacePct,
-      weightGoalPct,
-      weightMax,
-      weightMin,
-    };
-  }, [exerciseHistory, lifeData.loopRuns, lifeData.weightEntries]);
-
   const activeExercise = useMemo(
     () => workout.exercises.find((exercise) => `${selectedDay}-${exercise.name}` === activeExerciseKey) ?? null,
     [activeExerciseKey, selectedDay, workout.exercises]
   );
+  const gymViewOptions: { label: string; value: GymView }[] = gymViews.map((view) => ({ label: view, value: view }));
+  const gymDayOptions: { label: string; value: GymDay }[] = gymDays.map((day) => ({ label: day, value: day }));
 
   const openExerciseLogger = async (exerciseName: string) => {
     const nextKey = `${selectedDay}-${exerciseName}`;
@@ -511,34 +382,29 @@ export default function Gym() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={triggerRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
+    <>
+      <AppScreenShell
+        colors={colors}
+        refreshing={refreshing}
+        onRefresh={triggerRefresh}
+        hero={
+          <View
+            style={{
+              backgroundColor: colors.hero,
+              borderRadius: 16,
+              padding: 20,
+              minHeight: 112,
+              justifyContent: 'center',
+              marginBottom: 18,
+            }}
+          >
+            <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Health</Text>
+            <Text style={{ color: colors.heroSubtext, fontSize: 12, lineHeight: 18 }}>
+              Preferred split: {preferences.preferredWorkoutSplit} | {weeklyGymVisits}/3 gym visits this week
+            </Text>
+          </View>
         }
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
       >
-        <View
-          style={{
-            backgroundColor: colors.hero,
-            borderRadius: 16,
-            padding: 20,
-            minHeight: 112,
-            justifyContent: 'center',
-            marginBottom: 18,
-          }}
-        >
-          <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Health</Text>
-          <Text style={{ color: colors.heroSubtext, fontSize: 12, lineHeight: 18 }}>
-            Preferred split: {preferences.preferredWorkoutSplit} | {weeklyGymVisits}/3 gym visits this week
-          </Text>
-        </View>
 
         <GymPaceSection
           colors={colors}
@@ -582,60 +448,27 @@ export default function Gym() {
         />
 
         <SectionCard title="Gym View" emoji={'⇄'} colors={colors}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {gymViews.map((view) => {
-              const selected = view === selectedView;
-
-              return (
-                <Pressable
-                  key={view}
-                  onPress={async () => {
-                    await triggerHaptic();
-                    setSelectedView(view);
-                  }}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                    backgroundColor: selected ? colors.accent : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.cardBorder,
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>{view}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedToggleRow
+            colors={colors}
+            options={gymViewOptions}
+            selectedValue={selectedView}
+            onSelect={async (view) => {
+              await triggerHaptic();
+              setSelectedView(view);
+            }}
+          />
         </SectionCard>
 
         <SectionCard title="Day Selector" emoji={'📋'} colors={colors}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {gymDays.map((day) => {
-              const selected = day === selectedDay;
-
-              return (
-                <Pressable
-                  key={day}
-                  onPress={() => setSelectedDay(day)}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                    backgroundColor: selected ? colors.accent : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.cardBorder,
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>{day}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedToggleRow
+            colors={colors}
+            options={gymDayOptions}
+            selectedValue={selectedDay}
+            onSelect={async (day) => {
+              await triggerHaptic();
+              setSelectedDay(day);
+            }}
+          />
         </SectionCard>
 
         {selectedView === 'Workout' ? (
@@ -673,7 +506,7 @@ export default function Gym() {
             }}
           />
         )}
-      </ScrollView>
+      </AppScreenShell>
 
       <ExerciseLogModal
         activeExercise={activeExercise}
@@ -699,6 +532,6 @@ export default function Gym() {
           void saveExerciseLogger();
         }}
       />
-    </SafeAreaView>
+    </>
   );
 }

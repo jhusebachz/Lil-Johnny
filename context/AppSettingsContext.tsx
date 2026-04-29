@@ -168,6 +168,8 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   const [notificationAccess, setNotificationAccess] = useState<NotificationAccess>('undetermined');
   const [hasHydrated, setHasHydrated] = useState(false);
   const webFiredKeysRef = useRef<Record<string, boolean>>({});
+  const remindersRef = useRef(reminders);
+  const preferencesRef = useRef(preferences);
 
   useEffect(() => {
     let mounted = true;
@@ -243,6 +245,14 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     };
   }, [hasHydrated, notificationAccess, preferences.notificationsEnabled, preferences.privateNotifications, reminders]);
 
+  useEffect(() => {
+    remindersRef.current = reminders;
+  }, [reminders]);
+
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
+
   const updateReminder = useCallback((id: string, updates: Partial<ReminderItem>) => {
     setReminders((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -291,8 +301,8 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const requestNotificationAccess = useCallback(
-    async () => requestReminderNotificationAccess(reminders, preferences, setNotificationAccess),
-    [preferences, reminders]
+    async () => requestReminderNotificationAccess(remindersRef.current, preferencesRef.current, setNotificationAccess),
+    []
   );
 
   const triggerHaptic = useCallback(async (force = false) => {

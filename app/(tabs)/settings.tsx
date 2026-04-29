@@ -1,7 +1,7 @@
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, Text, View } from 'react-native';
 
 import SectionCard from '../../components/SectionCard';
+import AppScreenShell from '../../components/ui/AppScreenShell';
 import { ThemeMode, usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { getThemeColors } from '../../data/theme';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
@@ -80,19 +80,11 @@ export default function Settings() {
   const currentThemeLabel = themeOptions.find((option) => option.value === theme)?.label ?? theme;
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={triggerRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
-        }
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-      >
+    <AppScreenShell
+      colors={colors}
+      refreshing={refreshing}
+      onRefresh={triggerRefresh}
+      hero={
         <View
           style={{
             backgroundColor: colors.hero,
@@ -105,6 +97,8 @@ export default function Settings() {
         >
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800' }}>Settings</Text>
         </View>
+      }
+    >
 
         <SectionCard title="Notifications" emoji={'\u{1F514}'} colors={colors}>
           <SettingToggle
@@ -190,7 +184,6 @@ export default function Settings() {
             {preferences.privateNotifications ? 'Private alerts' : 'Full alerts'}
           </Text>
         </SectionCard>
-      </ScrollView>
-    </SafeAreaView>
+    </AppScreenShell>
   );
 }

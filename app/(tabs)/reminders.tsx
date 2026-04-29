@@ -6,17 +6,16 @@ import {
   Modal,
   Platform,
   Pressable,
-  RefreshControl,
-  ScrollView,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ReminderCard from '../../components/reminders/ReminderCard';
 import ReminderTimeWheel from '../../components/reminders/ReminderTimeWheel';
 import SectionCard from '../../components/SectionCard';
 import StreakGoalCard from '../../components/streaks/StreakGoalCard';
+import AppScreenShell from '../../components/ui/AppScreenShell';
+import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
@@ -61,6 +60,10 @@ export default function Reminders() {
   const heroOpacity = useState(() => new Animated.Value(0))[0];
   const heroLift = useState(() => new Animated.Value(18))[0];
   const expandedReminder = reminders.find((reminder) => reminder.id === expandedReminderId) ?? null;
+  const streakViewOptions: { label: string; value: StreaksView }[] = [
+    { label: '2026 Streaks', value: 'streaks' },
+    { label: 'Reminder Alarms', value: 'alarms' },
+  ];
 
   useEffect(() => {
     const reveal = Animated.parallel([
@@ -117,67 +120,44 @@ export default function Reminders() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={16}
       >
-        <ScrollView
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={triggerRefresh}
-              tintColor={colors.accent}
-              colors={[colors.accent]}
-              progressBackgroundColor={colors.card}
-            />
-          }
+        <AppScreenShell
+          colors={colors}
+          refreshing={refreshing}
+          onRefresh={triggerRefresh}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+          hero={
+            <Animated.View
+              style={{
+                backgroundColor: colors.hero,
+                borderRadius: 16,
+                padding: 20,
+                minHeight: 112,
+                justifyContent: 'center',
+                marginBottom: 18,
+                opacity: heroOpacity,
+                transform: [{ translateY: heroLift }],
+              }}
+            >
+              <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800' }}>Streaks</Text>
+            </Animated.View>
+          }
         >
-          <Animated.View
-            style={{
-              backgroundColor: colors.hero,
-              borderRadius: 16,
-              padding: 20,
-              minHeight: 112,
-              justifyContent: 'center',
-              marginBottom: 18,
-              opacity: heroOpacity,
-              transform: [{ translateY: heroLift }],
-            }}
-          >
-            <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800' }}>Streaks</Text>
-          </Animated.View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 18 }}>
-            {(['streaks', 'alarms'] as StreaksView[]).map((view) => {
-              const selected = selectedView === view;
-              const label = view === 'streaks' ? '2026 Streaks' : 'Reminder Alarms';
-
-              return (
-                <Pressable
-                  key={view}
-                  onPress={async () => {
-                    await triggerHaptic();
-                    setSelectedView(view);
-                  }}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 14,
-                    borderRadius: 999,
-                    backgroundColor: selected ? colors.accent : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.cardBorder,
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 14, fontWeight: '700' }}>{label}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={{ marginBottom: 18 }}>
+            <SegmentedToggleRow
+              colors={colors}
+              options={streakViewOptions}
+              selectedValue={selectedView}
+              onSelect={async (view) => {
+                await triggerHaptic();
+                setSelectedView(view);
+              }}
+            />
           </View>
 
           {selectedView === 'streaks' ? (
@@ -297,7 +277,7 @@ export default function Reminders() {
               </SectionCard>
             </>
           ) : null}
-        </ScrollView>
+        </AppScreenShell>
       </KeyboardAvoidingView>
       <Modal
         visible={expandedReminder !== null}
@@ -352,6 +332,6 @@ export default function Reminders() {
           ) : null}
         </View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
