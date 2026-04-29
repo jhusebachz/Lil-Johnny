@@ -71,6 +71,10 @@ export type DiyTask = {
   completedAt?: string | null;
 };
 
+export type LifeTrackerMetadata = {
+  appliedMigrations: string[];
+};
+
 export type LifeTrackerData = {
   certifications: CertificationTracker[];
   studyLogs: StudyLogEntry[];
@@ -79,6 +83,7 @@ export type LifeTrackerData = {
   weightEntries: WeightEntry[];
   loopRuns: LoopRunEntry[];
   diyTasks: DiyTask[];
+  metadata: LifeTrackerMetadata;
 };
 
 const STORAGE_FILE = `${FileSystem.documentDirectory ?? ''}lil-johnny-life-trackers.json`;
@@ -90,6 +95,7 @@ export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
 export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
 const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
+const RESET_SNACKS_SWEETS_MIGRATION = 'reset-snacks-sweets-initial-state-v1';
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -157,6 +163,9 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       completedAt: null,
     },
   ],
+  metadata: {
+    appliedMigrations: [],
+  },
 };
 
 export function getTodayDateKey(date = new Date()) {
@@ -345,6 +354,8 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   );
   const persistedGoals2026 = (data.goals2026 ?? []) as Array<AvoidanceGoal | LegacyDailyCheckGoal>;
   const todayDateKey = getTodayDateKey();
+  const appliedMigrations = new Set(data.metadata?.appliedMigrations ?? []);
+  const shouldApplySnacksReset = !appliedMigrations.has(RESET_SNACKS_SWEETS_MIGRATION);
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
     const persistedGoal = persistedGoals2026.find((goal) => goal.id === fallback.id);
 
@@ -373,31 +384,27 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     }
 
     if (fallback.type === 'avoidance') {
+      if (shouldApplySnacksReset && NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id)) {
+        return {
+          ...fallback,
+          startedAt: todayDateKey,
+          lastFailureDate: null,
+          bestStreakDays: 0,
+        };
+      }
+
       if (persistedGoal.type === 'avoidance') {
         const shouldResetLegacyBaseline =
           persistedGoal.startedAt === TRACKER_BASELINE_DATE && (persistedGoal.lastFailureDate ?? null) === null;
-        const shouldResetNewlyAddedGoalStart =
-          NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
-          (persistedGoal.lastFailureDate ?? null) === null &&
-          persistedGoal.startedAt === AVOIDANCE_STREAK_START_DATE;
-        const normalizedStartedAt = shouldResetNewlyAddedGoalStart
-          ? todayDateKey
-          : shouldResetLegacyBaseline
-            ? AVOIDANCE_STREAK_START_DATE
-            : persistedGoal.startedAt ?? fallback.startedAt;
+        const normalizedStartedAt = shouldResetLegacyBaseline
+          ? AVOIDANCE_STREAK_START_DATE
+          : persistedGoal.startedAt ?? fallback.startedAt;
         const normalizedCurrentStreak = getAvoidanceStreak({
           ...fallback,
           ...persistedGoal,
           startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
         });
-        const shouldResetNewlyAddedGoalBest =
-          NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id) &&
-          (persistedGoal.lastFailureDate ?? null) === null &&
-          (persistedGoal.bestStreakDays ?? 0) > normalizedCurrentStreak;
-        const normalizedBestStreakDays = shouldResetNewlyAddedGoalBest
-          ? normalizedCurrentStreak
-          : Math.max(persistedGoal.bestStreakDays ?? 0, normalizedCurrentStreak);
 
         return {
           ...fallback,
@@ -407,7 +414,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           type: 'avoidance' as const,
           startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
-          bestStreakDays: normalizedBestStreakDays,
+          bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, normalizedCurrentStreak),
         };
       }
 
@@ -416,6 +423,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
 
     return fallback;
   });
+  const normalizedAppliedMigrations = shouldApplySnacksReset
+    ? [...appliedMigrations, RESET_SNACKS_SWEETS_MIGRATION]
+    : [...appliedMigrations];
 
   return {
     certifications: defaultLifeTrackerData.certifications.map((fallback) => {
@@ -454,5 +464,8 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     weightEntries: data.weightEntries?.length ? data.weightEntries : defaultLifeTrackerData.weightEntries,
     loopRuns: data.loopRuns ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
+    metadata: {
+      appliedMigrations: normalizedAppliedMigrations,
+    },
   };
 }
