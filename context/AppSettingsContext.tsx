@@ -56,7 +56,6 @@ type AppSettingsContextType = {
   triggerTabHaptic: () => Promise<void>;
 };
 
-const AppSettingsContext = createContext<AppSettingsContextType | undefined>(undefined);
 const ThemeSettingsContext = createContext<Pick<AppSettingsContextType, 'theme' | 'setTheme'> | undefined>(undefined);
 const ReminderSettingsContext = createContext<
   Pick<AppSettingsContextType, 'reminders' | 'addReminder' | 'updateReminder' | 'toggleReminderCompletion'> | undefined
@@ -325,36 +324,6 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     await Haptics.selectionAsync();
   }, [preferences.hapticsEnabled]);
 
-  const value = useMemo(
-    () => ({
-      theme,
-      setTheme,
-      reminders,
-      addReminder,
-      updateReminder,
-      toggleReminderCompletion,
-      preferences,
-      updatePreferences,
-      notificationAccess,
-      requestNotificationAccess,
-      triggerHaptic,
-      triggerTabHaptic,
-    }),
-    [
-      addReminder,
-      notificationAccess,
-      preferences,
-      reminders,
-      requestNotificationAccess,
-      theme,
-      toggleReminderCompletion,
-      triggerHaptic,
-      triggerTabHaptic,
-      updatePreferences,
-      updateReminder,
-    ]
-  );
-
   const themeValue = useMemo(
     () => ({
       theme,
@@ -386,24 +355,12 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   );
 
   return (
-    <AppSettingsContext.Provider value={value}>
-      <ThemeSettingsContext.Provider value={themeValue}>
-        <ReminderSettingsContext.Provider value={reminderValue}>
-          <PreferenceSettingsContext.Provider value={preferenceValue}>{children}</PreferenceSettingsContext.Provider>
-        </ReminderSettingsContext.Provider>
-      </ThemeSettingsContext.Provider>
-    </AppSettingsContext.Provider>
+    <ThemeSettingsContext.Provider value={themeValue}>
+      <ReminderSettingsContext.Provider value={reminderValue}>
+        <PreferenceSettingsContext.Provider value={preferenceValue}>{children}</PreferenceSettingsContext.Provider>
+      </ReminderSettingsContext.Provider>
+    </ThemeSettingsContext.Provider>
   );
-}
-
-export function useAppSettings() {
-  const context = useContext(AppSettingsContext);
-
-  if (!context) {
-    throw new Error('useAppSettings must be used inside AppSettingsProvider');
-  }
-
-  return context;
 }
 
 export function useThemeSettings() {
