@@ -3,20 +3,20 @@ import Pill from '../Pill';
 import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
+import { LiveRunescapeTracker } from '../../data/osrsTracker';
 import { ThemeColors } from '../../data/theme';
-import { useRunescapeTracker } from '../../hooks/use-runescape-tracker';
 
 type RunescapeSectionProps = {
   colors: ThemeColors;
-  refreshToken: number;
+  tracker: LiveRunescapeTracker;
+  trackerError: string | null;
+  trackerLoading: boolean;
 };
 
-export default function RunescapeSection({ colors, refreshToken }: RunescapeSectionProps) {
-  const { tracker, trackerError, trackerLoading } = useRunescapeTracker(refreshToken);
-
+export default function RunescapeSection({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - tracker.totalLevel, 0);
-  const goal1Projection = tracker.goalProjections.base90;
+  const goal1Projection = tracker.goalProjections.baseGoal;
   const goal2Projection = tracker.goalProjections.runefest;
   const goal3Projection = tracker.goalProjections.maxCape;
 
@@ -130,9 +130,9 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
         })}
       </SectionCard>
 
-      <SectionCard title="Goal 1 - Base 90 All Skills" emoji={'\uD83C\uDFAF'} colors={colors}>
-        <StatRow label="Deadline" value={`2026-05-22 (${goal1Projection.daysLeft} days left)`} colors={colors} />
-        <StatRow label="Skills at 90+" value={`${24 - tracker.base90Remaining.length}/24`} colors={colors} />
+      <SectionCard title="Goal 1 - Base 92s (Runecrafting 90) by RuneFest" emoji={'\uD83C\uDFAF'} colors={colors}>
+        <StatRow label="Deadline" value={`2026-10-03 - RuneFest (${goal1Projection.daysLeft} days left)`} colors={colors} />
+        <StatRow label="Skills at target+" value={`${24 - tracker.baseGoalRemaining.length}/24`} colors={colors} />
         <StatRow
           label="Estimated grind"
           value={
@@ -166,11 +166,11 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
           Still needed
         </Text>
 
-        {tracker.base90Remaining.map((item) => (
+        {tracker.baseGoalRemaining.slice(0, 5).map((item) => (
           <View key={item.skill} style={{ marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 12, color: colors.text, flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level}
+                <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level} / {item.targetLevel}
               </Text>
               <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
                 <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>{item.pct.toFixed(1)}%</Text>
@@ -262,7 +262,7 @@ export default function RunescapeSection({ colors, refreshToken }: RunescapeSect
         <ProgressBar pct={(tracker.maxedSkills.length / 24) * 100} color="#ec4899" colors={colors} />
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }}>
-          {tracker.maxedSkills.map((skill) => (
+          {tracker.maxedSkills.slice(0, 8).map((skill) => (
             <View
               key={skill}
               style={{

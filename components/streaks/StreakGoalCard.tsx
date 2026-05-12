@@ -8,6 +8,12 @@ export default function StreakGoalCard({
   colors,
   streak,
   bestStreak,
+  consistencyLabel,
+  consistencyPct,
+  goodDays,
+  trackedDays,
+  windowDays,
+  blissImpactText,
   onMarkFailureToday,
   onMarkFailureYesterday,
 }: {
@@ -15,6 +21,12 @@ export default function StreakGoalCard({
   colors: ReturnType<typeof getThemeColors>;
   streak: number;
   bestStreak: number;
+  consistencyLabel: string;
+  consistencyPct: number;
+  goodDays: number;
+  trackedDays: number;
+  windowDays: number;
+  blissImpactText: string;
   onMarkFailureToday: () => Promise<void>;
   onMarkFailureYesterday: () => Promise<void>;
 }) {
@@ -41,12 +53,24 @@ export default function StreakGoalCard({
       >
         <View style={{ flex: isCompact ? 0 : 1, paddingRight: isCompact ? 0 : 14, marginBottom: isCompact ? 12 : 0 }}>
           <Text style={{ fontSize: 17, color: colors.text, fontWeight: '800', marginBottom: 6 }}>{goal.title}</Text>
-          <Text style={{ fontSize: 16, color: colors.subtext }}>
-            Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
-            {streak === 1 ? 'day' : 'days'}
+          <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 4 }}>
+            Good Days: <Text style={{ fontWeight: '800' }}>{goodDays}</Text> / {windowDays}
           </Text>
-          <Text style={{ fontSize: 14, color: colors.subtext, marginTop: 4 }}>
-            All-time best: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
+          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 2 }}>
+            Consistency: <Text style={{ color: colors.text, fontWeight: '800' }}>{consistencyPct}%</Text>
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 2 }}>
+            Status: <Text style={{ color: colors.text, fontWeight: '800' }}>{consistencyLabel}</Text>
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 6 }}>
+            Bliss Impact: <Text style={{ color: colors.text, fontWeight: '800' }}>{blissImpactText}</Text>
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.subtext }}>
+            Tracking window: <Text style={{ color: colors.text, fontWeight: '700' }}>{trackedDays}</Text> day{trackedDays === 1 ? '' : 's'} logged
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.subtext, marginTop: 4 }}>
+            Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
+            {streak === 1 ? 'day' : 'days'} | All-time best: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
             {bestStreak === 1 ? 'day' : 'days'}
           </Text>
         </View>

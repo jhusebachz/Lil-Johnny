@@ -8,9 +8,10 @@ import {
 } from '../data/gymData';
 import {
   GOAL_WEIGHT_LB,
-  LifeTrackerData,
+  LoopRunEntry,
   TRACKER_BASELINE_DATE,
   WEIGHT_GOAL_TARGET_DATE,
+  WeightEntry,
   getDateRangePacePct,
   getScheduledGymPacePct,
   getUniqueWeekCount,
@@ -81,16 +82,18 @@ function getBestAtTopWeight(points: ExerciseProgressSummary[]) {
 
 type UseGymProgressMetricsArgs = {
   exerciseHistory: GymExerciseHistory;
-  lifeData: LifeTrackerData;
+  loopRuns: LoopRunEntry[];
   progressExerciseName: string;
   selectedDay: GymDay;
+  weightEntries: WeightEntry[];
 };
 
 export function useGymProgressMetrics({
   exerciseHistory,
-  lifeData,
+  loopRuns,
   progressExerciseName,
   selectedDay,
+  weightEntries,
 }: UseGymProgressMetricsArgs) {
   const progressMetrics = useMemo(() => {
     const rawProgressPoints = exerciseHistory[selectedDay][progressExerciseName] ?? [];
@@ -131,16 +134,16 @@ export function useGymProgressMetrics({
 
   const healthMetrics = useMemo(() => {
     const weeklyGymVisits = getUniqueWeekCount(getLoggedGymDateKeys(exerciseHistory));
-    const allWeights = [...lifeData.weightEntries].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+    const allWeights = [...weightEntries].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
     const latestWeight = allWeights.at(-1);
     const weightMin = allWeights.length > 0 ? Math.min(...allWeights.map((entry) => entry.weight)) : 0;
     const weightMax = allWeights.length > 0 ? Math.max(...allWeights.map((entry) => entry.weight)) : 1;
-    const recentLoopRuns = [...lifeData.loopRuns]
+    const recentLoopRuns = [...loopRuns]
       .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
       .slice(0, 10);
-    const bestLoopRun = lifeData.loopRuns.reduce(
+    const bestLoopRun = loopRuns.reduce(
       (best, run) => (!best || run.timeSeconds < best.timeSeconds ? run : best),
-      lifeData.loopRuns[0]
+      loopRuns[0]
     );
     const weeklyGymPct = clampPct((weeklyGymVisits / 3) * 100);
     const weeklyGymPacePct = getScheduledGymPacePct();
@@ -166,7 +169,7 @@ export function useGymProgressMetrics({
       weightMax,
       weightMin,
     };
-  }, [exerciseHistory, lifeData.loopRuns, lifeData.weightEntries]);
+  }, [exerciseHistory, loopRuns, weightEntries]);
 
   return {
     ...progressMetrics,

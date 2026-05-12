@@ -1,20 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
+import CertificationSummaryList from '../../components/cyber/CertificationSummaryList';
 import ProgressBar from '../../components/ProgressBar';
 import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
+import AppScreenShell from '../../components/ui/AppScreenShell';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import {
   ChapterPracticeScore,
   formatDateKey,
-  getDateRangePacePct,
   getTodayDateKey,
   StudyLogEntry,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useSelectedCertificationData } from '../../hooks/use-selected-certification-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 function parsePositiveNumber(value: string) {
@@ -32,7 +33,6 @@ export default function Cyber() {
   const { triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { lifeData, setLifeData } = useLifeTrackerData();
-  const [selectedCertId, setSelectedCertId] = useState(lifeData.certifications[0].id);
   const [draftChapters, setDraftChapters] = useState('');
   const [draftStudyNote, setDraftStudyNote] = useState('');
   const [draftScoreChapter, setDraftScoreChapter] = useState('');
@@ -40,42 +40,20 @@ export default function Cyber() {
   const [draftScoreNote, setDraftScoreNote] = useState('');
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const certifications = lifeData.certifications;
-
-  useEffect(() => {
-    setSelectedCertId((current) =>
-      certifications.some((cert) => cert.id === current) ? current : certifications[0].id
-    );
-  }, [certifications]);
-
-  const selectedCert = useMemo(
-    () => certifications.find((cert) => cert.id === selectedCertId) ?? certifications[0],
-    [certifications, selectedCertId]
-  );
-  const certLogs = useMemo(
-    () =>
-      lifeData.studyLogs
-        .filter((entry) => entry.certId === selectedCert.id)
-        .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
-        .slice(0, 8),
-    [lifeData.studyLogs, selectedCert.id]
-  );
-  const certScores = useMemo(
-    () =>
-      lifeData.chapterPracticeScores
-        .filter((entry) => entry.certId === selectedCert.id)
-        .sort((left, right) => {
-          if (right.chapterNumber !== left.chapterNumber) {
-            return right.chapterNumber - left.chapterNumber;
-          }
-          return right.dateKey.localeCompare(left.dateKey);
-        })
-        .slice(0, 12),
-    [lifeData.chapterPracticeScores, selectedCert.id]
-  );
-  const averageScore = useMemo(
-    () => (certScores.length > 0 ? certScores.reduce((total, entry) => total + entry.score, 0) / certScores.length : null),
-    [certScores]
-  );
+  const {
+    averageScore,
+    certLogs,
+    certScores,
+    progressPacePct,
+    progressPct,
+    selectedCert,
+    selectedCertId,
+    setSelectedCertId,
+  } = useSelectedCertificationData({
+    certifications,
+    chapterPracticeScores: lifeData.chapterPracticeScores,
+    studyLogs: lifeData.studyLogs,
+  });
 
   const addStudySession = async () => {
     const chapters = parsePositiveNumber(draftChapters);
@@ -142,19 +120,11 @@ export default function Cyber() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={triggerRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
-        }
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-      >
+    <AppScreenShell
+      colors={colors}
+      refreshing={refreshing}
+      onRefresh={triggerRefresh}
+      hero={
         <View
           style={{
             backgroundColor: colors.hero,
@@ -166,43 +136,10 @@ export default function Cyber() {
           }}
         >
           <Text style={{ color: colors.heroText, fontSize: 28, fontWeight: '800', marginBottom: 10 }}>Cyber</Text>
-          {lifeData.certifications.map((cert) => {
-            const selected = cert.id === selectedCertId;
-
-            return (
-              <View
-                key={`hero-cert-${cert.id}`}
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: selected ? colors.heroText : colors.heroSubtext,
-                    fontSize: 13,
-                    fontWeight: selected ? '800' : '700',
-                    flex: 1,
-                    paddingRight: 12,
-                  }}
-                >
-                  {cert.name}
-                </Text>
-                <Text
-                  style={{
-                    color: selected ? colors.heroText : colors.heroSubtext,
-                    fontSize: 13,
-                    fontWeight: selected ? '800' : '700',
-                  }}
-                >
-                  {cert.chaptersCompleted}/{cert.chapterCount} Chapters
-                </Text>
-              </View>
-            );
-          })}
+          <CertificationSummaryList certifications={certifications} colors={colors} selectedCertId={selectedCertId} />
         </View>
+      }
+    >
 
         <SectionCard title="Certifications" emoji={'🧠'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -237,51 +174,46 @@ export default function Cyber() {
         </SectionCard>
 
         <SectionCard title="Certification Progress" emoji={'🛡'} colors={colors}>
-          {(() => {
-            const pct =
-              selectedCert.chapterCount > 0 ? (selectedCert.chaptersCompleted / selectedCert.chapterCount) * 100 : 0;
-            const pacePct =
-              selectedCert.startDate && selectedCert.examDate
-                ? getDateRangePacePct(selectedCert.startDate, selectedCert.examDate)
-                : null;
-
-            return (
-              <View
-                style={{
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: colors.cardBorder,
-                  backgroundColor: colors.inputBackground,
-                  padding: 14,
-                }}
-              >
-                <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6, textAlign: 'center' }}>
-                  {selectedCert.name}
-                </Text>
-                <StatRow
-                  label="Chapters complete"
-                  value={`${selectedCert.chaptersCompleted} / ${selectedCert.chapterCount}`}
-                  colors={colors}
-                />
-                {selectedCert.studyGuide ? <StatRow label="Study guide" value={selectedCert.studyGuide} colors={colors} /> : null}
-                {selectedCert.startDate ? <StatRow label="Start target" value={selectedCert.startDate} colors={colors} /> : null}
-                {selectedCert.examDate ? <StatRow label="Exam target" value={selectedCert.examDate} colors={colors} /> : null}
-                <ProgressBar pct={pct} markerPct={pacePct ?? undefined} color={colors.accent} colors={colors} height={10} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {pct.toFixed(1)}%</Text>
-                  <Text style={{ fontSize: 11, color: colors.subtext }}>
-                    {pacePct !== null ? `Pace ${pacePct.toFixed(1)}%` : 'No pace line'}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700', textAlign: 'center' }}>
-                  Practice score average:{' '}
-                  <Text style={{ color: colors.subtext, fontWeight: '400' }}>
-                    {averageScore !== null ? `${averageScore.toFixed(1)}%` : 'No scores logged yet'}
-                  </Text>
-                </Text>
-              </View>
-            );
-          })()}
+          <View
+            style={{
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.cardBorder,
+              backgroundColor: colors.inputBackground,
+              padding: 14,
+            }}
+          >
+            <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6, textAlign: 'center' }}>
+              {selectedCert.name}
+            </Text>
+            <StatRow
+              label="Chapters complete"
+              value={`${selectedCert.chaptersCompleted} / ${selectedCert.chapterCount}`}
+              colors={colors}
+            />
+            {selectedCert.studyGuide ? <StatRow label="Study guide" value={selectedCert.studyGuide} colors={colors} /> : null}
+            {selectedCert.startDate ? <StatRow label="Start target" value={selectedCert.startDate} colors={colors} /> : null}
+            {selectedCert.examDate ? <StatRow label="Exam target" value={selectedCert.examDate} colors={colors} /> : null}
+            <ProgressBar
+              pct={progressPct}
+              markerPct={progressPacePct ?? undefined}
+              color={colors.accent}
+              colors={colors}
+              height={10}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>Actual {progressPct.toFixed(1)}%</Text>
+              <Text style={{ fontSize: 11, color: colors.subtext }}>
+                {progressPacePct !== null ? `Pace ${progressPacePct.toFixed(1)}%` : 'No pace line'}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, color: colors.text, fontWeight: '700', textAlign: 'center' }}>
+              Practice score average:{' '}
+              <Text style={{ color: colors.subtext, fontWeight: '400' }}>
+                {averageScore !== null ? `${averageScore.toFixed(1)}%` : 'No scores logged yet'}
+              </Text>
+            </Text>
+          </View>
         </SectionCard>
 
         <SectionCard title="Log Chapter Progress" emoji={'✍'} colors={colors}>
@@ -471,7 +403,6 @@ export default function Cyber() {
             </Text>
           )}
         </SectionCard>
-      </ScrollView>
-    </SafeAreaView>
+    </AppScreenShell>
   );
 }

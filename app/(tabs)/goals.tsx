@@ -14,6 +14,7 @@ import {
   getTodayDateKey,
 } from '../../data/lifeTrackerData';
 import { getThemeColors } from '../../data/theme';
+import { useRunescapeTracker } from '../../hooks/use-runescape-tracker';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 
 type HobbiesView = 'osrs' | 'diy';
@@ -168,6 +169,7 @@ export default function Goals() {
   const [draftDiyTitle, setDraftDiyTitle] = useState('');
   const [draftDiyNote, setDraftDiyNote] = useState('');
   const { refreshing, triggerRefresh } = useTimedRefresh();
+  const { tracker, trackerError, trackerLoading } = useRunescapeTracker(runescapeRefreshToken);
 
   const toggleDiyTask = async (taskId: string) => {
     await triggerHaptic();
@@ -259,7 +261,14 @@ export default function Goals() {
           />
         </SectionCard>
 
-        {selectedView === 'osrs' ? <RunescapeSection colors={colors} refreshToken={runescapeRefreshToken} /> : null}
+        {selectedView === 'osrs' ? (
+          <RunescapeSection
+            colors={colors}
+            tracker={tracker}
+            trackerError={trackerError}
+            trackerLoading={trackerLoading}
+          />
+        ) : null}
 
         {selectedView === 'diy' ? (
           <>

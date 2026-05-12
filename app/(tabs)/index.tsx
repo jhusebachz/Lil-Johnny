@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Animated, Image, Text, View, useWindowDimensions } from 'react-native';
 
 import SectionCard from '../../components/SectionCard';
+import AppScreenShell from '../../components/ui/AppScreenShell';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
 import { useGymData } from '../../context/GymDataContext';
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { getThemeColors } from '../../data/theme';
+import { useDashboardHeroAnimation } from '../../hooks/use-dashboard-hero-animation';
 import { OverviewItem, useDashboardMetrics } from '../../hooks/use-dashboard-metrics';
 import { useRunescapeTracker } from '../../hooks/use-runescape-tracker';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
@@ -99,72 +100,9 @@ export default function Dashboard() {
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const [trackerRefreshToken, setTrackerRefreshToken] = useState(0);
   const { tracker } = useRunescapeTracker(trackerRefreshToken);
-  const heroOpacity = useState(() => new Animated.Value(0))[0];
-  const heroLift = useState(() => new Animated.Value(18))[0];
-  const logoFloat = useState(() => new Animated.Value(0))[0];
-  const haloPulse = useState(() => new Animated.Value(0.94))[0];
+  const { haloPulse, heroLift, heroOpacity, logoFloat } = useDashboardHeroAnimation();
   const isCompact = width < 430;
   const isVeryCompact = width < 380;
-
-  useEffect(() => {
-    const reveal = Animated.parallel([
-      Animated.timing(heroOpacity, {
-        toValue: 1,
-        duration: 480,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(heroLift, {
-        toValue: 0,
-        duration: 480,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-
-    const floatLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoFloat, {
-          toValue: -8,
-          duration: 2600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoFloat, {
-          toValue: 0,
-          duration: 2600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(haloPulse, {
-          toValue: 1.04,
-          duration: 2400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(haloPulse, {
-          toValue: 0.94,
-          duration: 2400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    reveal.start();
-    floatLoop.start();
-    pulseLoop.start();
-
-    return () => {
-      floatLoop.stop();
-      pulseLoop.stop();
-    };
-  }, [haloPulse, heroLift, heroOpacity, logoFloat]);
   const {
     alcoholStreak,
     blissBreakdown,
@@ -177,29 +115,25 @@ export default function Dashboard() {
     suggestedActions,
     todayLabel,
   } = useDashboardMetrics({
+    certifications: lifeData.certifications,
+    diyTasks: lifeData.diyTasks,
     exerciseHistory,
-    lifeData,
+    goals2026: lifeData.goals2026,
+    loopRuns: lifeData.loopRuns,
     profileName: preferences.profileName,
     tracker,
+    weightEntries: lifeData.weightEntries,
   });
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              triggerRefresh();
-              setTrackerRefreshToken((current) => current + 1);
-            }}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-            progressBackgroundColor={colors.card}
-          />
-        }
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-      >
+    <AppScreenShell
+      colors={colors}
+      refreshing={refreshing}
+      onRefresh={() => {
+        triggerRefresh();
+        setTrackerRefreshToken((current) => current + 1);
+      }}
+      hero={
         <Animated.View
           style={{
             backgroundColor: colors.hero,
@@ -302,6 +236,8 @@ export default function Dashboard() {
             </Animated.View>
           </View>
         </Animated.View>
+      }
+    >
 
         <SectionCard title="Bliss Score" emoji={'\u2728'} colors={colors}>
           <Text
@@ -402,7 +338,6 @@ export default function Dashboard() {
             </View>
           ))}
         </SectionCard>
-      </ScrollView>
-    </SafeAreaView>
+    </AppScreenShell>
   );
 }

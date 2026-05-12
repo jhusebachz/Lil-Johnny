@@ -1,13 +1,22 @@
 import { useMemo } from 'react';
 
+import {
+  DIY_RECENT_WINDOW_DAYS,
+  getHobbiesBlissScore,
+  hasRecentCompletedDiyTask,
+} from '../data/dashboardBlissMath';
 import { GymExerciseHistory, getLoggedGymDateKeys } from '../data/gymData';
 import {
   AvoidanceGoal,
+  CertificationTracker,
+  DiyTask,
   GOAL_WEIGHT_LB,
-  LifeTrackerData,
+  LoopRunEntry,
   TRACKER_BASELINE_DATE,
   WEIGHT_GOAL_TARGET_DATE,
+  WeightEntry,
   formatLongDate,
+  getAvoidanceConsistencySummary,
   getAvoidanceStreak,
   getCurrentWeekDateKeys,
   getDateRangePacePct,
@@ -48,17 +57,25 @@ export type OverviewItem = {
 };
 
 type UseDashboardMetricsArgs = {
+  certifications: CertificationTracker[];
+  diyTasks: DiyTask[];
   exerciseHistory: GymExerciseHistory;
-  lifeData: LifeTrackerData;
+  goals2026: AvoidanceGoal[];
+  loopRuns: LoopRunEntry[];
   profileName?: string;
   tracker: LiveRunescapeTracker;
+  weightEntries: WeightEntry[];
 };
 
 export function useDashboardMetrics({
+  certifications,
+  diyTasks,
   exerciseHistory,
-  lifeData,
+  goals2026,
+  loopRuns,
   profileName,
   tracker,
+  weightEntries,
 }: UseDashboardMetricsArgs) {
   const todayDateKey = getTodayDateKey();
   const now = useMemo(() => new Date(`${todayDateKey}T12:00:00`), [todayDateKey]);
@@ -66,42 +83,44 @@ export function useDashboardMetrics({
   const greeting = `${getGreetingForTime(now)}, ${profileName || 'John'}!`;
   const sortedCertifications = useMemo(
     () =>
-      [...lifeData.certifications].sort(
+      [...certifications].sort(
         (left, right) =>
           left.chaptersCompleted / Math.max(left.chapterCount, 1) - right.chaptersCompleted / Math.max(right.chapterCount, 1)
       ),
-    [lifeData.certifications]
+    [certifications]
   );
   const lowestCert = sortedCertifications[0];
   const currentCert = useMemo(
     () =>
-      lifeData.certifications.find(
+      certifications.find(
         (cert) =>
           cert.startDate &&
           cert.examDate &&
           now >= new Date(`${cert.startDate}${CERT_WINDOW_START_TIME}`) &&
           now <= new Date(`${cert.examDate}${CERT_WINDOW_END_TIME}`)
       ) ??
-      lifeData.certifications.find((cert) => cert.startDate && now < new Date(`${cert.startDate}${CERT_WINDOW_START_TIME}`)) ??
-      lifeData.certifications[lifeData.certifications.length - 1],
-    [lifeData.certifications, now]
+      certifications.find((cert) => cert.startDate && now < new Date(`${cert.startDate}${CERT_WINDOW_START_TIME}`)) ??
+      certifications[certifications.length - 1],
+    [certifications, now]
   );
   const sortedWeightEntries = useMemo(
-    () => [...lifeData.weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey)),
-    [lifeData.weightEntries]
+    () => [...weightEntries].sort((left, right) => right.dateKey.localeCompare(left.dateKey)),
+    [weightEntries]
   );
   const latestWeight = sortedWeightEntries[0];
-  const avoidanceGoals = useMemo(
-    () => lifeData.goals2026.filter((goal): goal is AvoidanceGoal => goal.type === 'avoidance'),
-    [lifeData.goals2026]
-  );
-  const hobbiesOpenTasks = useMemo(() => lifeData.diyTasks.filter((task) => !task.completed), [lifeData.diyTasks]);
+  const avoidanceGoals = useMemo(() => goals2026.filter((goal) => goal.type === 'avoidance'), [goals2026]);
+  const hobbiesOpenTasks = useMemo(() => diyTasks.filter((task) => !task.completed), [diyTasks]);
   const alcoholGoal = avoidanceGoals.find((goal) => goal.id === 'alcohol');
   const stretchingGoal = avoidanceGoals.find((goal) => goal.id === 'stretching');
   const snacksGoal = avoidanceGoals.find((goal) => goal.id === 'snacks-sweets');
   const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal, now) : 0;
   const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal, now) : 0;
   const snacksStreak = snacksGoal ? getAvoidanceStreak(snacksGoal, now) : 0;
+  const streaksScore =
+    avoidanceGoals.length > 0
+      ? avoidanceGoals.reduce((total, goal) => total + getAvoidanceConsistencySummary(goal, now).multiplier, 0) /
+        avoidanceGoals.length
+      : 1;
   const currentDay = now.getDay();
   const currentCertPct = currentCert
     ? Math.round((currentCert.chaptersCompleted / Math.max(currentCert.chapterCount, 1)) * 100)
@@ -124,11 +143,11 @@ export function useDashboardMetrics({
   const weeklyGymPacePct = getScheduledGymPacePct(now);
   const weeklyGymActualPct = clamp01(gymVisitCount / 3) * 100;
   const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;
-  const loopRunLoggedThisWeek = lifeData.loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
+  const loopRunLoggedThisWeek = loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
   const cyberOnPace = currentCertPacePct !== null ? currentCertPct >= currentCertPacePct : false;
-  const base90OnPace = tracker.goalProjections.base90.progressPct >= tracker.goalProjections.base90.pacePct;
+  const baseGoalOnPace = tracker.goalProjections.baseGoal.progressPct >= tracker.goalProjections.baseGoal.pacePct;
   const runefestOnPace = tracker.goalProjections.runefest.progressPct >= tracker.goalProjections.runefest.pacePct;
-  const hobbiesScore = [base90OnPace ? 1 : 0, runefestOnPace ? 1 : 0].reduce((total, value) => total + value, 0) / 2;
+  const diyRecentlyActive = hasRecentCompletedDiyTask(diyTasks, now, DIY_RECENT_WINDOW_DAYS);
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissTrend = useMemo(() => {
     const weightedScores = Array.from({ length: BLISS_TREND_WEEKS }, (_, index) => {
@@ -140,7 +159,7 @@ export function useDashboardMetrics({
       const referenceGymPacePct = getScheduledGymPacePct(referenceDate);
       const referenceGymActualPct = clamp01(referenceGymVisitCount / 3) * 100;
       const referenceGymOnPace = referenceGymVisitCount >= 3 || referenceGymActualPct >= referenceGymPacePct;
-      const referenceLoopRunLogged = lifeData.loopRuns.some((run) => referenceWeekKeys.has(run.dateKey));
+      const referenceLoopRunLogged = loopRuns.some((run) => referenceWeekKeys.has(run.dateKey));
       const referenceWeekEndDateKey = getReferenceWeekEndDateKey(referenceDate);
       const referenceWeightEntry = sortedWeightEntries.find((entry) => entry.dateKey <= referenceWeekEndDateKey);
       const referenceWeightLossActualPct = referenceWeightEntry ? getWeightLossProgressPct(referenceWeightEntry.weight) : 0;
@@ -151,19 +170,20 @@ export function useDashboardMetrics({
         referenceLoopRunLogged ? 1 : 0,
         referenceWeightLossOnPace ? 1 : 0,
       ].reduce((total, value) => total + value, 0) / 3;
-      const referenceStreaksScore =
-        avoidanceGoals.length > 0
-          ? avoidanceGoals.reduce((total, goal) => total + clamp01(getAvoidanceStreak(goal, referenceDate) / 30), 0) /
-            avoidanceGoals.length
-          : 1;
-      const referenceBlissScore = cyberScore * 0.3 + referenceHealthScore * 0.4 + referenceStreaksScore * 0.25 + hobbiesScore * 0.05;
+      const referenceHobbiesScore = getHobbiesBlissScore({
+        baseGoalOnPace,
+        diyTasks,
+        referenceDate,
+        runefestOnPace,
+      });
+      const referenceBlissScore = cyberScore * 0.3 + referenceHealthScore * 0.4 + streaksScore * 0.25 + referenceHobbiesScore * 0.05;
 
       return {
         weight,
         cyber: cyberScore,
         health: referenceHealthScore,
-        hobbies: hobbiesScore,
-        streaks: referenceStreaksScore,
+        hobbies: referenceHobbiesScore,
+        streaks: streaksScore,
         total: referenceBlissScore,
       };
     });
@@ -178,7 +198,7 @@ export function useDashboardMetrics({
       hobbies: weightedAverage('hobbies'),
       streaks: weightedAverage('streaks'),
     };
-  }, [avoidanceGoals, cyberScore, hobbiesScore, lifeData.loopRuns, loggedGymDateKeys, now, sortedWeightEntries]);
+  }, [baseGoalOnPace, cyberScore, diyTasks, loggedGymDateKeys, loopRuns, now, runefestOnPace, sortedWeightEntries, streaksScore]);
   const blissScore = Math.round(blissTrend.total * 100);
   const blissBreakdown = [
     `Cyber: ${Math.round(blissTrend.cyber * 100)}`,
@@ -218,12 +238,12 @@ export function useDashboardMetrics({
   ];
   const hobbiesOverviewItems: OverviewItem[] = [
     {
-      label: 'Base 90 by May 22',
+      label: 'Base 92s (RC 90) by RuneFest',
       showCheck: false,
     },
     {
       label: 'On Pace',
-      complete: base90OnPace,
+      complete: baseGoalOnPace,
     },
     {
       label: '2250 Total Level by RuneFest',
@@ -232,6 +252,14 @@ export function useDashboardMetrics({
     {
       label: 'On Pace',
       complete: runefestOnPace,
+    },
+    {
+      label: 'DIY completed in last 4 weeks',
+      showCheck: false,
+    },
+    {
+      label: 'On Pace',
+      complete: diyRecentlyActive,
     },
   ];
   const suggestedActions = useMemo(() => {
@@ -260,10 +288,10 @@ export function useDashboardMetrics({
       });
     }
 
-    if (!base90OnPace) {
+    if (!baseGoalOnPace) {
       candidates.push({
-        label: 'OSRS base 90 is behind pace. Give the highest-pressure skill some time soon.',
-        urgency: tracker.goalProjections.base90.progressPct + 8 < tracker.goalProjections.base90.pacePct ? 0.88 : 0.74,
+        label: 'OSRS base 92s are behind pace. Give the highest-pressure RuneFest skill some focused time soon.',
+        urgency: tracker.goalProjections.baseGoal.progressPct + 8 < tracker.goalProjections.baseGoal.pacePct ? 0.88 : 0.74,
       });
     }
 
@@ -278,6 +306,12 @@ export function useDashboardMetrics({
       candidates.push({
         label: `Knock out one DIY task: ${hobbiesOpenTasks[0].title}. Keeping the house list moving will lower background drag.`,
         urgency: 0.58,
+      });
+    }
+    if (!diyRecentlyActive) {
+      candidates.push({
+        label: 'Finish one DIY task soon so the hobbies score reflects real movement outside OSRS.',
+        urgency: 0.62,
       });
     }
 
@@ -297,17 +331,18 @@ export function useDashboardMetrics({
 
     return candidates.sort((left, right) => right.urgency - left.urgency).slice(0, 3);
   }, [
-    base90OnPace,
+    baseGoalOnPace,
     currentCertHasActiveWindow,
     currentDay,
+    diyRecentlyActive,
     gymVisitCount,
     hobbiesOpenTasks,
     latestWeight,
     loopRunLoggedThisWeek,
     lowestCert,
     runefestOnPace,
-    tracker.goalProjections.base90.pacePct,
-    tracker.goalProjections.base90.progressPct,
+    tracker.goalProjections.baseGoal.pacePct,
+    tracker.goalProjections.baseGoal.progressPct,
     tracker.goalProjections.runefest.pacePct,
     tracker.goalProjections.runefest.progressPct,
   ]);

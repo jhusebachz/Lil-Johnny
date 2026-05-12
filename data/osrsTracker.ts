@@ -13,6 +13,8 @@ const TRACKER_TIME_ZONE = 'America/New_York';
 const SNAPSHOT_HOUR = 8;
 const SNAPSHOT_MINUTE = 45;
 const GOAL_PROGRESS_START = '2026-03-25';
+const GOAL_ONE_DEADLINE = '2026-10-03';
+const GOAL_ONE_LABEL = 'Base 92s (Runecrafting 90)';
 const FRIEND_ORDER = ['gwahpy', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
 
 const SKILL_ORDER = [
@@ -101,6 +103,7 @@ export type TrackerFriendSummary = {
 export type TrackerGoal = {
   skill: string;
   level: number;
+  targetLevel?: number;
   pct: number;
   remainingXp: number;
   xpPerHour?: number;
@@ -114,7 +117,7 @@ export type LiveRunescapeTracker = {
   totalLevel: number;
   topSkills: TrackerSummaryItem[];
   friends: TrackerFriendSummary[];
-  base90Remaining: TrackerGoal[];
+  baseGoalRemaining: TrackerGoal[];
   maxClosest: TrackerGoal[];
   maxedSkills: string[];
   hoursToNextLevel: {
@@ -132,7 +135,7 @@ export type LiveRunescapeTracker = {
     remainingXp: number;
   }[];
   goalProjections: {
-    base90: GoalProjection;
+    baseGoal: GoalProjection;
     runefest: GoalProjection;
     maxCape: GoalProjection;
   };
@@ -216,6 +219,10 @@ function percentToTarget(experience: number, targetLevel: number) {
   const progressed = Math.max(experience, 0);
 
   return Math.max(0, Math.min(100, (progressed / Math.max(targetXp, 1)) * 100));
+}
+
+function getGoalOneTargetLevel(skill: SkillName) {
+  return skill === 'runecraft' ? 90 : 92;
 }
 
 function daysUntil(targetDate: string, now = new Date()) {
@@ -415,7 +422,7 @@ function applyPassiveCombatXp(
 function buildTargetProgress(
   baselineSkills: Record<SkillName | 'overall', Pick<OsrsSkillStat, 'level' | 'experience'>>,
   currentPlayer: OsrsPlayerStats,
-  targetType: 'base90' | 'runefest' | 'maxCape'
+  targetType: 'baseGoal' | 'runefest' | 'maxCape'
 ) {
   if (targetType === 'runefest') {
     const baselineLevelsNeeded = Math.max(2250 - baselineSkills.overall.level, 0);
@@ -443,11 +450,11 @@ function buildTargetProgress(
     return clampPct(totalNeededXp > 0 ? ((totalNeededXp - remainingXp) / totalNeededXp) * 100 : 100);
   }
 
-  const targetLevel = targetType === 'base90' ? 90 : 99;
   let totalNeededXp = 0;
   let remainingXp = 0;
 
   SKILL_ORDER.forEach((skill) => {
+    const targetLevel = targetType === 'baseGoal' ? getGoalOneTargetLevel(skill) : 99;
     const baseline = baselineSkills[skill];
     if (baseline.level >= targetLevel) {
       return;
@@ -522,14 +529,14 @@ function fallbackTracker(): LiveRunescapeTracker {
     totalLevel: 0,
     topSkills: [],
     friends: [],
-    base90Remaining: [],
+    baseGoalRemaining: [],
     maxClosest: [],
     maxedSkills: [],
     hoursToNextLevel: [],
     milestoneAlerts: [],
     goalProjections: {
-      base90: {
-        label: 'Base 90',
+      baseGoal: {
+        label: GOAL_ONE_LABEL,
         daysLeft: 0,
         hoursLeft: null,
         hoursPerDay: null,
@@ -676,19 +683,25 @@ export function buildLiveRunescapeTracker(
       return safeLeftIndex - safeRightIndex;
     });
 
-  const base90Remaining = [...skills]
-    .filter((skill) => skill.level < 90)
-    .sort((left, right) => xpForLevel(90) - left.experience - (xpForLevel(90) - right.experience))
-    .slice(0, 5)
+  const baseGoalRemaining = [...skills]
+    .filter((skill) => skill.level < getGoalOneTargetLevel(skill.skill))
+    .sort(
+      (left, right) =>
+        xpForLevel(getGoalOneTargetLevel(left.skill)) -
+        left.experience -
+        (xpForLevel(getGoalOneTargetLevel(right.skill)) - right.experience)
+    )
     .map((skill) => ({
       skill: formatSkillName(skill.skill),
       level: skill.level,
-      pct: percentToTarget(skill.experience, 90),
-      remainingXp: Math.max(xpForLevel(90) - skill.experience, 0),
+      targetLevel: getGoalOneTargetLevel(skill.skill),
+      pct: percentToTarget(skill.experience, getGoalOneTargetLevel(skill.skill)),
+      remainingXp: Math.max(xpForLevel(getGoalOneTargetLevel(skill.skill)) - skill.experience, 0),
       xpPerHour: GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0,
       hoursLeft:
         (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
-          ? Math.max(xpForLevel(90) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
+          ? Math.max(xpForLevel(getGoalOneTargetLevel(skill.skill)) - skill.experience, 0) /
+            (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
           : null,
     }));
 
@@ -708,10 +721,7 @@ export function buildLiveRunescapeTracker(
     }));
   const maxClosest = maxRemainingAll.slice(0, 5);
 
-  const maxedSkills = skills
-    .filter((skill) => skill.level >= 99)
-    .map((skill) => formatSkillName(skill.skill))
-    .slice(0, 8);
+  const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatSkillName(skill.skill));
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - player.overall.level, 0);
 
@@ -780,8 +790,8 @@ export function buildLiveRunescapeTracker(
     .sort((left, right) => left.remainingXp - right.remainingXp)
     .slice(0, 5);
 
-  const base90Hours = base90Remaining.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
-  const base90Unestimated = base90Remaining
+  const baseGoalHours = baseGoalRemaining.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
+  const baseGoalUnestimated = baseGoalRemaining
     .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
     .map((item) => item.skill);
   const maxHours = maxRemainingAll.reduce((total, item) => total + (item.hoursLeft ?? 0), 0);
@@ -790,7 +800,7 @@ export function buildLiveRunescapeTracker(
     .map((item) => item.skill);
   const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
   const runefestProjectionPlan = buildRuneFestProjection(skills, totalLevelsNeeded);
-  const base90ProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'base90');
+  const baseGoalProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'baseGoal');
   const runefestProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'runefest');
   const maxCapeProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'maxCape');
   const runefestProjection = buildGoalProjection(
@@ -802,13 +812,13 @@ export function buildLiveRunescapeTracker(
     getPacePct('2026-10-03')
   );
   const goalProjections = {
-    base90: buildGoalProjection(
-      'Base 90',
-      daysUntil('2026-05-22'),
-      base90Hours,
-      base90Unestimated,
-      base90ProgressPct,
-      getPacePct('2026-05-22')
+    baseGoal: buildGoalProjection(
+      GOAL_ONE_LABEL,
+      daysUntil(GOAL_ONE_DEADLINE),
+      baseGoalHours,
+      baseGoalUnestimated,
+      baseGoalProgressPct,
+      getPacePct(GOAL_ONE_DEADLINE)
     ),
     runefest: runefestProjection,
     maxCape: buildGoalProjection(
@@ -821,7 +831,7 @@ export function buildLiveRunescapeTracker(
     ),
   };
   const coachingParts = [
-    `${goalProjections.base90.label} ${describeGoalStatus(goalProjections.base90.status)}${goalProjections.base90.hoursPerDay !== null ? ` at ${goalProjections.base90.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
+    `${goalProjections.baseGoal.label} ${describeGoalStatus(goalProjections.baseGoal.status)}${goalProjections.baseGoal.hoursPerDay !== null ? ` at ${goalProjections.baseGoal.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
     `${goalProjections.runefest.label} ${describeGoalStatus(goalProjections.runefest.status)}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
     `${goalProjections.maxCape.label} ${describeGoalStatus(goalProjections.maxCape.status)}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
   ];
@@ -835,7 +845,7 @@ export function buildLiveRunescapeTracker(
     totalLevel: player.overall.level,
     topSkills,
     friends,
-    base90Remaining,
+    baseGoalRemaining,
     maxClosest,
     maxedSkills,
     hoursToNextLevel,

@@ -1,5 +1,14 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
+import {
+  appendAvoidanceFailureDate,
+  getAvoidanceBestStreak,
+  getAvoidanceConsistencySummary,
+  getAvoidanceStreak,
+  getAvoidanceStreakBeforeFailure,
+  getTodayDateKey as getLocalTodayDateKey,
+  normalizeAvoidanceFailureDates,
+} from './avoidanceGoalMath';
 
 export type CertificationTracker = {
   id: string;
@@ -37,6 +46,7 @@ export type AvoidanceGoal = {
   startedAt: string;
   lastFailureDate?: string | null;
   bestStreakDays?: number;
+  failureDates?: string[];
 };
 
 type LegacyDailyCheckGoal = {
@@ -94,6 +104,7 @@ export const GOAL_WEIGHT_LB = 185;
 export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
 export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
+const SNACKS_SWEETS_START_DATE = getLocalTodayDateKey();
 const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
 const RESET_SNACKS_SWEETS_MIGRATION = 'reset-snacks-sweets-initial-state-v1';
 
@@ -137,12 +148,12 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   studyLogs: [],
   chapterPracticeScores: [],
   goals2026: [
-    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
-    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
-    { id: 'snacks-sweets', title: 'No snacks or sweets', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
-    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
-    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
-    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0 },
+    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'snacks-sweets', title: 'No snacks or sweets', type: 'avoidance', startedAt: SNACKS_SWEETS_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
   ],
   weightEntries: [
     {
@@ -169,7 +180,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
 };
 
 export function getTodayDateKey(date = new Date()) {
-  return toLocalDateKey(date);
+  return getLocalTodayDateKey(date);
 }
 
 export function getRelativeDateKey(offsetDays: number, date = new Date()) {
@@ -228,24 +239,7 @@ function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-export function getAvoidanceStreak(goal: AvoidanceGoal, now = new Date()) {
-  const anchor = goal.lastFailureDate ? new Date(`${goal.lastFailureDate}T12:00:00`) : new Date(`${goal.startedAt}T12:00:00`);
-  const today = new Date(`${getTodayDateKey(now)}T12:00:00`);
-  const diffDays = Math.max(Math.round((today.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
-  return goal.lastFailureDate ? Math.max(diffDays - 1, 0) : diffDays;
-}
-
-export function getAvoidanceStreakBeforeFailure(goal: AvoidanceGoal, failureDate: string) {
-  const anchorDateKey = goal.lastFailureDate ?? goal.startedAt;
-  const anchor = new Date(`${anchorDateKey}T12:00:00`);
-  const failure = new Date(`${failureDate}T12:00:00`);
-  const diffDays = Math.max(Math.round((failure.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)), 0);
-  return goal.lastFailureDate ? Math.max(diffDays - 1, 0) : diffDays;
-}
-
-export function getAvoidanceBestStreak(goal: AvoidanceGoal, now = new Date()) {
-  return Math.max(goal.bestStreakDays ?? 0, getAvoidanceStreak(goal, now));
-}
+export { appendAvoidanceFailureDate, getAvoidanceBestStreak, getAvoidanceConsistencySummary, getAvoidanceStreak, getAvoidanceStreakBeforeFailure };
 
 export function getCurrentWeekDateKeys(now = new Date()) {
   const current = new Date(now);
@@ -366,6 +360,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           startedAt: todayDateKey,
           lastFailureDate: null,
           bestStreakDays: 0,
+          failureDates: [],
         };
       }
 
@@ -380,6 +375,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         startedAt: AVOIDANCE_STREAK_START_DATE,
         lastFailureDate: null,
         bestStreakDays: 0,
+        failureDates: [],
       };
     }
 
@@ -390,6 +386,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           startedAt: todayDateKey,
           lastFailureDate: null,
           bestStreakDays: 0,
+          failureDates: [],
         };
       }
 
@@ -415,6 +412,12 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
           bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, normalizedCurrentStreak),
+          failureDates: normalizeAvoidanceFailureDates({
+            ...fallback,
+            ...persistedGoal,
+            startedAt: normalizedStartedAt,
+            lastFailureDate: persistedGoal.lastFailureDate ?? null,
+          }),
         };
       }
 

@@ -20,6 +20,8 @@ import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '..
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
+  appendAvoidanceFailureDate,
+  getAvoidanceConsistencySummary,
   getAvoidanceBestStreak,
   getAvoidanceStreakBeforeFailure,
   YearGoal,
@@ -98,6 +100,7 @@ export default function Reminders() {
         .filter((goal) => goal.type === 'avoidance')
         .map((goal) => ({
           goal,
+          consistency: getAvoidanceConsistencySummary(goal),
           streak: getAvoidanceStreak(goal),
           bestStreak: getAvoidanceBestStreak(goal),
         })),
@@ -163,13 +166,19 @@ export default function Reminders() {
           {selectedView === 'streaks' ? (
             <>
               <SectionCard title="Streaks" emoji={'🔥'} colors={colors}>
-                {avoidanceGoals.map(({ goal, streak, bestStreak }) => (
+                {avoidanceGoals.map(({ goal, consistency, streak, bestStreak }) => (
                   <StreakGoalCard
                     key={goal.id}
                     goal={goal}
                     colors={colors}
                     streak={streak}
                     bestStreak={bestStreak}
+                    consistencyLabel={consistency.label}
+                    consistencyPct={Math.round(consistency.consistencyRate * 100)}
+                    goodDays={consistency.goodDays}
+                    trackedDays={consistency.trackedDays}
+                    windowDays={consistency.windowDays}
+                    blissImpactText={consistency.blissPenaltyPct === 0 ? 'No penalty' : `-${consistency.blissPenaltyPct}%`}
                     onMarkFailureYesterday={async () => {
                       const failureDate = getRelativeDateKey(-1);
 
@@ -183,6 +192,7 @@ export default function Reminders() {
                                 getAvoidanceStreakBeforeFailure(currentGoal, failureDate)
                               ),
                         lastFailureDate: failureDate,
+                        failureDates: appendAvoidanceFailureDate(currentGoal, failureDate),
                       }));
                     }}
                     onMarkFailureToday={async () => {
@@ -190,6 +200,7 @@ export default function Reminders() {
                         ...currentGoal,
                         bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),
                         lastFailureDate: getTodayDateKey(),
+                        failureDates: appendAvoidanceFailureDate(currentGoal, getTodayDateKey()),
                       }));
                     }}
                   />
