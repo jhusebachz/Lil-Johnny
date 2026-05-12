@@ -109,19 +109,19 @@ export function getAvoidanceConsistencySummary(
   windowDays = AVOIDANCE_CONSISTENCY_WINDOW_DAYS
 ): AvoidanceConsistencySummary {
   const todayDateKey = getTodayDateKey(now);
-  const startWindowDateKey = getDateKeyDaysAgo(windowDays - 1, now);
-  const trackedDays = Math.max(Math.min(getDaysBetween(todayDateKey, goal.startedAt) + 1, windowDays), 1);
+  const startWindowDateKey = getDateKeyDaysAgo(windowDays, now);
+  const trackedDays = Math.max(Math.min(getDaysBetween(todayDateKey, goal.startedAt), windowDays), 0);
   const actualWindowStartDateKey =
     getDaysBetween(goal.startedAt, startWindowDateKey) > 0 ? goal.startedAt : startWindowDateKey;
   const failureDates = normalizeAvoidanceFailureDates(goal).filter(
-    (dateKey) => dateKey >= actualWindowStartDateKey && dateKey <= todayDateKey
+    (dateKey) => dateKey >= actualWindowStartDateKey && dateKey < todayDateKey
   );
   const badDays = new Set(failureDates).size;
   const actualGoodDays = Math.max(trackedDays - badDays, 0);
-  const goodDays =
-    trackedDays >= windowDays ? actualGoodDays : Math.round((actualGoodDays / trackedDays) * windowDays);
-  const consistencyRate = goodDays / windowDays;
-  const multiplier = getConsistencyMultiplier(goodDays);
+  const projectedGoodDays = trackedDays > 0 ? Math.round((actualGoodDays / trackedDays) * windowDays) : windowDays;
+  const consistencyRate = trackedDays > 0 ? actualGoodDays / trackedDays : 1;
+  const multiplier = getConsistencyMultiplier(projectedGoodDays);
+  const label = trackedDays === 0 ? 'Fresh Start' : getConsistencyLabel(projectedGoodDays);
 
   return {
     actualGoodDays,
@@ -129,8 +129,8 @@ export function getAvoidanceConsistencySummary(
     blissPenaltyPct: Math.round((1 - multiplier) * 100),
     consistencyRate,
     currentStreak: getAvoidanceStreak(goal, now),
-    goodDays,
-    label: getConsistencyLabel(goodDays),
+    goodDays: actualGoodDays,
+    label,
     longestStreak: getAvoidanceBestStreak(goal, now),
     multiplier,
     trackedDays,

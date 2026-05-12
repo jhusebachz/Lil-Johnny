@@ -57,7 +57,10 @@ export default function StreakGoalCard({
             Good Days: <Text style={{ fontWeight: '800' }}>{goodDays}</Text> / {windowDays}
           </Text>
           <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 2 }}>
-            Consistency: <Text style={{ color: colors.text, fontWeight: '800' }}>{consistencyPct}%</Text>
+            Consistency:{' '}
+            <Text style={{ color: colors.text, fontWeight: '800' }}>
+              {trackedDays === 0 ? 'Starting now' : `${consistencyPct}%`}
+            </Text>
           </Text>
           <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 2 }}>
             Status: <Text style={{ color: colors.text, fontWeight: '800' }}>{consistencyLabel}</Text>
@@ -70,7 +73,7 @@ export default function StreakGoalCard({
           </Text>
           <Text style={{ fontSize: 13, color: colors.subtext, marginTop: 4 }}>
             Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
-            {streak === 1 ? 'day' : 'days'} | All-time best: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
+            {streak === 1 ? 'day' : 'days'} | All-time high: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
             {bestStreak === 1 ? 'day' : 'days'}
           </Text>
         </View>

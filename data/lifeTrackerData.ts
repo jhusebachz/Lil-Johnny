@@ -104,9 +104,10 @@ export const GOAL_WEIGHT_LB = 185;
 export const STARTING_WEIGHT_LB = 205;
 export const WEIGHT_GOAL_TARGET_DATE = '2026-12-31';
 export const WEEKLY_GYM_TARGET_DAYS = [3, 4, 5] as const;
-const SNACKS_SWEETS_START_DATE = getLocalTodayDateKey();
+const DEFAULT_AVOIDANCE_START_DATE = getLocalTodayDateKey();
 const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
 const RESET_SNACKS_SWEETS_MIGRATION = 'reset-snacks-sweets-initial-state-v1';
+const RESET_ALL_AVOIDANCE_GOALS_MIGRATION = 'restart-all-avoidance-goals-v1';
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -148,12 +149,12 @@ export const defaultLifeTrackerData: LifeTrackerData = {
   studyLogs: [],
   chapterPracticeScores: [],
   goals2026: [
-    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
-    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
-    { id: 'snacks-sweets', title: 'No snacks or sweets', type: 'avoidance', startedAt: SNACKS_SWEETS_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
-    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
-    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
-    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: AVOIDANCE_STREAK_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'alcohol', title: 'No alcohol', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'stretching', title: 'Stretching daily', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'snacks-sweets', title: 'No snacks or sweets', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'fast-food', title: 'No fast food', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'coffee', title: 'No coffees purchased', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
+    { id: 'soda', title: 'Only one Zero Sugar soda', type: 'avoidance', startedAt: DEFAULT_AVOIDANCE_START_DATE, lastFailureDate: null, bestStreakDays: 0, failureDates: [] },
   ],
   weightEntries: [
     {
@@ -342,6 +343,16 @@ export function mergeLifeTrackerData(data?: Partial<LifeTrackerData> | null): Li
   return normalizeLifeTrackerData(data ?? {});
 }
 
+function createResetAvoidanceGoal(goal: AvoidanceGoal, startedAt: string): AvoidanceGoal {
+  return {
+    ...goal,
+    startedAt,
+    lastFailureDate: null,
+    bestStreakDays: 0,
+    failureDates: [],
+  };
+}
+
 function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerData {
   const persistedCertifications = new Map(
     (data.certifications ?? []).map((cert) => [cert.id === 'pnpt' ? 'cloud-plus' : cert.id, cert])
@@ -349,45 +360,38 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const persistedGoals2026 = (data.goals2026 ?? []) as Array<AvoidanceGoal | LegacyDailyCheckGoal>;
   const todayDateKey = getTodayDateKey();
   const appliedMigrations = new Set(data.metadata?.appliedMigrations ?? []);
+  const shouldApplyFullAvoidanceReset = !appliedMigrations.has(RESET_ALL_AVOIDANCE_GOALS_MIGRATION);
   const shouldApplySnacksReset = !appliedMigrations.has(RESET_SNACKS_SWEETS_MIGRATION);
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
+    if (fallback.type === 'avoidance' && shouldApplyFullAvoidanceReset) {
+      return createResetAvoidanceGoal(fallback, todayDateKey);
+    }
+
     const persistedGoal = persistedGoals2026.find((goal) => goal.id === fallback.id);
 
     if (!persistedGoal) {
       if (NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id)) {
-        return {
-          ...fallback,
-          startedAt: todayDateKey,
-          lastFailureDate: null,
-          bestStreakDays: 0,
-          failureDates: [],
-        };
+        return createResetAvoidanceGoal(fallback, todayDateKey);
       }
 
       return fallback;
     }
 
     if ((fallback.id === 'stretching' || fallback.id === 'soda') && persistedGoal.type === 'daily-check') {
-      return {
+      return createResetAvoidanceGoal({
         id: fallback.id,
         title: fallback.title,
         type: 'avoidance' as const,
-        startedAt: AVOIDANCE_STREAK_START_DATE,
+        startedAt: DEFAULT_AVOIDANCE_START_DATE,
         lastFailureDate: null,
         bestStreakDays: 0,
         failureDates: [],
-      };
+      }, todayDateKey);
     }
 
     if (fallback.type === 'avoidance') {
       if (shouldApplySnacksReset && NEWLY_ADDED_AVOIDANCE_GOAL_IDS.has(fallback.id)) {
-        return {
-          ...fallback,
-          startedAt: todayDateKey,
-          lastFailureDate: null,
-          bestStreakDays: 0,
-          failureDates: [],
-        };
+        return createResetAvoidanceGoal(fallback, todayDateKey);
       }
 
       if (persistedGoal.type === 'avoidance') {
@@ -429,6 +433,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const normalizedAppliedMigrations = shouldApplySnacksReset
     ? [...appliedMigrations, RESET_SNACKS_SWEETS_MIGRATION]
     : [...appliedMigrations];
+  const finalAppliedMigrations = shouldApplyFullAvoidanceReset
+    ? [...normalizedAppliedMigrations, RESET_ALL_AVOIDANCE_GOALS_MIGRATION]
+    : normalizedAppliedMigrations;
 
   return {
     certifications: defaultLifeTrackerData.certifications.map((fallback) => {
@@ -468,7 +475,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     loopRuns: data.loopRuns ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
     metadata: {
-      appliedMigrations: normalizedAppliedMigrations,
+      appliedMigrations: finalAppliedMigrations,
     },
   };
 }

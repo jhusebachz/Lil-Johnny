@@ -26,7 +26,7 @@ function buildGoal({
   failureDaysAgo?: number[];
 }) {
   return {
-    startedAt: getDateKeyDaysAgo(trackedDays - 1, now),
+    startedAt: getDateKeyDaysAgo(trackedDays, now),
     lastFailureDate: failureDaysAgo.length > 0 ? getDateKeyDaysAgo(Math.min(...failureDaysAgo), now) : null,
     bestStreakDays: 0,
     failureDates: failureDaysAgo.map((daysAgo) => getDateKeyDaysAgo(daysAgo, now)),
@@ -56,7 +56,7 @@ test('115/120 good days stays locked in with no penalty', () => {
 test('105/120 good days is very consistent with a small penalty', () => {
   const now = new Date('2026-05-11T20:30:00-04:00');
   const summary = getAvoidanceConsistencySummary(
-    buildGoal({ now, failureDaysAgo: Array.from({ length: 15 }, (_, index) => index * 3) }),
+    buildGoal({ now, failureDaysAgo: Array.from({ length: 15 }, (_, index) => index * 3 + 1) }),
     now
   );
 
@@ -68,7 +68,7 @@ test('105/120 good days is very consistent with a small penalty', () => {
 test('95/120 good days is solid but slipping', () => {
   const now = new Date('2026-05-11T20:30:00-04:00');
   const summary = getAvoidanceConsistencySummary(
-    buildGoal({ now, failureDaysAgo: Array.from({ length: 25 }, (_, index) => index * 2) }),
+    buildGoal({ now, failureDaysAgo: Array.from({ length: 25 }, (_, index) => index * 2 + 1) }),
     now
   );
 
@@ -80,7 +80,7 @@ test('95/120 good days is solid but slipping', () => {
 test('85/120 good days is inconsistent', () => {
   const now = new Date('2026-05-11T20:30:00-04:00');
   const summary = getAvoidanceConsistencySummary(
-    buildGoal({ now, failureDaysAgo: Array.from({ length: 35 }, (_, index) => index * 2) }),
+    buildGoal({ now, failureDaysAgo: Array.from({ length: 35 }, (_, index) => index * 2 + 1) }),
     now
   );
 
@@ -92,7 +92,7 @@ test('85/120 good days is inconsistent', () => {
 test('80/120 good days needs a reset', () => {
   const now = new Date('2026-05-11T20:30:00-04:00');
   const summary = getAvoidanceConsistencySummary(
-    buildGoal({ now, failureDaysAgo: Array.from({ length: 40 }, (_, index) => index * 2) }),
+    buildGoal({ now, failureDaysAgo: Array.from({ length: 40 }, (_, index) => index * 2 + 1) }),
     now
   );
 
@@ -101,14 +101,26 @@ test('80/120 good days needs a reset', () => {
   assert.equal(summary.multiplier, 0.5);
 });
 
-test('less than 120 tracked days projects the current pace into the full window', () => {
+test('less than 120 tracked days shows real good days while keeping the same pace label', () => {
   const now = new Date('2026-05-11T20:30:00-04:00');
   const summary = getAvoidanceConsistencySummary(buildGoal({ now, trackedDays: 30, failureDaysAgo: [10] }), now);
 
   assert.equal(summary.trackedDays, 30);
   assert.equal(summary.actualGoodDays, 29);
-  assert.equal(summary.goodDays, 116);
+  assert.equal(summary.goodDays, 29);
+  assert.equal(summary.consistencyRate, 29 / 30);
   assert.equal(summary.label, 'Locked In');
+  assert.equal(summary.multiplier, 1);
+});
+
+test('a brand-new streak starts from zero good days without an immediate penalty', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const summary = getAvoidanceConsistencySummary(buildGoal({ now, trackedDays: 0 }), now);
+
+  assert.equal(summary.trackedDays, 0);
+  assert.equal(summary.goodDays, 0);
+  assert.equal(summary.consistencyRate, 1);
+  assert.equal(summary.label, 'Fresh Start');
   assert.equal(summary.multiplier, 1);
 });
 
