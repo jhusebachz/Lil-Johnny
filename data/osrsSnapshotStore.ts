@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
-import type { OsrsApiResponse } from './osrsTracker';
+import type { OsrsApiResponse } from './osrsTracker.ts';
 
 const SNAPSHOT_FILE = `${FileSystem.documentDirectory ?? ''}osrs-daily-snapshots.json`;
 

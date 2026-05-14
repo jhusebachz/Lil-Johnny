@@ -3,6 +3,7 @@ import Pill from '../Pill';
 import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
+import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
 import { LiveRunescapeTracker } from '../../data/osrsTracker';
 import { ThemeColors } from '../../data/theme';
 
@@ -19,6 +20,11 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
   const goal1Projection = tracker.goalProjections.baseGoal;
   const goal2Projection = tracker.goalProjections.runefest;
   const goal3Projection = tracker.goalProjections.maxCape;
+  const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
+  const topEffectiveHourContributors = tracker.effectiveHours.bySkill
+    .slice(0, 3)
+    .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
+    .join(' · ');
 
   const renderPaceCheck = (projection: typeof goal1Projection, color: string) => (
     <View style={{ marginTop: 10, marginBottom: 12 }}>
@@ -72,6 +78,19 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                 {item.xp.toLocaleString()} xp
               </Text>
             ))}
+          </View>
+        ) : null}
+
+        {hasEffectiveHours ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ color: colors.heroText, fontSize: 14, fontWeight: '800' }}>
+              OSRS effective hours: {tracker.effectiveHours.totalHours.toFixed(1)}h
+            </Text>
+            {topEffectiveHourContributors ? (
+              <Text style={{ color: colors.heroSubtext, marginTop: 4, fontSize: 12 }}>
+                Top effective-hour contributors: {topEffectiveHourContributors}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -220,6 +239,13 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           }
           colors={colors}
         />
+        {hasEffectiveHours ? (
+          <StatRow
+            label="Effective hours today"
+            value={`${tracker.effectiveHours.totalHours.toFixed(1)} h`}
+            colors={colors}
+          />
+        ) : null}
 
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}

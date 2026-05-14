@@ -20,13 +20,12 @@ import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '..
 import { useLifeTrackerData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
 import {
-  appendAvoidanceFailureDate,
   getAvoidanceConsistencySummary,
   getAvoidanceBestStreak,
-  getAvoidanceStreakBeforeFailure,
   YearGoal,
   getAvoidanceStreak,
   getRelativeDateKey,
+  recordAvoidanceFailure,
   getTodayDateKey,
 } from '../../data/lifeTrackerData';
 import {
@@ -184,23 +183,13 @@ export default function Reminders() {
 
                       await updateGoal(goal.id, (currentGoal) => ({
                         ...currentGoal,
-                        bestStreakDays:
-                          bestStreak === streak
-                            ? getAvoidanceStreakBeforeFailure(currentGoal, failureDate)
-                            : Math.max(
-                                currentGoal.bestStreakDays ?? 0,
-                                getAvoidanceStreakBeforeFailure(currentGoal, failureDate)
-                              ),
-                        lastFailureDate: failureDate,
-                        failureDates: appendAvoidanceFailureDate(currentGoal, failureDate),
+                        ...recordAvoidanceFailure(currentGoal, failureDate),
                       }));
                     }}
                     onMarkFailureToday={async () => {
                       await updateGoal(goal.id, (currentGoal) => ({
                         ...currentGoal,
-                        bestStreakDays: Math.max(currentGoal.bestStreakDays ?? 0, streak),
-                        lastFailureDate: getTodayDateKey(),
-                        failureDates: appendAvoidanceFailureDate(currentGoal, getTodayDateKey()),
+                        ...recordAvoidanceFailure(currentGoal, getTodayDateKey()),
                       }));
                     }}
                   />

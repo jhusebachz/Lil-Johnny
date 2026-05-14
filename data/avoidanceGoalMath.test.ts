@@ -4,7 +4,9 @@ import test from 'node:test';
 import {
   AVOIDANCE_CONSISTENCY_WINDOW_DAYS,
   getAvoidanceConsistencySummary,
+  getAvoidanceBestStreak,
   getAvoidanceStreak,
+  recordAvoidanceFailure,
 } from './avoidanceGoalMath.ts';
 
 function getDateKeyDaysAgo(daysAgo: number, now: Date) {
@@ -134,4 +136,35 @@ test('calendar-day streak math does not count the day after a failure as one ful
 
   assert.equal(getAvoidanceStreak(goal, new Date('2026-05-11T00:30:00-04:00')), 0);
   assert.equal(getAvoidanceStreak(goal, new Date('2026-05-12T00:30:00-04:00')), 1);
+});
+
+test('recording a streak break for yesterday immediately updates current streak, good days, and best streak from failure history', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const goal = buildGoal({ now, trackedDays: 10 });
+  const updatedGoal = {
+    ...goal,
+    ...recordAvoidanceFailure(goal, '2026-05-10', now),
+  };
+  const summary = getAvoidanceConsistencySummary(updatedGoal, now);
+
+  assert.equal(getAvoidanceStreak(updatedGoal, now), 0);
+  assert.equal(getAvoidanceBestStreak(updatedGoal, now), 9);
+  assert.equal(summary.goodDays, 9);
+  assert.deepEqual(updatedGoal.failureDates, ['2026-05-10']);
+  assert.equal(updatedGoal.lastFailureDate, '2026-05-10');
+});
+
+test('recording a streak break for today preserves the completed good-day history but resets the live streak immediately', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const goal = buildGoal({ now, trackedDays: 10 });
+  const updatedGoal = {
+    ...goal,
+    ...recordAvoidanceFailure(goal, '2026-05-11', now),
+  };
+  const summary = getAvoidanceConsistencySummary(updatedGoal, now);
+
+  assert.equal(getAvoidanceStreak(updatedGoal, now), 0);
+  assert.equal(getAvoidanceBestStreak(updatedGoal, now), 10);
+  assert.equal(summary.goodDays, 10);
+  assert.equal(updatedGoal.lastFailureDate, '2026-05-11');
 });

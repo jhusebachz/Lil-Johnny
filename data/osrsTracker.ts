@@ -1,16 +1,22 @@
-import { daysUntilGoalDate, getGoalPacePct } from './osrsGoalMath';
+import { daysUntilGoalDate, getGoalPacePct } from './osrsGoalMath.ts';
+import {
+  formatOsrsSkillName,
+  resolveOsrsEffectiveHours,
+  ResolvedOsrsEffectiveHoursSummary,
+} from './osrsEffectiveHours.ts';
 import {
   findLatestSnapshotKey,
   findPreviousSnapshotKey,
   readSnapshotStore,
   SnapshotStore,
   writeSnapshotStore,
-} from './osrsSnapshotStore';
+} from './osrsSnapshotStore.ts';
 
 const TRACKER_URL =
   'https://raw.githubusercontent.com/jhusebachz/OSRS-Daily-Tracker/main/data/last_stats.json';
 const TRACKER_TIME_ZONE = 'America/New_York';
-const SNAPSHOT_HOUR = 8;
+// Keep the local snapshot window slightly after the earlier GitHub run so email/commit delays can land first.
+const SNAPSHOT_HOUR = 4;
 const SNAPSHOT_MINUTE = 45;
 const GOAL_PROGRESS_START = '2026-03-25';
 const GOAL_ONE_DEADLINE = '2026-10-03';
@@ -70,6 +76,11 @@ type ProjectedSkillState = {
   experience: number;
 };
 
+type RunescapeTrackerMetadata = {
+  effectiveHours?: Record<string, unknown>;
+  generatedAt?: string;
+};
+
 export type OsrsSkillStat = {
   metric: string;
   experience: number;
@@ -82,7 +93,7 @@ export type OsrsPlayerStats = {
   overall: OsrsSkillStat;
 } & Record<SkillName, OsrsSkillStat>;
 
-export type OsrsApiResponse = Record<string, OsrsPlayerStats>;
+export type OsrsApiResponse = Record<string, unknown>;
 
 export type TrackerSummaryItem = {
   skill: string;
@@ -115,6 +126,7 @@ export type LiveRunescapeTracker = {
   snapshotDateLabel: string;
   totalXp: number;
   totalLevel: number;
+  effectiveHours: ResolvedOsrsEffectiveHoursSummary;
   topSkills: TrackerSummaryItem[];
   friends: TrackerFriendSummary[];
   baseGoalRemaining: TrackerGoal[];
@@ -196,12 +208,69 @@ const GOAL_PROGRESS_BASELINE: Record<SkillName | 'overall', Pick<OsrsSkillStat, 
 
 const PASSIVE_COMBAT_SKILLS: readonly SkillName[] = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'magic'];
 
-function formatSkillName(skill: string) {
-  if (skill === 'runecraft') {
-    return 'Runecraft';
+function isOsrsSkillStat(value: unknown): value is OsrsSkillStat {
+  if (!value || typeof value !== 'object') {
+    return false;
   }
 
-  return `${skill.charAt(0).toUpperCase()}${skill.slice(1)}`;
+  const stat = value as Record<string, unknown>;
+
+  return (
+    typeof stat.metric === 'string' &&
+    typeof stat.experience === 'number' &&
+    typeof stat.rank === 'number' &&
+    typeof stat.level === 'number' &&
+    typeof stat.ehp === 'number'
+  );
+}
+
+function isOsrsPlayerStats(value: unknown): value is OsrsPlayerStats {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const player = value as Record<string, unknown>;
+
+  return isOsrsSkillStat(player.overall);
+}
+
+function getPlayerStats(data: OsrsApiResponse, username: string) {
+  const player = data[username];
+  return isOsrsPlayerStats(player) ? player : null;
+}
+
+function getPlayerEntries(data: OsrsApiResponse) {
+  return Object.entries(data).filter(
+    (entry): entry is [string, OsrsPlayerStats] => entry[0] !== '_meta' && isOsrsPlayerStats(entry[1])
+  );
+}
+
+function getTrackerMetadata(data: OsrsApiResponse): RunescapeTrackerMetadata | null {
+  const metadata = data._meta;
+
+  if (!metadata || typeof metadata !== 'object') {
+    return null;
+  }
+
+  return metadata as RunescapeTrackerMetadata;
+}
+
+function getEffectiveHours(
+  currentData: OsrsApiResponse,
+  previousData: OsrsApiResponse | undefined,
+  username: string,
+  skills: (OsrsSkillStat & { skill: SkillName })[]
+): ResolvedOsrsEffectiveHoursSummary {
+  const currentPlayer = getPlayerStats(currentData, username);
+  const previousPlayer = previousData ? getPlayerStats(previousData, username) : null;
+  const gainsBySkill =
+    currentPlayer && previousPlayer
+      ? Object.fromEntries(
+          skills.map((skill) => [skill.skill, getSkillDelta(currentPlayer, previousPlayer, skill.skill)])
+        )
+      : null;
+
+  return resolveOsrsEffectiveHours(getTrackerMetadata(currentData)?.effectiveHours?.[username], gainsBySkill);
 }
 
 function xpForLevel(level: number) {
@@ -342,7 +411,7 @@ function buildRuneFestProjection(skills: (OsrsSkillStat & { skill: SkillName })[
     if (bestIndex === -1) {
       projectedSkills
         .filter((skill) => skill.level < 99)
-        .forEach((skill) => unestimatedSkills.add(formatSkillName(skill.skill)));
+        .forEach((skill) => unestimatedSkills.add(formatOsrsSkillName(skill.skill)));
       break;
     }
 
@@ -527,6 +596,12 @@ function fallbackTracker(): LiveRunescapeTracker {
     snapshotDateLabel: 'No snapshot yet',
     totalXp: 0,
     totalLevel: 0,
+    effectiveHours: {
+      totalHours: 0,
+      bySkill: [],
+      skippedSkills: [],
+      source: 'unavailable',
+    },
     topSkills: [],
     friends: [],
     baseGoalRemaining: [],
@@ -593,7 +668,7 @@ async function buildTrackerFromLatestStoredSnapshot(store?: SnapshotStore) {
 
 function getSkillDelta(
   currentPlayer: OsrsPlayerStats,
-  previousPlayer: OsrsPlayerStats | undefined,
+  previousPlayer: OsrsPlayerStats | null | undefined,
   skill: SkillName
 ) {
   const currentXp = currentPlayer[skill]?.experience ?? 0;
@@ -616,8 +691,8 @@ export function buildLiveRunescapeTracker(
   username = 'jhusebachz',
   snapshotKey?: string
 ): LiveRunescapeTracker {
-  const player = currentData[username];
-  const previousPlayer = previousData?.[username];
+  const player = getPlayerStats(currentData, username);
+  const previousPlayer = previousData ? getPlayerStats(previousData, username) : null;
 
   if (!player) {
     return fallbackTracker();
@@ -631,10 +706,11 @@ export function buildLiveRunescapeTracker(
       skill,
       ...player[skill],
     }));
+  const effectiveHours = getEffectiveHours(currentData, previousData, username, skills);
 
   const topSkills = [...skills]
     .map((skill) => ({
-      skill: formatSkillName(skill.skill),
+      skill: formatOsrsSkillName(skill.skill),
       xp: hasDelta ? getSkillDelta(player, previousPlayer, skill.skill) : skill.experience,
       level: skill.level,
     }))
@@ -643,10 +719,10 @@ export function buildLiveRunescapeTracker(
     .slice(0, 5)
     .map(({ skill, xp }) => ({ skill, xp }));
 
-  const friends = Object.entries(currentData)
+  const friends = getPlayerEntries(currentData)
     .filter(([name]) => name !== username)
     .map(([name, stats]) => {
-      const previousFriend = previousData?.[name];
+      const previousFriend = previousData ? getPlayerStats(previousData, name) : null;
       const overallXp = hasDelta
         ? Math.max(stats.overall.experience - (previousFriend?.overall.experience ?? stats.overall.experience), 0)
         : stats.overall.experience;
@@ -668,7 +744,7 @@ export function buildLiveRunescapeTracker(
           .sort((left, right) => right.xp - left.xp)
           .slice(0, 3)
           .map((skill) => ({
-            skill: formatSkillName(skill.skill),
+            skill: formatOsrsSkillName(skill.skill),
             xp: skill.xp,
             level: skill.level,
         })),
@@ -692,7 +768,7 @@ export function buildLiveRunescapeTracker(
         (xpForLevel(getGoalOneTargetLevel(right.skill)) - right.experience)
     )
     .map((skill) => ({
-      skill: formatSkillName(skill.skill),
+      skill: formatOsrsSkillName(skill.skill),
       level: skill.level,
       targetLevel: getGoalOneTargetLevel(skill.skill),
       pct: percentToTarget(skill.experience, getGoalOneTargetLevel(skill.skill)),
@@ -709,7 +785,7 @@ export function buildLiveRunescapeTracker(
     .filter((skill) => skill.level < 99)
     .sort((left, right) => xpForLevel(99) - left.experience - (xpForLevel(99) - right.experience))
     .map((skill) => ({
-      skill: formatSkillName(skill.skill),
+      skill: formatOsrsSkillName(skill.skill),
       level: skill.level,
       pct: percentToTarget(skill.experience, 99),
       remainingXp: Math.max(xpForLevel(99) - skill.experience, 0),
@@ -721,7 +797,7 @@ export function buildLiveRunescapeTracker(
     }));
   const maxClosest = maxRemainingAll.slice(0, 5);
 
-  const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatSkillName(skill.skill));
+  const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatOsrsSkillName(skill.skill));
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - player.overall.level, 0);
 
@@ -741,7 +817,7 @@ export function buildLiveRunescapeTracker(
       }
 
       return {
-        skill: formatSkillName(skill.skill),
+        skill: formatOsrsSkillName(skill.skill),
         level: skill.level,
         targetLevel,
         remainingXp,
@@ -781,7 +857,7 @@ export function buildLiveRunescapeTracker(
       }
 
       return {
-        skill: formatSkillName(skill.skill),
+        skill: formatOsrsSkillName(skill.skill),
         target: `Lv${targetLevel}`,
         remainingXp,
       };
@@ -843,6 +919,7 @@ export function buildLiveRunescapeTracker(
       ? Math.max(player.overall.experience - (previousPlayer?.overall.experience ?? player.overall.experience), 0)
       : player.overall.experience,
     totalLevel: player.overall.level,
+    effectiveHours,
     topSkills,
     friends,
     baseGoalRemaining,

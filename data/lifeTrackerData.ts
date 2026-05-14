@@ -2,12 +2,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import {
   appendAvoidanceFailureDate,
+  deriveAvoidanceGoalState,
   getAvoidanceBestStreak,
   getAvoidanceConsistencySummary,
   getAvoidanceStreak,
-  getAvoidanceStreakBeforeFailure,
   getTodayDateKey as getLocalTodayDateKey,
-  normalizeAvoidanceFailureDates,
+  recordAvoidanceFailure,
 } from './avoidanceGoalMath';
 
 export type CertificationTracker = {
@@ -240,7 +240,13 @@ function clampPct(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-export { appendAvoidanceFailureDate, getAvoidanceBestStreak, getAvoidanceConsistencySummary, getAvoidanceStreak, getAvoidanceStreakBeforeFailure };
+export {
+  appendAvoidanceFailureDate,
+  getAvoidanceBestStreak,
+  getAvoidanceConsistencySummary,
+  getAvoidanceStreak,
+  recordAvoidanceFailure,
+};
 
 export function getCurrentWeekDateKeys(now = new Date()) {
   const current = new Date(now);
@@ -400,12 +406,13 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
         const normalizedStartedAt = shouldResetLegacyBaseline
           ? AVOIDANCE_STREAK_START_DATE
           : persistedGoal.startedAt ?? fallback.startedAt;
-        const normalizedCurrentStreak = getAvoidanceStreak({
+        const normalizedGoal = {
           ...fallback,
           ...persistedGoal,
           startedAt: normalizedStartedAt,
           lastFailureDate: persistedGoal.lastFailureDate ?? null,
-        });
+        };
+        const derivedState = deriveAvoidanceGoalState(normalizedGoal);
 
         return {
           ...fallback,
@@ -414,14 +421,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
           title: fallback.title,
           type: 'avoidance' as const,
           startedAt: normalizedStartedAt,
-          lastFailureDate: persistedGoal.lastFailureDate ?? null,
-          bestStreakDays: Math.max(persistedGoal.bestStreakDays ?? 0, normalizedCurrentStreak),
-          failureDates: normalizeAvoidanceFailureDates({
-            ...fallback,
-            ...persistedGoal,
-            startedAt: normalizedStartedAt,
-            lastFailureDate: persistedGoal.lastFailureDate ?? null,
-          }),
+          lastFailureDate: derivedState.lastFailureDate,
+          bestStreakDays: derivedState.bestStreakDays,
+          failureDates: derivedState.failureDates,
         };
       }
 
