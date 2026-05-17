@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Animated,
-  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,8 +16,9 @@ import StreakGoalCard from '../../components/streaks/StreakGoalCard';
 import AppScreenShell from '../../components/ui/AppScreenShell';
 import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useReminderSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { useLifeTrackerData } from '../../context/LifeTrackerContext';
+import { useLifeTrackerGoalsData } from '../../context/LifeTrackerContext';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
+import { useHeroRevealAnimation } from '../../hooks/use-hero-reveal-animation';
 import {
   getAvoidanceConsistencySummary,
   getAvoidanceBestStreak,
@@ -56,46 +56,23 @@ export default function Reminders() {
   const [selectedView, setSelectedView] = useState<StreaksView>('streaks');
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null);
   const [draftReminderTime, setDraftReminderTime] = useState<string | null>(null);
-  const { lifeData, setLifeData } = useLifeTrackerData();
+  const { goals2026, setGoals2026 } = useLifeTrackerGoalsData();
   const { refreshing, triggerRefresh } = useTimedRefresh();
-  const heroOpacity = useState(() => new Animated.Value(0))[0];
-  const heroLift = useState(() => new Animated.Value(18))[0];
+  const { heroOpacity, heroLift } = useHeroRevealAnimation();
   const expandedReminder = reminders.find((reminder) => reminder.id === expandedReminderId) ?? null;
   const streakViewOptions: { label: string; value: StreaksView }[] = [
     { label: '2026 Streaks', value: 'streaks' },
     { label: 'Reminder Alarms', value: 'alarms' },
   ];
 
-  useEffect(() => {
-    const reveal = Animated.parallel([
-      Animated.timing(heroOpacity, {
-        toValue: 1,
-        duration: 460,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(heroLift, {
-        toValue: 0,
-        duration: 460,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-
-    reveal.start();
-  }, [heroLift, heroOpacity]);
-
   const updateGoal = async (goalId: string, updater: (goal: YearGoal) => YearGoal) => {
     await triggerHaptic();
-    setLifeData((current) => ({
-      ...current,
-      goals2026: current.goals2026.map((goal) => (goal.id === goalId ? updater(goal) : goal)),
-    }));
+    setGoals2026((current) => current.map((goal) => (goal.id === goalId ? updater(goal) : goal)));
   };
 
   const avoidanceGoals = useMemo(
     () =>
-      lifeData.goals2026
+      goals2026
         .filter((goal) => goal.type === 'avoidance')
         .map((goal) => ({
           goal,
@@ -103,7 +80,7 @@ export default function Reminders() {
           streak: getAvoidanceStreak(goal),
           bestStreak: getAvoidanceBestStreak(goal),
         })),
-    [lifeData.goals2026]
+    [goals2026]
   );
 
   const openReminderTimePicker = async (reminderId: string, time: string) => {
@@ -165,35 +142,41 @@ export default function Reminders() {
           {selectedView === 'streaks' ? (
             <>
               <SectionCard title="Streaks" emoji={'🔥'} colors={colors}>
-                {avoidanceGoals.map(({ goal, consistency, streak, bestStreak }) => (
-                  <StreakGoalCard
-                    key={goal.id}
-                    goal={goal}
-                    colors={colors}
-                    streak={streak}
-                    bestStreak={bestStreak}
-                    consistencyLabel={consistency.label}
-                    consistencyPct={Math.round(consistency.consistencyRate * 100)}
-                    goodDays={consistency.goodDays}
-                    trackedDays={consistency.trackedDays}
-                    windowDays={consistency.windowDays}
-                    blissImpactText={consistency.blissPenaltyPct === 0 ? 'No penalty' : `-${consistency.blissPenaltyPct}%`}
-                    onMarkFailureYesterday={async () => {
-                      const failureDate = getRelativeDateKey(-1);
+                {avoidanceGoals.length > 0 ? (
+                  avoidanceGoals.map(({ goal, consistency, streak, bestStreak }) => (
+                    <StreakGoalCard
+                      key={goal.id}
+                      goal={goal}
+                      colors={colors}
+                      streak={streak}
+                      bestStreak={bestStreak}
+                      consistencyLabel={consistency.label}
+                      consistencyPct={Math.round(consistency.consistencyRate * 100)}
+                      goodDays={consistency.goodDays}
+                      trackedDays={consistency.trackedDays}
+                      windowDays={consistency.windowDays}
+                      blissImpactText={consistency.blissPenaltyPct === 0 ? 'No penalty' : `-${consistency.blissPenaltyPct}%`}
+                      onMarkFailureYesterday={async () => {
+                        const failureDate = getRelativeDateKey(-1);
 
-                      await updateGoal(goal.id, (currentGoal) => ({
-                        ...currentGoal,
-                        ...recordAvoidanceFailure(currentGoal, failureDate),
-                      }));
-                    }}
-                    onMarkFailureToday={async () => {
-                      await updateGoal(goal.id, (currentGoal) => ({
-                        ...currentGoal,
-                        ...recordAvoidanceFailure(currentGoal, getTodayDateKey()),
-                      }));
-                    }}
-                  />
-                ))}
+                        await updateGoal(goal.id, (currentGoal) => ({
+                          ...currentGoal,
+                          ...recordAvoidanceFailure(currentGoal, failureDate),
+                        }));
+                      }}
+                      onMarkFailureToday={async () => {
+                        await updateGoal(goal.id, (currentGoal) => ({
+                          ...currentGoal,
+                          ...recordAvoidanceFailure(currentGoal, getTodayDateKey()),
+                        }));
+                      }}
+                    />
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22 }}>
+                    No streak goals are available right now. Pull to refresh if your tracker just changed.
+                  </Text>
+                )}
               </SectionCard>
             </>
           ) : null}

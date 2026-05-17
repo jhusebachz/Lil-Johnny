@@ -168,3 +168,38 @@ test('recording a streak break for today preserves the completed good-day histor
   assert.equal(summary.goodDays, 10);
   assert.equal(updatedGoal.lastFailureDate, '2026-05-11');
 });
+
+test('legacy malformed failure history is ignored instead of crashing streak calculations', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const summary = getAvoidanceConsistencySummary(
+    {
+      startedAt: '2026-05-01',
+      lastFailureDate: 'invalid-date',
+      bestStreakDays: Number.NaN,
+      failureDates: '2026-05-04' as unknown as string[],
+    },
+    now
+  );
+
+  assert.equal(summary.goodDays, 10);
+  assert.equal(summary.currentStreak, 10);
+  assert.equal(summary.longestStreak, 10);
+});
+
+test('invalid startedAt falls back safely without introducing NaN streak values', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const summary = getAvoidanceConsistencySummary(
+    {
+      startedAt: 'not-a-date',
+      lastFailureDate: null,
+      bestStreakDays: Number.POSITIVE_INFINITY,
+      failureDates: ['2026-05-10'],
+    },
+    now
+  );
+
+  assert.equal(summary.trackedDays, 0);
+  assert.equal(summary.goodDays, 0);
+  assert.equal(summary.currentStreak, 0);
+  assert.equal(summary.longestStreak, 0);
+});

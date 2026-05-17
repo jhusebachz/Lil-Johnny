@@ -32,6 +32,14 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function sanitizeUnitScore(value: number) {
+  return Number.isFinite(value) ? clamp01(value) : 0;
+}
+
+function sanitizePercent(value: number) {
+  return Number.isFinite(value) ? value : 0;
+}
+
 const BLISS_TREND_WEEKS = 4;
 const CERT_WINDOW_END_TIME = 'T23:59:59';
 const CERT_WINDOW_START_TIME = 'T00:00:00';
@@ -116,11 +124,12 @@ export function useDashboardMetrics({
   const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal, now) : 0;
   const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal, now) : 0;
   const snacksStreak = snacksGoal ? getAvoidanceStreak(snacksGoal, now) : 0;
-  const streaksScore =
+  const streaksScore = sanitizeUnitScore(
     avoidanceGoals.length > 0
       ? avoidanceGoals.reduce((total, goal) => total + getAvoidanceConsistencySummary(goal, now).multiplier, 0) /
         avoidanceGoals.length
-      : 1;
+      : 1
+  );
   const currentDay = now.getDay();
   const currentCertPct = currentCert
     ? Math.round((currentCert.chaptersCompleted / Math.max(currentCert.chapterCount, 1)) * 100)
@@ -145,8 +154,12 @@ export function useDashboardMetrics({
   const gymOnPace = gymVisitCount >= 3 || weeklyGymActualPct >= weeklyGymPacePct;
   const loopRunLoggedThisWeek = loopRuns.some((run) => currentWeekKeys.has(run.dateKey));
   const cyberOnPace = currentCertPacePct !== null ? currentCertPct >= currentCertPacePct : false;
-  const baseGoalOnPace = tracker.goalProjections.baseGoal.progressPct >= tracker.goalProjections.baseGoal.pacePct;
-  const runefestOnPace = tracker.goalProjections.runefest.progressPct >= tracker.goalProjections.runefest.pacePct;
+  const baseGoalProgressPct = sanitizePercent(tracker.goalProjections.baseGoal.progressPct);
+  const baseGoalPacePct = sanitizePercent(tracker.goalProjections.baseGoal.pacePct);
+  const runefestProgressPct = sanitizePercent(tracker.goalProjections.runefest.progressPct);
+  const runefestPacePct = sanitizePercent(tracker.goalProjections.runefest.pacePct);
+  const baseGoalOnPace = baseGoalProgressPct >= baseGoalPacePct;
+  const runefestOnPace = runefestProgressPct >= runefestPacePct;
   const diyRecentlyActive = hasRecentCompletedDiyTask(diyTasks, now, DIY_RECENT_WINDOW_DAYS);
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissTrend = useMemo(() => {
@@ -165,31 +178,33 @@ export function useDashboardMetrics({
       const referenceWeightLossActualPct = referenceWeightEntry ? getWeightLossProgressPct(referenceWeightEntry.weight) : 0;
       const referenceWeightLossPacePct = getDateRangePacePct(TRACKER_BASELINE_DATE, WEIGHT_GOAL_TARGET_DATE, referenceDate);
       const referenceWeightLossOnPace = referenceWeightLossActualPct >= referenceWeightLossPacePct;
-      const referenceHealthScore = [
+      const referenceHealthScore = sanitizeUnitScore([
         referenceGymOnPace ? 1 : 0,
         referenceLoopRunLogged ? 1 : 0,
         referenceWeightLossOnPace ? 1 : 0,
-      ].reduce((total, value) => total + value, 0) / 3;
-      const referenceHobbiesScore = getHobbiesBlissScore({
+      ].reduce((total, value) => total + value, 0) / 3);
+      const referenceHobbiesScore = sanitizeUnitScore(getHobbiesBlissScore({
         baseGoalOnPace,
         diyTasks,
         referenceDate,
         runefestOnPace,
-      });
-      const referenceBlissScore = cyberScore * 0.3 + referenceHealthScore * 0.4 + streaksScore * 0.25 + referenceHobbiesScore * 0.05;
+      }));
+      const referenceBlissScore = sanitizeUnitScore(
+        cyberScore * 0.3 + referenceHealthScore * 0.4 + sanitizeUnitScore(streaksScore) * 0.25 + referenceHobbiesScore * 0.05
+      );
 
       return {
         weight,
-        cyber: cyberScore,
+        cyber: sanitizeUnitScore(cyberScore),
         health: referenceHealthScore,
         hobbies: referenceHobbiesScore,
-        streaks: streaksScore,
+        streaks: sanitizeUnitScore(streaksScore),
         total: referenceBlissScore,
       };
     });
     const totalWeight = sumWeights(weightedScores.length);
     const weightedAverage = (key: 'cyber' | 'health' | 'hobbies' | 'streaks' | 'total') =>
-      weightedScores.reduce((sum, score) => sum + score[key] * score.weight, 0) / totalWeight;
+      sanitizeUnitScore(weightedScores.reduce((sum, score) => sum + score[key] * score.weight, 0) / totalWeight);
 
     return {
       total: weightedAverage('total'),
@@ -291,14 +306,14 @@ export function useDashboardMetrics({
     if (!baseGoalOnPace) {
       candidates.push({
         label: 'OSRS base 92s are behind pace. Give the highest-pressure RuneFest skill some focused time soon.',
-        urgency: tracker.goalProjections.baseGoal.progressPct + 8 < tracker.goalProjections.baseGoal.pacePct ? 0.88 : 0.74,
+        urgency: baseGoalProgressPct + 8 < baseGoalPacePct ? 0.88 : 0.74,
       });
     }
 
     if (!runefestOnPace) {
       candidates.push({
         label: '2250 total by RuneFest is behind pace. Put some focused OSRS time into the total-level path.',
-        urgency: tracker.goalProjections.runefest.progressPct + 8 < tracker.goalProjections.runefest.pacePct ? 0.84 : 0.69,
+        urgency: runefestProgressPct + 8 < runefestPacePct ? 0.84 : 0.69,
       });
     }
 
@@ -341,10 +356,10 @@ export function useDashboardMetrics({
     loopRunLoggedThisWeek,
     lowestCert,
     runefestOnPace,
-    tracker.goalProjections.baseGoal.pacePct,
-    tracker.goalProjections.baseGoal.progressPct,
-    tracker.goalProjections.runefest.pacePct,
-    tracker.goalProjections.runefest.progressPct,
+    baseGoalPacePct,
+    baseGoalProgressPct,
+    runefestPacePct,
+    runefestProgressPct,
   ]);
 
   return {

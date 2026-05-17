@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --experimental-strip-types --test data/avoidanceGoalMath.test.ts data/dashboardBlissMath.test.ts data/osrsGoalMath.test.ts data/osrsTracker.test.ts"
+    "test": "node --experimental-strip-types --test data/avoidanceGoalMath.test.ts data/dashboardBlissMath.test.ts data/osrsGoalMath.test.ts data/osrsTracker.test.ts data/osrsTrackerSevenDay.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

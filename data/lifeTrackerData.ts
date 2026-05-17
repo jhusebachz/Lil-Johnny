@@ -306,6 +306,11 @@ export function getDateRangePacePct(startDate: string, targetDate: string, now =
 }
 
 export function getWeightLossProgressPct(weight: number) {
+  if (!Number.isFinite(weight)) {
+    console.warn('[lifeTrackerData] Ignoring non-finite weight entry while calculating progress.');
+    return 0;
+  }
+
   const effectiveWeight = Math.min(weight, STARTING_WEIGHT_LB);
   const totalLossNeeded = Math.max(STARTING_WEIGHT_LB - GOAL_WEIGHT_LB, 1);
   const lossAchieved = Math.max(STARTING_WEIGHT_LB - effectiveWeight, 0);
@@ -333,7 +338,7 @@ export async function readPersistedLifeTrackerData(): Promise<LifeTrackerData | 
 }
 
 export async function writePersistedLifeTrackerData(data: LifeTrackerData) {
-  const raw = JSON.stringify(data);
+  const raw = JSON.stringify(normalizeLifeTrackerData(data));
 
   if (Platform.OS === 'web') {
     if (typeof localStorage !== 'undefined') {

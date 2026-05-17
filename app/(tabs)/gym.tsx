@@ -12,8 +12,8 @@ import SectionCard from '../../components/SectionCard';
 import AppScreenShell from '../../components/ui/AppScreenShell';
 import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { useGymData } from '../../context/GymDataContext';
-import { useLifeTrackerData } from '../../context/LifeTrackerContext';
+import { useGymExerciseHistoryData, useGymExerciseLogsData } from '../../context/GymDataContext';
+import { useLifeTrackerHealthData } from '../../context/LifeTrackerContext';
 import {
   createDraftExerciseSet,
   ExerciseSet,
@@ -88,8 +88,9 @@ export default function Gym() {
   const { preferences, triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
-  const { exerciseHistory, exerciseLogs, setExerciseHistory, setExerciseLogs } = useGymData();
-  const { lifeData, setLifeData } = useLifeTrackerData();
+  const { exerciseHistory, setExerciseHistory } = useGymExerciseHistoryData();
+  const { exerciseLogs, setExerciseLogs } = useGymExerciseLogsData();
+  const { loopRuns, setLoopRuns, setWeightEntries, weightEntries } = useLifeTrackerHealthData();
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const [selectedDay, setSelectedDay] = useState<GymDay>('Push');
   const [selectedView, setSelectedView] = useState<GymView>('Workout');
@@ -138,10 +139,10 @@ export default function Gym() {
     weightMin,
   } = useGymProgressMetrics({
     exerciseHistory,
-    loopRuns: lifeData.loopRuns,
+    loopRuns,
     progressExerciseName,
     selectedDay,
-    weightEntries: lifeData.weightEntries,
+    weightEntries,
   });
   const {
     activeExercise,
@@ -266,10 +267,7 @@ export default function Gym() {
       weight: parsed,
     };
 
-    setLifeData((current) => ({
-      ...current,
-      weightEntries: [...current.weightEntries, nextEntry].slice(-60),
-    }));
+    setWeightEntries((current) => [...current, nextEntry].slice(-60));
     setDraftWeight('');
   };
 
@@ -288,10 +286,7 @@ export default function Gym() {
       timeSeconds: seconds,
     };
 
-    setLifeData((current) => ({
-      ...current,
-      loopRuns: [nextEntry, ...current.loopRuns],
-    }));
+    setLoopRuns((current) => [nextEntry, ...current]);
     setDraftLoopRun('');
   };
 
@@ -339,7 +334,7 @@ export default function Gym() {
           colors={colors}
           draftLoopRun={draftLoopRun}
           recentLoopRuns={recentLoopRuns}
-          totalLoopRuns={lifeData.loopRuns.length}
+          totalLoopRuns={loopRuns.length}
           onDraftLoopRunChange={setDraftLoopRun}
           onLogLoopRun={() => {
             void logLoopRun();

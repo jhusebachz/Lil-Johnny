@@ -4,8 +4,13 @@ import { Animated, Image, Text, View, useWindowDimensions } from 'react-native';
 import SectionCard from '../../components/SectionCard';
 import AppScreenShell from '../../components/ui/AppScreenShell';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { useGymData } from '../../context/GymDataContext';
-import { useLifeTrackerData } from '../../context/LifeTrackerContext';
+import { useGymExerciseHistoryData } from '../../context/GymDataContext';
+import {
+  useLifeTrackerCyberData,
+  useLifeTrackerGoalsData,
+  useLifeTrackerHealthData,
+  useLifeTrackerHobbiesData,
+} from '../../context/LifeTrackerContext';
 import { getThemeColors } from '../../data/theme';
 import { useDashboardHeroAnimation } from '../../hooks/use-dashboard-hero-animation';
 import { OverviewItem, useDashboardMetrics } from '../../hooks/use-dashboard-metrics';
@@ -95,8 +100,11 @@ export default function Dashboard() {
   const { preferences } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
-  const { lifeData } = useLifeTrackerData();
-  const { exerciseHistory } = useGymData();
+  const { certifications } = useLifeTrackerCyberData();
+  const { diyTasks } = useLifeTrackerHobbiesData();
+  const { goals2026 } = useLifeTrackerGoalsData();
+  const { loopRuns, weightEntries } = useLifeTrackerHealthData();
+  const { exerciseHistory } = useGymExerciseHistoryData();
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const [trackerRefreshToken, setTrackerRefreshToken] = useState(0);
   const { tracker } = useRunescapeTracker(trackerRefreshToken);
@@ -115,14 +123,14 @@ export default function Dashboard() {
     suggestedActions,
     todayLabel,
   } = useDashboardMetrics({
-    certifications: lifeData.certifications,
-    diyTasks: lifeData.diyTasks,
+    certifications,
+    diyTasks,
     exerciseHistory,
-    goals2026: lifeData.goals2026,
-    loopRuns: lifeData.loopRuns,
+    goals2026,
+    loopRuns,
     profileName: preferences.profileName,
     tracker,
-    weightEntries: lifeData.weightEntries,
+    weightEntries,
   });
 
   return (

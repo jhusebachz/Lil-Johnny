@@ -1,11 +1,13 @@
 import { Text, View } from 'react-native';
+
 import Pill from '../Pill';
 import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
-import { LiveRunescapeTracker } from '../../data/osrsTracker';
 import { ThemeColors } from '../../data/theme';
+import type { LiveRunescapeTracker } from '../../data/osrsTracker';
+import TrackerGoalCard from './TrackerGoalCard';
 
 type RunescapeSectionProps = {
   colors: ThemeColors;
@@ -13,6 +15,18 @@ type RunescapeSectionProps = {
   trackerError: string | null;
   trackerLoading: boolean;
 };
+
+function formatCompactXp(value: number) {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)}M`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+
+  return value.toLocaleString();
+}
 
 export default function RunescapeSection({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
   const totalLevelTarget = 2250;
@@ -25,23 +39,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
     .slice(0, 3)
     .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
     .join(' · ');
-
-  const renderPaceCheck = (projection: typeof goal1Projection, color: string) => (
-    <View style={{ marginTop: 10, marginBottom: 12 }}>
-      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 6 }}>
-        Pace Check
-      </Text>
-      <ProgressBar pct={projection.progressPct} markerPct={projection.pacePct} color={color} colors={colors} height={10} />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-        <Text style={{ fontSize: 11, color: colors.subtext }}>
-          Actual {projection.progressPct.toFixed(1)}%
-        </Text>
-        <Text style={{ fontSize: 11, color: colors.subtext }}>
-          Pace {projection.pacePct.toFixed(1)}%
-        </Text>
-      </View>
-    </View>
-  );
+  const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
 
   return (
     <>
@@ -93,11 +91,76 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
             ) : null}
           </View>
         ) : null}
+
+        {hasSevenDaySummary ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ color: colors.heroText, fontSize: 14, fontWeight: '800' }}>
+              Last 7 days: {formatCompactXp(tracker.lastSevenDays.totalXp)} xp ·{' '}
+              {tracker.lastSevenDays.totalEffectiveHours.toFixed(1)}h
+            </Text>
+            <Text style={{ color: colors.heroSubtext, marginTop: 4, fontSize: 12 }}>
+              {tracker.lastSevenDays.activeDays} active day{tracker.lastSevenDays.activeDays === 1 ? '' : 's'} tracked
+            </Text>
+          </View>
+        ) : null}
       </View>
+
+      {hasSevenDaySummary ? (
+        <SectionCard title="Last 7 Days" emoji={'📈'} colors={colors}>
+          <StatRow
+            label="Total progress"
+            value={`${tracker.lastSevenDays.totalXp.toLocaleString()} xp`}
+            colors={colors}
+          />
+          <StatRow
+            label="Effective hours"
+            value={`${tracker.lastSevenDays.totalEffectiveHours.toFixed(1)} h`}
+            colors={colors}
+          />
+          <StatRow
+            label="Active days"
+            value={`${tracker.lastSevenDays.activeDays} / ${tracker.lastSevenDays.daysTracked}`}
+            colors={colors}
+          />
+          <StatRow
+            label="Average per tracked day"
+            value={`${Math.round(tracker.lastSevenDays.averageXp).toLocaleString()} xp · ${tracker.lastSevenDays.averageEffectiveHours.toFixed(1)}h`}
+            colors={colors}
+          />
+          <View style={{ marginTop: 10 }}>
+            {tracker.lastSevenDays.days.map((day) => (
+              <View
+                key={day.dateKey}
+                style={{
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.inputBackground,
+                  padding: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800', marginBottom: 4 }}>
+                  {day.label}
+                </Text>
+                <Text style={{ color: colors.subtext, fontSize: 12 }}>
+                  {day.totalXp.toLocaleString()} xp · {day.effectiveHours.toFixed(1)}h
+                </Text>
+                {day.topSkills.length > 0 ? (
+                  <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 4 }}>
+                    Top skills:{' '}
+                    {day.topSkills.map((skill) => `${formatOsrsSkillName(skill.skill)} ${formatCompactXp(skill.xp)} xp`).join(' · ')}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title={tracker.mode === 'delta' ? 'Since Last Snapshot - You vs Friends' : 'Account Snapshot - You vs Friends'}
-        emoji={'\u2694'}
+        emoji={'⚔'}
         colors={colors}
       >
         <StatRow
@@ -133,11 +196,8 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                     {tracker.mode === 'delta' ? 'Top gains:' : 'Top skills:'}
                   </Text>
                   {friend.topSkills.map((gain) => (
-                    <Text
-                      key={`${friend.name}-${gain.skill}`}
-                      style={{ fontSize: 12, color: colors.text, marginBottom: 3 }}
-                    >
-                      {'\u2022'} {gain.skill}: {gain.xp.toLocaleString()} xp (Lv{gain.level})
+                    <Text key={`${friend.name}-${gain.skill}`} style={{ fontSize: 12, color: colors.text, marginBottom: 3 }}>
+                      {'•'} {gain.skill}: {gain.xp.toLocaleString()} xp (Lv{gain.level})
                     </Text>
                   ))}
                 </>
@@ -149,28 +209,15 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         })}
       </SectionCard>
 
-      <SectionCard title="Goal 1 - Base 92s (Runecrafting 90) by RuneFest" emoji={'\uD83C\uDFAF'} colors={colors}>
-        <StatRow label="Deadline" value={`2026-10-03 - RuneFest (${goal1Projection.daysLeft} days left)`} colors={colors} />
-        <StatRow label="Skills at target+" value={`${24 - tracker.baseGoalRemaining.length}/24`} colors={colors} />
-        <StatRow
-          label="Estimated grind"
-          value={
-            goal1Projection.hoursLeft !== null
-              ? `${goal1Projection.hoursLeft.toFixed(1)} hours`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
-        <StatRow
-          label="Required pace"
-          value={
-            goal1Projection.hoursPerDay !== null
-              ? `${goal1Projection.hoursPerDay.toFixed(2)} h/day`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
-
+      <TrackerGoalCard
+        title="Goal 1 - Base 92s (Runecrafting 90) by RuneFest"
+        emoji={'🎯'}
+        colors={colors}
+        deadlineLabel={`2026-10-03 - RuneFest (${goal1Projection.daysLeft} days left)`}
+        projection={goal1Projection}
+        paceColor={colors.accent}
+        statRows={[{ label: 'Skills at target+', value: `${24 - tracker.baseGoalRemaining.length}/24` }]}
+      >
         <Text
           style={{
             marginTop: 10,
@@ -197,94 +244,47 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                   {item.remainingXp.toLocaleString()} xp left
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.subtext, textAlign: 'right' }}>
-                  {item.hoursLeft != null
-                    ? `${item.hoursLeft.toFixed(1)}h @ ${item.xpPerHour?.toLocaleString()} xp/hr`
-                    : 'Manual estimate'}
+                  {item.hoursLeft != null ? `${item.hoursLeft.toFixed(1)}h @ ${item.xpPerHour?.toLocaleString()} xp/hr` : 'Manual estimate'}
                 </Text>
               </View>
             </View>
             <ProgressBar pct={item.pct} color={item.pct >= 80 ? colors.warning : colors.accent} colors={colors} />
           </View>
         ))}
-        {renderPaceCheck(goal1Projection, colors.accent)}
-      </SectionCard>
+      </TrackerGoalCard>
 
-      <SectionCard title="Goal 2 - Total Level 2250 by RuneFest" emoji={'\u26F5'} colors={colors}>
-        <StatRow
-          label="Deadline"
-          value={`2026-10-03 - RuneFest (${goal2Projection.daysLeft} days left)`}
-          colors={colors}
-        />
-        <StatRow
-          label="Current total level"
-          value={`${tracker.totalLevel} / ${totalLevelTarget}`}
-          colors={colors}
-        />
-        <StatRow label="Levels still needed" value={`${totalLevelsNeeded}`} colors={colors} />
-        <StatRow
-          label="Estimated grind"
-          value={
-            goal2Projection.hoursLeft !== null
-              ? `${goal2Projection.hoursLeft.toFixed(1)} hours`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
-        <StatRow
-          label="Required pace"
-          value={
-            goal2Projection.hoursPerDay !== null
-              ? `${goal2Projection.hoursPerDay.toFixed(2)} h/day`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
-        {hasEffectiveHours ? (
-          <StatRow
-            label="Effective hours today"
-            value={`${tracker.effectiveHours.totalHours.toFixed(1)} h`}
-            colors={colors}
-          />
-        ) : null}
-
+      <TrackerGoalCard
+        title="Goal 2 - Total Level 2250 by RuneFest"
+        emoji={'⛵'}
+        colors={colors}
+        deadlineLabel={`2026-10-03 - RuneFest (${goal2Projection.daysLeft} days left)`}
+        projection={goal2Projection}
+        paceColor={colors.accent}
+        statRows={[
+          { label: 'Current total level', value: `${tracker.totalLevel} / ${totalLevelTarget}` },
+          { label: 'Levels still needed', value: `${totalLevelsNeeded}` },
+          ...(hasEffectiveHours ? [{ label: 'Effective hours today', value: `${tracker.effectiveHours.totalHours.toFixed(1)} h` }] : []),
+        ]}
+      >
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
           levels/day to hit 2250 in time
         </Text>
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Pace check: {goal2Projection.status}
-          {goal2Projection.hoursPerDay !== null
-            ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day`
-            : ''}
+          {goal2Projection.hoursPerDay !== null ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day` : ''}
         </Text>
-        {renderPaceCheck(goal2Projection, colors.accent)}
-      </SectionCard>
+      </TrackerGoalCard>
 
-      <SectionCard title="Goal 3 - Max Cape by 33rd Birthday" emoji={'\uD83C\uDF82'} colors={colors}>
-        <StatRow
-          label="Deadline"
-          value={`2027-03-15 - 33rd birthday (${goal3Projection.daysLeft} days left)`}
-          colors={colors}
-        />
-        <StatRow label="Skills maxed" value={`${tracker.maxedSkills.length}/24`} colors={colors} />
-        <StatRow
-          label="Estimated grind"
-          value={
-            goal3Projection.hoursLeft !== null
-              ? `${goal3Projection.hoursLeft.toFixed(1)} hours`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
-        <StatRow
-          label="Required pace"
-          value={
-            goal3Projection.hoursPerDay !== null
-              ? `${goal3Projection.hoursPerDay.toFixed(2)} h/day`
-              : 'Manual estimate needed'
-          }
-          colors={colors}
-        />
+      <TrackerGoalCard
+        title="Goal 3 - Max Cape by 33rd Birthday"
+        emoji={'🎂'}
+        colors={colors}
+        deadlineLabel={`2027-03-15 - 33rd birthday (${goal3Projection.daysLeft} days left)`}
+        projection={goal3Projection}
+        paceColor="#ec4899"
+        statRows={[{ label: 'Skills maxed', value: `${tracker.maxedSkills.length}/24` }]}
+      >
         <ProgressBar pct={(tracker.maxedSkills.length / 24) * 100} color="#ec4899" colors={colors} />
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }}>
@@ -309,18 +309,14 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           <View key={item.skill} style={{ marginBottom: 10 }}>
             <Text style={{ fontSize: 12, color: colors.text }}>
               <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level}
-              <Text style={{ color: colors.subtext }}>
-                {' '}
-                - {item.remainingXp.toLocaleString()} xp to 99
-              </Text>
+              <Text style={{ color: colors.subtext }}> - {item.remainingXp.toLocaleString()} xp to 99</Text>
             </Text>
             <ProgressBar pct={item.pct} color="#ec4899" colors={colors} />
           </View>
         ))}
-        {renderPaceCheck(goal3Projection, '#ec4899')}
-      </SectionCard>
+      </TrackerGoalCard>
 
-      <SectionCard title="Hours Left Until Next Level" emoji={'\u23F3'} colors={colors}>
+      <SectionCard title="Hours Left Until Next Level" emoji={'⏳'} colors={colors}>
         {tracker.hoursToNextLevel.length > 0 ? (
           tracker.hoursToNextLevel.map((item) => (
             <View
@@ -356,7 +352,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         )}
       </SectionCard>
 
-      <SectionCard title="Milestone Alerts" emoji={'\uD83D\uDEA8'} colors={colors}>
+      <SectionCard title="Milestone Alerts" emoji={'🚨'} colors={colors}>
         {tracker.milestoneAlerts.length > 0 ? (
           tracker.milestoneAlerts.map((item) => (
             <View
@@ -384,7 +380,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         )}
       </SectionCard>
 
-      <SectionCard title="Coaching Insight" emoji={'\uD83E\uDDE0'} colors={colors}>
+      <SectionCard title="Coaching Insight" emoji={'🧠'} colors={colors}>
         <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{tracker.coachingText}</Text>
       </SectionCard>
     </>

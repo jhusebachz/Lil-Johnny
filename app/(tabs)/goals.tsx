@@ -7,7 +7,7 @@ import SectionCard from '../../components/SectionCard';
 import AppScreenShell from '../../components/ui/AppScreenShell';
 import SegmentedToggleRow from '../../components/ui/SegmentedToggleRow';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { useLifeTrackerData } from '../../context/LifeTrackerContext';
+import { useLifeTrackerHobbiesData } from '../../context/LifeTrackerContext';
 import {
   DiyTask,
   formatTrackerDate,
@@ -165,7 +165,7 @@ export default function Goals() {
   const colors = getThemeColors(theme);
   const [selectedView, setSelectedView] = useState<HobbiesView>('diy');
   const [runescapeRefreshToken, setRunescapeRefreshToken] = useState(0);
-  const { lifeData, setLifeData } = useLifeTrackerData();
+  const { diyTasks, setDiyTasks } = useLifeTrackerHobbiesData();
   const [draftDiyTitle, setDraftDiyTitle] = useState('');
   const [draftDiyNote, setDraftDiyNote] = useState('');
   const { refreshing, triggerRefresh } = useTimedRefresh();
@@ -174,9 +174,8 @@ export default function Goals() {
   const toggleDiyTask = async (taskId: string) => {
     await triggerHaptic();
     const todayKey = getTodayDateKey();
-    setLifeData((current) => ({
-      ...current,
-      diyTasks: current.diyTasks.map((task) =>
+    setDiyTasks((current) =>
+      current.map((task) =>
         task.id === taskId
           ? {
               ...task,
@@ -184,8 +183,8 @@ export default function Goals() {
               completedAt: !task.completed ? todayKey : null,
             }
           : task
-      ),
-    }));
+      )
+    );
   };
 
   const addDiyTask = async () => {
@@ -197,9 +196,7 @@ export default function Goals() {
     }
 
     await triggerHaptic();
-    setLifeData((current) => ({
-      ...current,
-      diyTasks: [
+    setDiyTasks((current) => [
         {
           id: `diy-${Date.now()}`,
           title,
@@ -208,15 +205,14 @@ export default function Goals() {
           createdAt: getTodayDateKey(),
           completedAt: null,
         },
-        ...current.diyTasks,
-      ],
-    }));
+        ...current,
+      ]);
     setDraftDiyTitle('');
     setDraftDiyNote('');
   };
 
-  const openDiyCount = lifeData.diyTasks.filter((task) => !task.completed).length;
-  const completedDiyCount = lifeData.diyTasks.length - openDiyCount;
+  const openDiyCount = diyTasks.filter((task) => !task.completed).length;
+  const completedDiyCount = diyTasks.length - openDiyCount;
   const hobbiesViewOptions: { label: string; value: HobbiesView }[] = [
     { label: 'DIY To-Do', value: 'diy' },
     { label: 'OSRS', value: 'osrs' },
@@ -277,14 +273,14 @@ export default function Goals() {
                 Open: {openDiyCount} | Completed: {completedDiyCount}
               </Text>
               <ProgressBar
-                pct={lifeData.diyTasks.length > 0 ? (completedDiyCount / lifeData.diyTasks.length) * 100 : 0}
+                pct={diyTasks.length > 0 ? (completedDiyCount / diyTasks.length) * 100 : 0}
                 color={colors.success}
                 colors={colors}
                 height={10}
               />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: -2, marginBottom: 2 }}>
                 <Text style={{ fontSize: 11, color: colors.subtext }}>
-                  Actual {lifeData.diyTasks.length > 0 ? ((completedDiyCount / lifeData.diyTasks.length) * 100).toFixed(1) : '0.0'}%
+                  Actual {diyTasks.length > 0 ? ((completedDiyCount / diyTasks.length) * 100).toFixed(1) : '0.0'}%
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.subtext }}>Completion progress</Text>
               </View>
@@ -299,7 +295,7 @@ export default function Goals() {
               addDiyTask={addDiyTask}
             />
 
-            {lifeData.diyTasks.map((task) => (
+            {diyTasks.map((task) => (
               <DiyTaskCard
                 key={task.id}
                 task={task}

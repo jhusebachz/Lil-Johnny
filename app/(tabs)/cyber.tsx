@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import CertificationSummaryList from '../../components/cyber/CertificationSummaryList';
@@ -7,39 +6,25 @@ import SectionCard from '../../components/SectionCard';
 import StatRow from '../../components/StatRow';
 import AppScreenShell from '../../components/ui/AppScreenShell';
 import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettingsContext';
-import { useLifeTrackerData } from '../../context/LifeTrackerContext';
-import {
-  ChapterPracticeScore,
-  formatDateKey,
-  getTodayDateKey,
-  StudyLogEntry,
-} from '../../data/lifeTrackerData';
+import { useLifeTrackerCyberData } from '../../context/LifeTrackerContext';
 import { getThemeColors } from '../../data/theme';
+import { useCyberLogActions } from '../../hooks/use-cyber-log-actions';
 import { useSelectedCertificationData } from '../../hooks/use-selected-certification-data';
 import { useTimedRefresh } from '../../hooks/use-timed-refresh';
-
-function parsePositiveNumber(value: string) {
-  const parsed = Number(value.trim());
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function parseScore(value: string) {
-  const parsed = Number(value.trim());
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
-}
 
 export default function Cyber() {
   const { theme } = useThemeSettings();
   const { triggerHaptic } = usePreferenceSettings();
   const colors = getThemeColors(theme);
-  const { lifeData, setLifeData } = useLifeTrackerData();
-  const [draftChapters, setDraftChapters] = useState('');
-  const [draftStudyNote, setDraftStudyNote] = useState('');
-  const [draftScoreChapter, setDraftScoreChapter] = useState('');
-  const [draftScoreValue, setDraftScoreValue] = useState('');
-  const [draftScoreNote, setDraftScoreNote] = useState('');
+  const {
+    certifications,
+    chapterPracticeScores,
+    setCertifications,
+    setChapterPracticeScores,
+    setStudyLogs,
+    studyLogs,
+  } = useLifeTrackerCyberData();
   const { refreshing, triggerRefresh } = useTimedRefresh();
-  const certifications = lifeData.certifications;
   const {
     averageScore,
     certLogs,
@@ -51,73 +36,29 @@ export default function Cyber() {
     setSelectedCertId,
   } = useSelectedCertificationData({
     certifications,
-    chapterPracticeScores: lifeData.chapterPracticeScores,
-    studyLogs: lifeData.studyLogs,
+    chapterPracticeScores,
+    studyLogs,
   });
-
-  const addStudySession = async () => {
-    const chapters = parsePositiveNumber(draftChapters);
-    if (!chapters) {
-      return;
-    }
-
-    await triggerHaptic();
-    const todayKey = getTodayDateKey();
-    const nextEntry: StudyLogEntry = {
-      id: `${selectedCert.id}-${todayKey}-${Date.now()}`,
-      certId: selectedCert.id,
-      dateKey: todayKey,
-      label: formatDateKey(todayKey),
-      chapters,
-      note: draftStudyNote.trim() || undefined,
-    };
-
-    setLifeData((current) => ({
-      ...current,
-      certifications: current.certifications.map((cert) =>
-        cert.id === selectedCert.id
-          ? {
-              ...cert,
-              chaptersCompleted: Math.min(cert.chapterCount, cert.chaptersCompleted + chapters),
-            }
-          : cert
-      ),
-      studyLogs: [nextEntry, ...current.studyLogs],
-    }));
-
-    setDraftChapters('');
-    setDraftStudyNote('');
-  };
-
-  const addPracticeScore = async () => {
-    const chapterNumber = parsePositiveNumber(draftScoreChapter);
-    const score = parseScore(draftScoreValue);
-
-    if (chapterNumber === null || score === null) {
-      return;
-    }
-
-    await triggerHaptic();
-    const todayKey = getTodayDateKey();
-    const nextEntry: ChapterPracticeScore = {
-      id: `${selectedCert.id}-score-${todayKey}-${Date.now()}`,
-      certId: selectedCert.id,
-      chapterNumber,
-      score,
-      dateKey: todayKey,
-      label: formatDateKey(todayKey),
-      note: draftScoreNote.trim() || undefined,
-    };
-
-    setLifeData((current) => ({
-      ...current,
-      chapterPracticeScores: [nextEntry, ...current.chapterPracticeScores],
-    }));
-
-    setDraftScoreChapter('');
-    setDraftScoreValue('');
-    setDraftScoreNote('');
-  };
+  const {
+    addPracticeScore,
+    addStudySession,
+    draftChapters,
+    draftScoreChapter,
+    draftScoreNote,
+    draftScoreValue,
+    draftStudyNote,
+    setDraftChapters,
+    setDraftScoreChapter,
+    setDraftScoreNote,
+    setDraftScoreValue,
+    setDraftStudyNote,
+  } = useCyberLogActions({
+    selectedCert,
+    setCertifications,
+    setChapterPracticeScores,
+    setStudyLogs,
+    triggerHaptic,
+  });
 
   return (
     <AppScreenShell
@@ -143,7 +84,7 @@ export default function Cyber() {
 
         <SectionCard title="Certifications" emoji={'🧠'} colors={colors}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {lifeData.certifications.map((cert) => {
+            {certifications.map((cert) => {
               const selected = cert.id === selectedCertId;
 
               return (

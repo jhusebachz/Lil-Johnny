@@ -27,6 +27,16 @@ export type AvoidanceGoalDerivedState = {
   lastFailureDate: string | null;
 };
 
+type SanitizedAvoidanceGoal = {
+  bestStreakDays: number;
+  failureDates: string[];
+  lastFailureDate: string | null;
+  startedAt: string;
+};
+
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const warnedInvalidGoalInputs = new Set<string>();
+
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -38,8 +48,89 @@ function toLocalNoonDate(dateKey: string) {
   return new Date(`${dateKey}T12:00:00`);
 }
 
+function warnInvalidGoalInput(reason: string, detail: string) {
+  const warningKey = `${reason}:${detail}`;
+
+  if (warnedInvalidGoalInputs.has(warningKey)) {
+    return;
+  }
+
+  warnedInvalidGoalInputs.add(warningKey);
+  console.warn(`[avoidanceGoalMath] ${reason}: ${detail}`);
+}
+
+function isValidDateKey(dateKey: unknown): dateKey is string {
+  if (typeof dateKey !== 'string' || !DATE_KEY_PATTERN.test(dateKey)) {
+    return false;
+  }
+
+  const date = toLocalNoonDate(dateKey);
+  return Number.isFinite(date.getTime()) && toLocalDateKey(date) === dateKey;
+}
+
+function sanitizeFailureDates(failureDates: AvoidanceGoalLike['failureDates']) {
+  if (failureDates == null) {
+    return [];
+  }
+
+  if (!Array.isArray(failureDates)) {
+    warnInvalidGoalInput('Ignoring invalid failureDates payload', typeof failureDates);
+    return [];
+  }
+
+  return failureDates.reduce<string[]>((dates, value) => {
+    if (isValidDateKey(value)) {
+      dates.push(value);
+    } else if (value != null) {
+      warnInvalidGoalInput('Ignoring invalid failure date key', String(value));
+    }
+
+    return dates;
+  }, []);
+}
+
+function sanitizeBestStreakDays(bestStreakDays: number | undefined) {
+  if (typeof bestStreakDays !== 'number' || !Number.isFinite(bestStreakDays) || bestStreakDays < 0) {
+    return 0;
+  }
+
+  return Math.floor(bestStreakDays);
+}
+
+function sanitizeAvoidanceGoal(goal: AvoidanceGoalLike, now = new Date()): SanitizedAvoidanceGoal {
+  const safeTodayDateKey = getTodayDateKey(now);
+  const startedAt = isValidDateKey(goal.startedAt) ? goal.startedAt : safeTodayDateKey;
+
+  if (startedAt !== goal.startedAt) {
+    warnInvalidGoalInput('Falling back from invalid startedAt', String(goal.startedAt));
+  }
+
+  const failureDates = new Set<string>(sanitizeFailureDates(goal.failureDates));
+
+  if (isValidDateKey(goal.lastFailureDate)) {
+    failureDates.add(goal.lastFailureDate);
+  } else if (goal.lastFailureDate != null) {
+    warnInvalidGoalInput('Ignoring invalid lastFailureDate', String(goal.lastFailureDate));
+  }
+
+  return {
+    startedAt,
+    lastFailureDate: [...failureDates].sort().at(-1) ?? null,
+    bestStreakDays: sanitizeBestStreakDays(goal.bestStreakDays),
+    failureDates: [...failureDates].sort(),
+  };
+}
+
 function getDaysBetween(dateKeyA: string, dateKeyB: string) {
-  return Math.round((toLocalNoonDate(dateKeyA).getTime() - toLocalNoonDate(dateKeyB).getTime()) / (1000 * 60 * 60 * 24));
+  const dateA = toLocalNoonDate(dateKeyA).getTime();
+  const dateB = toLocalNoonDate(dateKeyB).getTime();
+
+  if (!Number.isFinite(dateA) || !Number.isFinite(dateB)) {
+    warnInvalidGoalInput('Unable to calculate day delta for invalid date keys', `${dateKeyA} -> ${dateKeyB}`);
+    return 0;
+  }
+
+  return Math.round((dateA - dateB) / (1000 * 60 * 60 * 24));
 }
 
 function getDateKeyDaysAgo(daysAgo: number, now = new Date()) {
@@ -53,19 +144,7 @@ export function getTodayDateKey(date = new Date()) {
 }
 
 export function normalizeAvoidanceFailureDates(goal: AvoidanceGoalLike) {
-  const failureDates = new Set<string>();
-
-  (goal.failureDates ?? []).forEach((dateKey) => {
-    if (dateKey) {
-      failureDates.add(dateKey);
-    }
-  });
-
-  if (goal.lastFailureDate) {
-    failureDates.add(goal.lastFailureDate);
-  }
-
-  return [...failureDates].sort();
+  return sanitizeAvoidanceGoal(goal).failureDates;
 }
 
 export function appendAvoidanceFailureDate(goal: AvoidanceGoalLike, failureDate: string) {
@@ -85,38 +164,42 @@ function getStreakDaysSinceAnchor(endDateKey: string, anchorDateKey: string, anc
 }
 
 export function getAvoidanceStreak(goal: AvoidanceGoalLike, now = new Date()) {
-  const latestFailureDate = getLatestAvoidanceFailureDate(goal);
-  const anchorDateKey = latestFailureDate ?? goal.startedAt;
+  const normalizedGoal = sanitizeAvoidanceGoal(goal, now);
+  const latestFailureDate = getLatestAvoidanceFailureDate(normalizedGoal);
+  const anchorDateKey = latestFailureDate ?? normalizedGoal.startedAt;
   const todayDateKey = getTodayDateKey(now);
 
   return getStreakDaysSinceAnchor(todayDateKey, anchorDateKey, Boolean(latestFailureDate));
 }
 
 export function getAvoidanceStreakBeforeFailure(goal: AvoidanceGoalLike, failureDate: string) {
+  const normalizedGoal = sanitizeAvoidanceGoal(goal);
   const previousFailureDate =
-    normalizeAvoidanceFailureDates(goal)
+    normalizeAvoidanceFailureDates(normalizedGoal)
       .filter((dateKey) => dateKey < failureDate)
       .at(-1) ?? null;
-  const anchorDateKey = previousFailureDate ?? goal.startedAt;
+  const anchorDateKey = previousFailureDate ?? normalizedGoal.startedAt;
 
   return getStreakDaysSinceAnchor(failureDate, anchorDateKey, Boolean(previousFailureDate));
 }
 
 function getDerivedAvoidanceBestStreak(goal: AvoidanceGoalLike, now = new Date()) {
-  const failureDates = normalizeAvoidanceFailureDates(goal);
+  const normalizedGoal = sanitizeAvoidanceGoal(goal, now);
+  const failureDates = normalizeAvoidanceFailureDates(normalizedGoal);
   const bestBrokenStreak = failureDates.reduce(
-    (best, failureDate) => Math.max(best, getAvoidanceStreakBeforeFailure(goal, failureDate)),
+    (best, failureDate) => Math.max(best, getAvoidanceStreakBeforeFailure(normalizedGoal, failureDate)),
     0
   );
 
-  return Math.max(bestBrokenStreak, getAvoidanceStreak(goal, now));
+  return Math.max(bestBrokenStreak, getAvoidanceStreak(normalizedGoal, now));
 }
 
 export function deriveAvoidanceGoalState(goal: AvoidanceGoalLike, now = new Date()): AvoidanceGoalDerivedState {
-  const failureDates = normalizeAvoidanceFailureDates(goal);
+  const normalizedGoal = sanitizeAvoidanceGoal(goal, now);
+  const failureDates = normalizeAvoidanceFailureDates(normalizedGoal);
   const derivedBestStreak = getDerivedAvoidanceBestStreak(
     {
-      ...goal,
+      ...normalizedGoal,
       failureDates,
       lastFailureDate: failureDates.at(-1) ?? null,
     },
@@ -127,15 +210,16 @@ export function deriveAvoidanceGoalState(goal: AvoidanceGoalLike, now = new Date
     failureDates,
     lastFailureDate: failureDates.at(-1) ?? null,
     bestStreakDays:
-      failureDates.length > 0 ? derivedBestStreak : Math.max(goal.bestStreakDays ?? 0, derivedBestStreak),
+      failureDates.length > 0 ? derivedBestStreak : Math.max(normalizedGoal.bestStreakDays, derivedBestStreak),
   };
 }
 
 export function recordAvoidanceFailure(goal: AvoidanceGoalLike, failureDate: string, now = new Date()) {
+  const normalizedGoal = sanitizeAvoidanceGoal(goal, now);
   return deriveAvoidanceGoalState(
     {
-      ...goal,
-      failureDates: appendAvoidanceFailureDate(goal, failureDate),
+      ...normalizedGoal,
+      failureDates: appendAvoidanceFailureDate(normalizedGoal, failureDate),
       lastFailureDate: failureDate,
     },
     now
@@ -167,12 +251,13 @@ export function getAvoidanceConsistencySummary(
   now = new Date(),
   windowDays = AVOIDANCE_CONSISTENCY_WINDOW_DAYS
 ): AvoidanceConsistencySummary {
+  const normalizedGoal = sanitizeAvoidanceGoal(goal, now);
   const todayDateKey = getTodayDateKey(now);
   const startWindowDateKey = getDateKeyDaysAgo(windowDays, now);
-  const trackedDays = Math.max(Math.min(getDaysBetween(todayDateKey, goal.startedAt), windowDays), 0);
+  const trackedDays = Math.max(Math.min(getDaysBetween(todayDateKey, normalizedGoal.startedAt), windowDays), 0);
   const actualWindowStartDateKey =
-    getDaysBetween(goal.startedAt, startWindowDateKey) > 0 ? goal.startedAt : startWindowDateKey;
-  const failureDates = normalizeAvoidanceFailureDates(goal).filter(
+    getDaysBetween(normalizedGoal.startedAt, startWindowDateKey) > 0 ? normalizedGoal.startedAt : startWindowDateKey;
+  const failureDates = normalizeAvoidanceFailureDates(normalizedGoal).filter(
     (dateKey) => dateKey >= actualWindowStartDateKey && dateKey < todayDateKey
   );
   const badDays = new Set(failureDates).size;
@@ -187,10 +272,10 @@ export function getAvoidanceConsistencySummary(
     badDays,
     blissPenaltyPct: Math.round((1 - multiplier) * 100),
     consistencyRate,
-    currentStreak: getAvoidanceStreak(goal, now),
+    currentStreak: getAvoidanceStreak(normalizedGoal, now),
     goodDays: actualGoodDays,
     label,
-    longestStreak: getAvoidanceBestStreak(goal, now),
+    longestStreak: getAvoidanceBestStreak(normalizedGoal, now),
     multiplier,
     trackedDays,
     windowDays,

@@ -16,9 +16,9 @@ export default function ProgressBar({
   markerPct,
   height = 8,
 }: ProgressBarProps) {
-  const safePct = Math.max(0, Math.min(100, pct));
+  const safePct = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
   const safeMarkerPct =
-    typeof markerPct === 'number' ? Math.max(0, Math.min(100, markerPct)) : null;
+    typeof markerPct === 'number' && Number.isFinite(markerPct) ? Math.max(0, Math.min(100, markerPct)) : null;
 
   return (
     <View

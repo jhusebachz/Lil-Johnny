@@ -66,3 +66,30 @@ test('effective-hours helper skips skills without configured XP-per-hour assumpt
   );
   assert.deepEqual(summary.skippedSkills, ['unknownskill']);
 });
+
+test('malformed effective-hours metadata falls back to derived gains safely', () => {
+  const summary = resolveOsrsEffectiveHours(
+    {
+      totalHours: Number.NaN,
+      bySkill: {
+        hunter: Number.POSITIVE_INFINITY,
+      },
+    },
+    {
+      hunter: 70_000,
+      slayer: 40_000,
+    }
+  );
+
+  assert.equal(summary.source, 'derived');
+  assert.equal(Number(summary.totalHours.toFixed(1)), 2);
+  assert.deepEqual(
+    summary.bySkill
+      .map((entry) => [entry.skill, Number(entry.hours.toFixed(1))] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    [
+      ['hunter', 1],
+      ['slayer', 1],
+    ]
+  );
+});
