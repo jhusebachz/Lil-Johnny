@@ -267,8 +267,16 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         ]}
       >
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
-          Need <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
-          levels/day to hit 2250 in time
+          Need{' '}
+          <Text style={{ fontWeight: '700', color: colors.text }}>
+            {goal2Projection.hoursPerDay !== null ? `${goal2Projection.hoursPerDay.toFixed(2)} hours/day` : 'a manual estimate'}
+          </Text>{' '}
+          of estimated training to hit 2250 in time
+        </Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
+          That currently works out to about{' '}
+          <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
+          levels/day.
         </Text>
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Pace check: {goal2Projection.status}

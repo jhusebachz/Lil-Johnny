@@ -2,6 +2,43 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { calculateOsrsEffectiveHoursFromGains, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
+import { GOAL_PROGRESS_BASELINE, buildRuneFestProjection, xpForLevel } from './osrsTrackerGoals.ts';
+import { SKILL_ORDER } from './osrsTrackerTypes.ts';
+import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
+
+function buildPlayerFromBaseline(
+  overrides: Partial<Record<SkillName, Partial<Pick<OsrsSkillStat, 'experience' | 'level'>>>> = {},
+  overallOverrides: Partial<Pick<OsrsSkillStat, 'experience' | 'level'>> = {}
+): OsrsPlayerStats {
+  const skills = Object.fromEntries(
+    SKILL_ORDER.map((skill) => {
+      const baseline = GOAL_PROGRESS_BASELINE[skill];
+      const skillOverrides = overrides[skill] ?? {};
+
+      return [
+        skill,
+        {
+          metric: skill,
+          experience: skillOverrides.experience ?? baseline.experience,
+          level: skillOverrides.level ?? baseline.level,
+          rank: 1,
+          ehp: 0,
+        },
+      ];
+    })
+  ) as Record<SkillName, OsrsSkillStat>;
+
+  return {
+    overall: {
+      metric: 'overall',
+      experience: overallOverrides.experience ?? GOAL_PROGRESS_BASELINE.overall.experience,
+      level: overallOverrides.level ?? GOAL_PROGRESS_BASELINE.overall.level,
+      rank: 1,
+      ehp: 0,
+    },
+    ...skills,
+  };
+}
 
 test('tracker effective-hours fallback derives hours from XP deltas when metadata is absent', () => {
   const summary = resolveOsrsEffectiveHours(null, {
@@ -92,4 +129,42 @@ test('malformed effective-hours metadata falls back to derived gains safely', ()
       ['slayer', 1],
     ]
   );
+});
+
+test('runefest required pace drops with xp progress even before total level changes', () => {
+  const hunterBaselineXp = GOAL_PROGRESS_BASELINE.hunter.experience;
+  const hunterNextLevelXp = xpForLevel(GOAL_PROGRESS_BASELINE.hunter.level + 1);
+  const hunterXpGain = Math.min(30_000, Math.max(hunterNextLevelXp - hunterBaselineXp - 1, 1));
+  const baselinePlayer = buildPlayerFromBaseline();
+  const progressedPlayer = buildPlayerFromBaseline(
+    {
+      hunter: {
+        experience: hunterBaselineXp + hunterXpGain,
+      },
+    },
+    {
+      experience: GOAL_PROGRESS_BASELINE.overall.experience + hunterXpGain,
+    }
+  );
+  const totalLevelsNeeded = Math.max(2250 - baselinePlayer.overall.level, 0);
+  const baselineProjection = buildRuneFestProjection(
+    SKILL_ORDER.map((skill) => ({
+      skill,
+      ...baselinePlayer[skill],
+    })),
+    totalLevelsNeeded
+  );
+  const progressedProjection = buildRuneFestProjection(
+    SKILL_ORDER.map((skill) => ({
+      skill,
+      ...progressedPlayer[skill],
+    })),
+    totalLevelsNeeded
+  );
+  const daysLeft = 1;
+  const baselineHoursPerDay = baselineProjection.hoursLeft / daysLeft;
+  const progressedHoursPerDay = progressedProjection.hoursLeft / daysLeft;
+
+  assert.equal(progressedPlayer.overall.level, baselinePlayer.overall.level);
+  assert.ok(progressedHoursPerDay < baselineHoursPerDay);
 });
