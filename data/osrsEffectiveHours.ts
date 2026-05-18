@@ -25,6 +25,9 @@ export const DEFAULT_OSRS_XP_PER_HOUR_BY_SKILL: Record<string, number> = {
   sailing: 60000,
 };
 
+const ALWAYS_PASSIVE_EFFECTIVE_HOUR_SKILLS = new Set(['hitpoints']);
+const SLAYER_OVERLAP_EFFECTIVE_HOUR_SKILLS = new Set(['attack', 'strength', 'defence', 'ranged', 'magic']);
+
 // These XP/hour values are directional estimates for comparing daily progress to pacing goals.
 // They are intentionally easy to tune later as your training methods change.
 export type OsrsEffectiveHoursSummary = {
@@ -54,12 +57,20 @@ export function formatOsrsSkillName(skill: string) {
   return `${skill.charAt(0).toUpperCase()}${skill.slice(1)}`;
 }
 
+function shouldSuppressEffectiveHourSkill(skill: string, gainsBySkill: Record<string, number>) {
+  if (ALWAYS_PASSIVE_EFFECTIVE_HOUR_SKILLS.has(skill)) {
+    return true;
+  }
+
+  return gainsBySkill.slayer > 0 && SLAYER_OVERLAP_EFFECTIVE_HOUR_SKILLS.has(skill);
+}
+
 export function calculateOsrsEffectiveHoursFromGains(
   gainsBySkill: Record<string, number>,
   xpPerHourBySkill = DEFAULT_OSRS_XP_PER_HOUR_BY_SKILL
 ): OsrsEffectiveHoursSummary {
   const bySkill = Object.entries(gainsBySkill)
-    .filter(([skill, xp]) => skill !== 'overall' && xp > 0)
+    .filter(([skill, xp]) => skill !== 'overall' && xp > 0 && !shouldSuppressEffectiveHourSkill(skill, gainsBySkill))
     .reduce<OsrsEffectiveHoursSummary['bySkill']>((entries, [skill, xp]) => {
       const xpPerHour = xpPerHourBySkill[skill];
 
