@@ -85,6 +85,7 @@ eas update --channel preview --message "Describe the change"
 Important:
 
 - `GitHub pushes do not update the phone app by themselves.`
+- app-side release workflow should run `eas update` directly after shipping JS or asset changes instead of only handing off the command.
 - `eas update` is enough for JS and asset changes.
 - native changes like icons, splash config, plugins, or app config need a fresh APK.
 - when runtime-breaking fixes land, pushing an OTA promptly matters because the installed preview build will only see GitHub changes after `eas update`

@@ -217,6 +217,10 @@ For JS / UI changes:
 eas update --channel preview --message "Describe the change"
 ```
 
+Current release workflow:
+
+- after app-side changes are pushed, run `eas update` directly instead of only sending the command back to the user
+
 For native/config changes:
 
 ```bash
@@ -233,4 +237,3 @@ Ask the new chat to:
 2. Check `git status --short`.
 3. Respect the existing local uncommitted changes unless asked to discard them.
 4. Avoid pushing unrelated changes together.
-
