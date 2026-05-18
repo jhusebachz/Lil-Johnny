@@ -1,6 +1,13 @@
 import { formatOsrsSkillName, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
 import { fetchRawRunescapeData } from './osrsTrackerFetch.ts';
 import {
+  createEmptyTrackerWeekSummary,
+  readTrackerCurrentWeekSummary,
+  readTrackerDailySummary,
+  readTrackerGeneratedAt,
+  readTrackerReportDateKey,
+} from './osrsTrackerMetadata.ts';
+import {
   GOAL_ONE_DEADLINE,
   GOAL_ONE_LABEL,
   GOAL_PROGRESS_BASELINE,
@@ -130,8 +137,31 @@ function formatSnapshotDate(snapshotKey: string) {
   }).format(date);
 }
 
+function formatGeneratedAtLabel(generatedAt: string | null) {
+  if (!generatedAt) {
+    return 'No tracker timestamp yet';
+  }
+
+  const parsedDate = new Date(generatedAt);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'Unknown tracker timestamp';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(parsedDate);
+}
+
 function getTodaySnapshotSummaryFromMetadata(data: OsrsApiResponse, username: string) {
   return readTrackerSevenDaySummaryFromMetadata(getTrackerMetadata(data)?.lastSevenDays?.[username]);
+}
+
+function getReportedSnapshotKey(data: OsrsApiResponse, fallbackKey: string) {
+  return readTrackerReportDateKey(getTrackerMetadata(data)) ?? fallbackKey;
 }
 
 function shouldUpdateStoredTodaySnapshot(existingSnapshot: OsrsApiResponse | undefined, nextSnapshot: OsrsApiResponse) {
@@ -158,7 +188,11 @@ function shouldUpdateStoredTodaySnapshot(existingSnapshot: OsrsApiResponse | und
 
 function fallbackTracker(): LiveRunescapeTracker {
   return {
+    currentWeek: createEmptyTrackerWeekSummary(),
+    generatedAt: null,
+    generatedAtLabel: 'No tracker timestamp yet',
     mode: 'snapshot',
+    reportDateKey: null,
     snapshotDateLabel: 'No snapshot yet',
     totalXp: 0,
     totalLevel: 0,
@@ -247,12 +281,17 @@ export function buildLiveRunescapeTracker(
 ): LiveRunescapeTracker {
   const player = getPlayerStats(currentData, username);
   const previousPlayer = previousData ? getPlayerStats(previousData, username) : null;
+  const metadata = getTrackerMetadata(currentData);
+  const generatedAt = readTrackerGeneratedAt(metadata);
+  const reportDateKey = readTrackerReportDateKey(metadata);
+  const currentWeek = readTrackerCurrentWeekSummary(metadata, username) ?? createEmptyTrackerWeekSummary();
+  const dailySummary = readTrackerDailySummary(metadata, username);
 
   if (!player) {
     return fallbackTracker();
   }
 
-  const hasDelta = Boolean(previousPlayer);
+  const hasDelta = Boolean(previousPlayer) || Boolean(dailySummary);
 
   const skills = SKILL_ORDER
     .filter((skill) => player[skill] && player[skill].experience >= 0)
@@ -262,7 +301,7 @@ export function buildLiveRunescapeTracker(
     }));
   const effectiveHours = getEffectiveHours(currentData, previousData, username, skills);
 
-  const topSkills = [...skills]
+  const derivedTopSkills = [...skills]
     .map((skill) => ({
       skill: formatOsrsSkillName(skill.skill),
       xp: hasDelta ? getSkillDelta(player, previousPlayer, skill.skill) : skill.experience,
@@ -272,8 +311,13 @@ export function buildLiveRunescapeTracker(
     .sort((left, right) => right.xp - left.xp)
     .slice(0, 5)
     .map(({ skill, xp }) => ({ skill, xp }));
+  const topSkills =
+    dailySummary?.topSkills.map(({ skill, xp }) => ({
+      skill: formatOsrsSkillName(skill),
+      xp,
+    })) ?? derivedTopSkills;
 
-  const friends = getPlayerEntries(currentData)
+  const derivedFriends = getPlayerEntries(currentData)
     .filter(([name]) => name !== username)
     .map(([name, stats]) => {
       const previousFriend = previousData ? getPlayerStats(previousData, name) : null;
@@ -312,6 +356,24 @@ export function buildLiveRunescapeTracker(
 
       return safeLeftIndex - safeRightIndex;
     });
+  const friends =
+    dailySummary?.friends
+      .map((friend) => ({
+        ...friend,
+        topSkills: friend.topSkills.map((entry) => ({
+          skill: formatOsrsSkillName(entry.skill),
+          xp: entry.xp,
+          level: entry.level,
+        })),
+      }))
+      .sort((left, right) => {
+        const leftIndex = FRIEND_ORDER.indexOf(left.name as (typeof FRIEND_ORDER)[number]);
+        const rightIndex = FRIEND_ORDER.indexOf(right.name as (typeof FRIEND_ORDER)[number]);
+        const safeLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+        const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+
+        return safeLeftIndex - safeRightIndex;
+      }) ?? derivedFriends;
 
   const baseGoalRemaining = [...skills]
     .filter((skill) => skill.level < getGoalOneTargetLevel(skill.skill))
@@ -476,11 +538,17 @@ export function buildLiveRunescapeTracker(
   ];
 
   return {
+    currentWeek,
+    generatedAt,
+    generatedAtLabel: formatGeneratedAtLabel(generatedAt),
     mode: hasDelta ? 'delta' : 'snapshot',
-    snapshotDateLabel: snapshotKey ? formatSnapshotDate(snapshotKey) : 'Live snapshot',
-    totalXp: hasDelta
-      ? Math.max(player.overall.experience - (previousPlayer?.overall.experience ?? player.overall.experience), 0)
-      : player.overall.experience,
+    reportDateKey,
+    snapshotDateLabel: snapshotKey ? formatSnapshotDate(snapshotKey) : reportDateKey ? formatSnapshotDate(reportDateKey) : 'Live snapshot',
+    totalXp:
+      dailySummary?.totalXp ??
+      (hasDelta
+        ? Math.max(player.overall.experience - (previousPlayer?.overall.experience ?? player.overall.experience), 0)
+        : player.overall.experience),
     totalLevel: player.overall.level,
     effectiveHours,
     topSkills,
@@ -520,25 +588,29 @@ export async function fetchRunescapeTrackerSnapshot() {
   }
 
   const todayKey = getTodaySnapshotKey();
+  const reportedSnapshotKey = getReportedSnapshotKey(liveData, todayKey);
 
-  if (hasReachedDailySnapshotTime() && shouldUpdateStoredTodaySnapshot(store.snapshots[todayKey], liveData)) {
-    store.snapshots[todayKey] = liveData;
+  if (
+    hasReachedDailySnapshotTime() &&
+    shouldUpdateStoredTodaySnapshot(store.snapshots[reportedSnapshotKey], liveData)
+  ) {
+    store.snapshots[reportedSnapshotKey] = liveData;
 
     try {
       await writeSnapshotStore(store);
     } catch {
       const metadataSummary = getTodaySnapshotSummaryFromMetadata(liveData, PRIMARY_USERNAME) ?? createEmptySevenDaySummary();
-      return buildLiveRunescapeTracker(liveData, undefined, PRIMARY_USERNAME, undefined, metadataSummary);
+      return buildLiveRunescapeTracker(liveData, undefined, PRIMARY_USERNAME, reportedSnapshotKey, metadataSummary);
     }
   }
 
   const metadataSummary = getTodaySnapshotSummaryFromMetadata(liveData, PRIMARY_USERNAME);
   const lastSevenDays = buildTrackerSevenDaySummaryFromSnapshotStore(store, PRIMARY_USERNAME, metadataSummary);
-  const latestSnapshotKey = store.snapshots[todayKey] ? todayKey : findLatestSnapshotKey(store);
+  const latestSnapshotKey = store.snapshots[reportedSnapshotKey] ? reportedSnapshotKey : findLatestSnapshotKey(store);
 
   if (latestSnapshotKey) {
     const previousKey =
-      latestSnapshotKey === todayKey ? findPreviousSnapshotKey(store, latestSnapshotKey) : latestSnapshotKey;
+      latestSnapshotKey === reportedSnapshotKey ? findPreviousSnapshotKey(store, latestSnapshotKey) : latestSnapshotKey;
 
     return buildLiveRunescapeTracker(
       liveData,
@@ -549,7 +621,13 @@ export async function fetchRunescapeTrackerSnapshot() {
     );
   }
 
-  return buildLiveRunescapeTracker(liveData, undefined, PRIMARY_USERNAME, undefined, metadataSummary ?? createEmptySevenDaySummary());
+  return buildLiveRunescapeTracker(
+    liveData,
+    undefined,
+    PRIMARY_USERNAME,
+    reportedSnapshotKey,
+    metadataSummary ?? createEmptySevenDaySummary()
+  );
 }
 
 export function getFallbackRunescapeTracker() {

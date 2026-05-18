@@ -3,6 +3,12 @@ import test from 'node:test';
 
 import { calculateOsrsEffectiveHoursFromGains, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
 import {
+  readTrackerCurrentWeekSummary,
+  readTrackerDailySummary,
+  readTrackerGeneratedAt,
+  readTrackerReportDateKey,
+} from './osrsTrackerMetadata.ts';
+import {
   GOAL_PROGRESS_BASELINE,
   buildRuneFestProjection,
   getEffectiveLevelsRemaining,
@@ -175,4 +181,52 @@ test('runefest required pace drops with xp progress even before total level chan
   assert.equal(progressedPlayer.overall.level, baselinePlayer.overall.level);
   assert.ok(progressedEffectiveLevelsRemaining < baselineEffectiveLevelsRemaining);
   assert.ok(progressedHoursPerDay < baselineHoursPerDay);
+});
+
+test('tracker metadata helpers preserve latest report timestamps and summaries for the app', () => {
+  const metadata = {
+    generatedAt: '2026-05-18T00:53:27Z',
+    reportDateKey: '2026-05-17',
+    currentWeek: {
+      jhusebachz: {
+        weekStartDateKey: '2026-05-11',
+        totalXp: 420_000,
+        totalEffectiveHours: 5.8,
+        activeDays: 3,
+        daysTracked: 4,
+        topSkills: [
+          { skill: 'hunter', xp: 250_000 },
+          { skill: 'slayer', xp: 120_000 },
+        ],
+      },
+    },
+    dailySummary: {
+      byPlayer: {
+        jhusebachz: {
+          totalXp: 100_000,
+          topSkills: [
+            { skill: 'hunter', xp: 70_000, level: GOAL_PROGRESS_BASELINE.hunter.level },
+            { skill: 'slayer', xp: 30_000, level: GOAL_PROGRESS_BASELINE.slayer.level },
+          ],
+        },
+        gwahpy: {
+          totalXp: 60_000,
+          diff: 40_000,
+          topSkills: [{ skill: 'hunter', xp: 60_000, level: GOAL_PROGRESS_BASELINE.hunter.level }],
+        },
+      },
+    },
+  };
+
+  const currentWeek = readTrackerCurrentWeekSummary(metadata, 'jhusebachz');
+  const dailySummary = readTrackerDailySummary(metadata, 'jhusebachz');
+
+  assert.equal(readTrackerGeneratedAt(metadata), '2026-05-18T00:53:27Z');
+  assert.equal(readTrackerReportDateKey(metadata), '2026-05-17');
+  assert.equal(currentWeek?.totalXp, 420_000);
+  assert.equal(currentWeek?.topSkills.length, 2);
+  assert.deepEqual(currentWeek?.topSkills[0], { skill: 'hunter', xp: 250_000 });
+  assert.equal(dailySummary?.totalXp, 100_000);
+  assert.equal(dailySummary?.friends[0]?.name, 'gwahpy');
+  assert.equal(dailySummary?.friends[0]?.overallXp, 60_000);
 });

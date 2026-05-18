@@ -200,10 +200,14 @@ export function buildTrackerSevenDaySummaryFromSnapshotStore(
   username: string,
   metadataSummary?: TrackerSevenDaySummary | null
 ) {
+  if (metadataSummary) {
+    return metadataSummary;
+  }
+
   const snapshotKeys = Object.keys(store.snapshots).sort();
 
   if (snapshotKeys.length === 0) {
-    return metadataSummary ?? createEmptySevenDaySummary();
+    return createEmptySevenDaySummary();
   }
 
   const snapshotDays = snapshotKeys
@@ -222,14 +226,8 @@ export function buildTrackerSevenDaySummaryFromSnapshotStore(
     .filter((entry): entry is TrackerSevenDayEntry => Boolean(entry));
 
   if (snapshotDays.length === 0) {
-    return metadataSummary ?? createEmptySevenDaySummary();
+    return createEmptySevenDaySummary();
   }
 
-  const derivedSummary = buildTrackerSevenDaySummary(snapshotDays);
-
-  if (metadataSummary && metadataSummary.daysTracked > derivedSummary.daysTracked) {
-    return metadataSummary;
-  }
-
-  return derivedSummary;
+  return buildTrackerSevenDaySummary(snapshotDays);
 }

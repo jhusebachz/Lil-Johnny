@@ -62,15 +62,15 @@ export type TrackerSummaryItem = {
   xp: number;
 };
 
+export type TrackerSummaryItemWithLevel = TrackerSummaryItem & {
+  level: number;
+};
+
 export type TrackerFriendSummary = {
   name: string;
   overallXp: number;
   diff: number;
-  topSkills: {
-    skill: string;
-    xp: number;
-    level: number;
-  }[];
+  topSkills: TrackerSummaryItemWithLevel[];
 };
 
 export type TrackerSevenDayEntry = {
@@ -92,9 +92,13 @@ export type TrackerSevenDaySummary = {
 };
 
 export type RunescapeTrackerMetadata = {
+  currentWeek?: Record<string, unknown>;
+  dailySummary?: Record<string, unknown>;
   effectiveHours?: Record<string, unknown>;
   generatedAt?: string;
   lastSevenDays?: Record<string, unknown>;
+  reportDateKey?: string;
+  timeZone?: string;
 };
 
 export type OsrsSkillStat = {
@@ -112,7 +116,18 @@ export type OsrsPlayerStats = {
 export type OsrsApiResponse = Record<string, unknown>;
 
 export type LiveRunescapeTracker = {
+  currentWeek: {
+    activeDays: number;
+    daysTracked: number;
+    topSkills: TrackerSummaryItem[];
+    totalEffectiveHours: number;
+    totalXp: number;
+    weekStartDateKey: string | null;
+  };
+  generatedAt: string | null;
+  generatedAtLabel: string;
   mode: 'delta' | 'snapshot';
+  reportDateKey: string | null;
   snapshotDateLabel: string;
   totalXp: number;
   totalLevel: number;

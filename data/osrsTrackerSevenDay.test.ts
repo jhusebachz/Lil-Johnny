@@ -124,3 +124,35 @@ test('seven-day summary can be derived from locally cached snapshots', () => {
   assert.equal(summary.totalXp, 400_000);
   assert.equal(Number(summary.totalEffectiveHours.toFixed(1)), 4.6);
 });
+
+test('seven-day summary prefers tracker-provided metadata when it is available', () => {
+  const store: SnapshotStore = {
+    snapshots: {
+      '2026-05-16': buildSnapshot(10_150_000, 1_070_000, 1.4),
+      '2026-05-17': buildSnapshot(10_400_000, 1_170_000, 2),
+    },
+  };
+  const metadataSummary = {
+    daysTracked: 2,
+    activeDays: 2,
+    totalXp: 555_000,
+    totalEffectiveHours: 4.8,
+    averageXp: 277_500,
+    averageEffectiveHours: 2.4,
+    days: [
+      {
+        dateKey: '2026-05-17',
+        label: 'May 17',
+        totalXp: 333_000,
+        effectiveHours: 2.6,
+        topSkills: [{ skill: 'Hunter', xp: 333_000 }],
+      },
+    ],
+  };
+
+  const summary = buildTrackerSevenDaySummaryFromSnapshotStore(store, 'jhusebachz', metadataSummary);
+
+  assert.equal(summary.totalXp, 555_000);
+  assert.equal(summary.totalEffectiveHours, 4.8);
+  assert.equal(summary.days[0]?.totalXp, 333_000);
+});
