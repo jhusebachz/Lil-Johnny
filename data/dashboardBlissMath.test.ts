@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DIY_RECENT_WINDOW_DAYS, getHobbiesBlissScore, hasRecentCompletedDiyTask } from './dashboardBlissMath.ts';
+import {
+  DIY_RECENT_WINDOW_DAYS,
+  getHobbiesBlissScore,
+  hasRecentCompletedDiyTask,
+  isTrackerGoalOnPace,
+} from './dashboardBlissMath.ts';
 
 test('recent DIY completion counts toward hobbies activity', () => {
   const referenceDate = new Date('2026-05-11T12:00:00-04:00');
@@ -33,4 +38,10 @@ test('DIY activity counts on the last in-window day and drops after that', () =>
 
   assert.equal(hasRecentCompletedDiyTask(inWindow, referenceDate, DIY_RECENT_WINDOW_DAYS), true);
   assert.equal(hasRecentCompletedDiyTask(outOfWindow, referenceDate, DIY_RECENT_WINDOW_DAYS), false);
+});
+
+test('missing OSRS tracker data does not count as on pace for hobbies scoring', () => {
+  assert.equal(isTrackerGoalOnPace(false, 0, 0), false);
+  assert.equal(isTrackerGoalOnPace(false, 55, 50), false);
+  assert.equal(isTrackerGoalOnPace(true, 55, 50), true);
 });

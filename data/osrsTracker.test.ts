@@ -14,6 +14,7 @@ import {
   getEffectiveLevelsRemaining,
   xpForLevel,
 } from './osrsTrackerGoals.ts';
+import { getPlayerStats } from './osrsTrackerParsers.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
 
@@ -229,4 +230,28 @@ test('tracker metadata helpers preserve latest report timestamps and summaries f
   assert.equal(dailySummary?.totalXp, 100_000);
   assert.equal(dailySummary?.friends[0]?.name, 'gwahpy');
   assert.equal(dailySummary?.friends[0]?.overallXp, 60_000);
+});
+
+test('OSRS tracker parser accepts published tracker players without metric or ehp fields', () => {
+  const player = getPlayerStats(
+    {
+      jhusebachz: {
+        overall: {
+          rank: 182_827,
+          level: 2216,
+          experience: 179_498_724,
+        },
+        runecraft: {
+          rank: 257_367,
+          level: 86,
+          experience: 3_644_872,
+        },
+      },
+    },
+    'jhusebachz'
+  );
+
+  assert.ok(player);
+  assert.equal(player?.overall.level, 2216);
+  assert.equal(player?.runecraft.experience, 3_644_872);
 });

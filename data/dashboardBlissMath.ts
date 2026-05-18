@@ -8,6 +8,10 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+export function isTrackerGoalOnPace(hasTrackerData: boolean, progressPct: number, pacePct: number) {
+  return hasTrackerData && Number.isFinite(progressPct) && Number.isFinite(pacePct) && progressPct >= pacePct;
+}
+
 export function isDateKeyWithinTrailingDays(dateKey: string, referenceDate: Date, trailingDays: number) {
   const referenceDateKey = `${referenceDate.getFullYear()}-${String(referenceDate.getMonth() + 1).padStart(2, '0')}-${String(referenceDate.getDate()).padStart(2, '0')}`;
   const diffDays = Math.round(

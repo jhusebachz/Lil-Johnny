@@ -14,11 +14,11 @@ export function isOsrsSkillStat(value: unknown): value is OsrsSkillStat {
   const stat = value as Record<string, unknown>;
 
   return (
-    typeof stat.metric === 'string' &&
     typeof stat.experience === 'number' &&
     typeof stat.rank === 'number' &&
     typeof stat.level === 'number' &&
-    typeof stat.ehp === 'number'
+    (typeof stat.metric === 'string' || typeof stat.metric === 'undefined') &&
+    (typeof stat.ehp === 'number' || typeof stat.ehp === 'undefined')
   );
 }
 

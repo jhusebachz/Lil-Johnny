@@ -4,6 +4,7 @@ import {
   DIY_RECENT_WINDOW_DAYS,
   getHobbiesBlissScore,
   hasRecentCompletedDiyTask,
+  isTrackerGoalOnPace,
 } from '../data/dashboardBlissMath';
 import { GymExerciseHistory, getLoggedGymDateKeys } from '../data/gymData';
 import {
@@ -158,8 +159,9 @@ export function useDashboardMetrics({
   const baseGoalPacePct = sanitizePercent(tracker.goalProjections.baseGoal.pacePct);
   const runefestProgressPct = sanitizePercent(tracker.goalProjections.runefest.progressPct);
   const runefestPacePct = sanitizePercent(tracker.goalProjections.runefest.pacePct);
-  const baseGoalOnPace = baseGoalProgressPct >= baseGoalPacePct;
-  const runefestOnPace = runefestProgressPct >= runefestPacePct;
+  const trackerHasOsrsData = tracker.totalLevel > 0;
+  const baseGoalOnPace = isTrackerGoalOnPace(trackerHasOsrsData, baseGoalProgressPct, baseGoalPacePct);
+  const runefestOnPace = isTrackerGoalOnPace(trackerHasOsrsData, runefestProgressPct, runefestPacePct);
   const diyRecentlyActive = hasRecentCompletedDiyTask(diyTasks, now, DIY_RECENT_WINDOW_DAYS);
   const cyberScore = cyberOnPace ? 1 : 0;
   const blissTrend = useMemo(() => {

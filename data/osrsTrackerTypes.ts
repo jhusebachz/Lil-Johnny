@@ -102,11 +102,11 @@ export type RunescapeTrackerMetadata = {
 };
 
 export type OsrsSkillStat = {
-  metric: string;
+  metric?: string;
   experience: number;
   rank: number;
   level: number;
-  ehp: number;
+  ehp?: number;
 };
 
 export type OsrsPlayerStats = {
