@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { calculateOsrsEffectiveHoursFromGains, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
-import { GOAL_PROGRESS_BASELINE, buildRuneFestProjection, xpForLevel } from './osrsTrackerGoals.ts';
+import {
+  GOAL_PROGRESS_BASELINE,
+  buildRuneFestProjection,
+  getEffectiveLevelsRemaining,
+  xpForLevel,
+} from './osrsTrackerGoals.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
 
@@ -164,7 +169,10 @@ test('runefest required pace drops with xp progress even before total level chan
   const daysLeft = 1;
   const baselineHoursPerDay = baselineProjection.hoursLeft / daysLeft;
   const progressedHoursPerDay = progressedProjection.hoursLeft / daysLeft;
+  const baselineEffectiveLevelsRemaining = getEffectiveLevelsRemaining(baselinePlayer, 2250);
+  const progressedEffectiveLevelsRemaining = getEffectiveLevelsRemaining(progressedPlayer, 2250);
 
   assert.equal(progressedPlayer.overall.level, baselinePlayer.overall.level);
+  assert.ok(progressedEffectiveLevelsRemaining < baselineEffectiveLevelsRemaining);
   assert.ok(progressedHoursPerDay < baselineHoursPerDay);
 });

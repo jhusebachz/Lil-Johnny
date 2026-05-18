@@ -128,6 +128,37 @@ export function getGoalOneTargetLevel(skill: SkillName) {
   return skill === 'runecraft' ? 90 : 92;
 }
 
+export function getPartialLevelProgress(level: number, experience: number) {
+  if (level >= 99) {
+    return 0;
+  }
+
+  const currentLevelXp = xpForLevel(Math.max(level, 1));
+  const nextLevelXp = xpForLevel(Math.max(level + 1, 2));
+  const span = Math.max(nextLevelXp - currentLevelXp, 1);
+  const progressedXp = Math.max(experience - currentLevelXp, 0);
+
+  return Math.max(0, Math.min(1, progressedXp / span));
+}
+
+export function getEffectiveTotalLevel(currentPlayer: OsrsPlayerStats) {
+  const partialLevelProgress = SKILL_ORDER.reduce((total, skill) => {
+    const stat = currentPlayer[skill];
+
+    if (!stat) {
+      return total;
+    }
+
+    return total + getPartialLevelProgress(stat.level, stat.experience);
+  }, 0);
+
+  return currentPlayer.overall.level + partialLevelProgress;
+}
+
+export function getEffectiveLevelsRemaining(currentPlayer: OsrsPlayerStats, targetTotalLevel: number) {
+  return Math.max(targetTotalLevel - getEffectiveTotalLevel(currentPlayer), 0);
+}
+
 export function daysUntil(targetDate: string, now = new Date()) {
   return daysUntilGoalDate(targetDate, now);
 }

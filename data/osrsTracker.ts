@@ -10,6 +10,7 @@ import {
   buildTargetProgress,
   daysUntil,
   describeGoalStatus,
+  getEffectiveLevelsRemaining,
   getGoalOneTargetLevel,
   getNextLevel,
   getPacePct,
@@ -59,6 +60,16 @@ export type {
   TrackerSevenDaySummary,
   TrackerSummaryItem,
 } from './osrsTrackerTypes.ts';
+
+export class CachedRunescapeTrackerError extends Error {
+  tracker: LiveRunescapeTracker;
+
+  constructor(message: string, tracker: LiveRunescapeTracker) {
+    super(message);
+    this.name = 'CachedRunescapeTrackerError';
+    this.tracker = tracker;
+  }
+}
 
 function getEffectiveHours(
   currentData: OsrsApiResponse,
@@ -197,6 +208,8 @@ function fallbackTracker(): LiveRunescapeTracker {
         pacePct: 0,
       },
     },
+    runefestEffectiveLevelsPerDayNeeded: 0,
+    runefestEffectiveLevelsRemaining: 0,
     runefestLevelsPerDayNeeded: 0,
     coachingText:
       'No live or cached OSRS tracker data is available yet. Once the feed is reachable, this view will build from real snapshots instead of placeholder stats.',
@@ -416,14 +429,18 @@ export function buildLiveRunescapeTracker(
   const maxUnestimated = maxRemainingAll
     .filter((item) => item.hoursLeft === null && !isSlayerTrackedSkill(item.skill.toLowerCase()))
     .map((item) => item.skill);
-  const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / Math.max(daysUntil('2026-10-03'), 1) : 0;
+  const runefestDaysLeft = Math.max(daysUntil('2026-10-03'), 1);
+  const runefestEffectiveLevelsRemaining = getEffectiveLevelsRemaining(player, totalLevelTarget);
+  const runefestEffectiveLevelsPerDayNeeded =
+    runefestEffectiveLevelsRemaining > 0 ? runefestEffectiveLevelsRemaining / runefestDaysLeft : 0;
+  const runefestLevelsPerDayNeeded = totalLevelsNeeded > 0 ? totalLevelsNeeded / runefestDaysLeft : 0;
   const runefestProjectionPlan = buildRuneFestProjection(skills, totalLevelsNeeded);
   const baseGoalProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'baseGoal');
   const runefestProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'runefest');
   const maxCapeProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'maxCape');
   const runefestProjection = buildGoalProjection(
     'RuneFest 2250',
-    daysUntil('2026-10-03'),
+    runefestDaysLeft,
     runefestProjectionPlan.hoursLeft,
     runefestProjectionPlan.unestimatedSkills,
     runefestProgressPct,
@@ -475,6 +492,8 @@ export function buildLiveRunescapeTracker(
     hoursToNextLevel,
     milestoneAlerts,
     goalProjections,
+    runefestEffectiveLevelsPerDayNeeded,
+    runefestEffectiveLevelsRemaining,
     runefestLevelsPerDayNeeded,
     coachingText: coachingParts.join(' '),
   };
@@ -493,8 +512,11 @@ export async function fetchRunescapeTrackerSnapshot() {
 
   try {
     liveData = await fetchRawRunescapeData();
-  } catch {
-    return buildTrackerFromLatestStoredSnapshot(store);
+  } catch (error) {
+    const cachedTracker = await buildTrackerFromLatestStoredSnapshot(store);
+    const message = error instanceof Error ? error.message : 'Unable to reach the live OSRS tracker feed.';
+
+    throw new CachedRunescapeTrackerError(`${message} Showing the latest cached OSRS snapshot instead.`, cachedTracker);
   }
 
   const todayKey = getTodaySnapshotKey();

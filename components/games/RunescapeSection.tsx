@@ -30,7 +30,6 @@ function formatCompactXp(value: number) {
 
 export default function RunescapeSection({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
   const totalLevelTarget = 2250;
-  const totalLevelsNeeded = Math.max(totalLevelTarget - tracker.totalLevel, 0);
   const goal1Projection = tracker.goalProjections.baseGoal;
   const goal2Projection = tracker.goalProjections.runefest;
   const goal3Projection = tracker.goalProjections.maxCape;
@@ -262,7 +261,10 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         paceColor={colors.accent}
         statRows={[
           { label: 'Current total level', value: `${tracker.totalLevel} / ${totalLevelTarget}` },
-          { label: 'Levels still needed', value: `${totalLevelsNeeded}` },
+          {
+            label: 'Levels still needed',
+            value: `${tracker.runefestEffectiveLevelsRemaining.toFixed(2)} effective`,
+          },
           ...(hasEffectiveHours ? [{ label: 'Effective hours today', value: `${tracker.effectiveHours.totalHours.toFixed(1)} h` }] : []),
         ]}
       >
@@ -275,8 +277,13 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         </Text>
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           That currently works out to about{' '}
-          <Text style={{ fontWeight: '700', color: colors.text }}>{tracker.runefestLevelsPerDayNeeded.toFixed(2)}</Text>{' '}
-          levels/day.
+          <Text style={{ fontWeight: '700', color: colors.text }}>
+            {tracker.runefestEffectiveLevelsPerDayNeeded.toFixed(2)}
+          </Text>{' '}
+          effective levels/day.
+          {tracker.runefestLevelsPerDayNeeded > 0
+            ? ` (${tracker.runefestLevelsPerDayNeeded.toFixed(2)} full levels/day)`
+            : ''}
         </Text>
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
           Pace check: {goal2Projection.status}

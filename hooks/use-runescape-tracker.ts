@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import {
+  CachedRunescapeTrackerError,
   LiveRunescapeTracker,
   fetchRunescapeTrackerSnapshot,
   getFallbackRunescapeTracker,
@@ -30,8 +31,13 @@ export function useRunescapeTracker(refreshToken = 0) {
       }
     } catch (error) {
       if (mountedRef.current) {
-        setTracker(getFallbackRunescapeTracker());
-        setTrackerError(error instanceof Error ? error.message : 'Unable to load live OSRS stats.');
+        if (error instanceof CachedRunescapeTrackerError) {
+          setTracker(error.tracker);
+          setTrackerError(error.message);
+        } else {
+          setTracker(getFallbackRunescapeTracker());
+          setTrackerError(error instanceof Error ? error.message : 'Unable to load live OSRS stats.');
+        }
       }
     } finally {
       if (mountedRef.current) {

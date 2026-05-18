@@ -142,6 +142,8 @@ export type LiveRunescapeTracker = {
     runefest: GoalProjection;
     maxCape: GoalProjection;
   };
+  runefestEffectiveLevelsPerDayNeeded: number;
+  runefestEffectiveLevelsRemaining: number;
   runefestLevelsPerDayNeeded: number;
   coachingText: string;
 };
