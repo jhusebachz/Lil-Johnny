@@ -392,7 +392,7 @@ export function buildLiveRunescapeTracker(
     }))
     .sort((left, right) => {
       if (left.hoursLeft === null && right.hoursLeft === null) {
-        return right.remainingXp - left.remainingXp;
+        return left.remainingXp - right.remainingXp;
       }
 
       if (left.hoursLeft === null) {
@@ -403,11 +403,11 @@ export function buildLiveRunescapeTracker(
         return -1;
       }
 
-      if (right.hoursLeft !== left.hoursLeft) {
-        return right.hoursLeft - left.hoursLeft;
+      if (left.hoursLeft !== right.hoursLeft) {
+        return left.hoursLeft - right.hoursLeft;
       }
 
-      return right.remainingXp - left.remainingXp;
+      return left.remainingXp - right.remainingXp;
     });
 
   const maxRemainingAll = [...skills]
@@ -423,7 +423,25 @@ export function buildLiveRunescapeTracker(
           ? Math.max(xpForLevel(99) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
           : null,
     }))
-    .sort((left, right) => left.remainingXp - right.remainingXp);
+    .sort((left, right) => {
+      if (left.hoursLeft === null && right.hoursLeft === null) {
+        return left.remainingXp - right.remainingXp;
+      }
+
+      if (left.hoursLeft === null) {
+        return 1;
+      }
+
+      if (right.hoursLeft === null) {
+        return -1;
+      }
+
+      if (left.hoursLeft !== right.hoursLeft) {
+        return left.hoursLeft - right.hoursLeft;
+      }
+
+      return left.remainingXp - right.remainingXp;
+    });
   const maxClosest = maxRemainingAll.filter((item) => !isSlayerTrackedSkill(item.skill.toLowerCase())).slice(0, 5);
 
   const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatOsrsSkillName(skill.skill));

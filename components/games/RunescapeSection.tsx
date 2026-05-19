@@ -139,41 +139,6 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
               ))}
             </View>
           ) : null}
-          <View style={{ marginTop: 10 }}>
-            {tracker.lastSevenDays.days.map((day) => (
-              <View
-                key={day.dateKey}
-                style={{
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.cardBorder,
-                  backgroundColor: colors.inputBackground,
-                  padding: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800', marginBottom: 4 }}>
-                  {day.label}
-                </Text>
-                <Text style={{ color: colors.subtext, fontSize: 12 }}>
-                  {day.totalXp.toLocaleString()} xp | {day.effectiveHours.toFixed(1)}h
-                </Text>
-                {day.topSkills.length > 0 ? (
-                  <View style={{ marginTop: 4 }}>
-                    <Text style={{ color: colors.subtext, fontSize: 12, marginBottom: 3 }}>Top skills</Text>
-                    {day.topSkills.map((skill) => (
-                      <Text
-                        key={`${day.dateKey}-${skill.skill}`}
-                        style={{ color: colors.subtext, fontSize: 12, marginBottom: 2 }}
-                      >
-                        {'\u2022'} {formatOsrsSkillName(skill.skill)} {formatCompactXp(skill.xp)} xp
-                      </Text>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
         </SectionCard>
       ) : null}
 
@@ -251,7 +216,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           Still needed
         </Text>
 
-        {tracker.baseGoalRemaining.slice(0, 5).map((item) => (
+        {tracker.baseGoalRemaining.map((item) => (
           <View key={item.skill} style={{ marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 12, color: colors.text, flex: 1 }}>
@@ -368,7 +333,11 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           <View key={item.skill} style={{ marginBottom: 10 }}>
             <Text style={{ fontSize: 12, color: colors.text }}>
               <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level}
-              <Text style={{ color: colors.subtext }}> - {item.remainingXp.toLocaleString()} xp to 99</Text>
+              <Text style={{ color: colors.subtext }}>
+                {' '}
+                - {item.remainingXp.toLocaleString()} xp to 99
+                {item.hoursLeft != null ? ` | ${item.hoursLeft.toFixed(1)}h to 99` : ' | Manual estimate'}
+              </Text>
             </Text>
             <ProgressBar pct={item.pct} color="#ec4899" colors={colors} />
           </View>
