@@ -250,6 +250,13 @@ export default function Reminders() {
                       await triggerHaptic();
                       updateReminder(reminder.id, { recurrence });
                     }}
+                    onCustomWeekdayToggle={async (weekday) => {
+                      await triggerHaptic();
+                      const nextWeekdays = reminder.customWeekdays.includes(weekday)
+                        ? reminder.customWeekdays.filter((day) => day !== weekday)
+                        : [...reminder.customWeekdays, weekday];
+                      updateReminder(reminder.id, { customWeekdays: nextWeekdays });
+                    }}
                     onCompleteToggle={async () => {
                       await triggerHaptic();
                       toggleReminderCompletion(reminder.id);

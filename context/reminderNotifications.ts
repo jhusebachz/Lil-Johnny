@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { getDateKey, isReminderScheduledOnDate } from '../data/reminders';
+import { getDateKey, getReminderScheduledWeekdays, isReminderScheduledOnDate } from '../data/reminders';
 import { getNotificationsModule, isExpoGo } from '../utils/notifications';
 import type { AppPreferences, NotificationAccess, ReminderItem } from './AppSettingsContext';
 
@@ -51,15 +51,11 @@ function getReminderNotificationCopy(reminder: ReminderItem, privateNotification
 }
 
 function getReminderWeekdays(reminder: ReminderItem) {
-  if (reminder.recurrence === 'weekdays') {
-    return [2, 3, 4, 5, 6];
+  if (reminder.recurrence === 'daily') {
+    return null;
   }
 
-  if (reminder.recurrence === 'weekends') {
-    return [1, 7];
-  }
-
-  return null;
+  return getReminderScheduledWeekdays(reminder).map((day) => (day === 0 ? 1 : day + 1));
 }
 
 export function createWebReminderPoller(

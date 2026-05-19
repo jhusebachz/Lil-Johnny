@@ -1,5 +1,23 @@
 import type { ReminderItem, ReminderRecurrence } from '../context/AppSettingsContext';
 
+export const REMINDER_CUSTOM_WEEKDAY_OPTIONS = [
+  { value: 1, shortLabel: 'Mon' },
+  { value: 2, shortLabel: 'Tue' },
+  { value: 3, shortLabel: 'Wed' },
+  { value: 4, shortLabel: 'Thu' },
+  { value: 5, shortLabel: 'Fri' },
+  { value: 6, shortLabel: 'Sat' },
+  { value: 0, shortLabel: 'Sun' },
+] as const;
+
+const DAILY_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+const WEEKDAY_WEEKDAYS = [1, 2, 3, 4, 5] as const;
+const WEEKEND_WEEKDAYS = [0, 6] as const;
+
+export function normalizeReminderCustomWeekdays(customWeekdays: number[]) {
+  return REMINDER_CUSTOM_WEEKDAY_OPTIONS.map((option) => option.value).filter((day) => customWeekdays.includes(day));
+}
+
 export function parseReminderTime(time: string) {
   const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
 
@@ -75,6 +93,10 @@ export function getDateKey(date = new Date()) {
 }
 
 export function getReminderRecurrenceLabel(recurrence: ReminderRecurrence) {
+  if (recurrence === 'custom') {
+    return 'Custom days';
+  }
+
   if (recurrence === 'weekdays') {
     return 'Weekdays';
   }
@@ -86,18 +108,38 @@ export function getReminderRecurrenceLabel(recurrence: ReminderRecurrence) {
   return 'Daily';
 }
 
-export function isReminderScheduledOnDate(reminder: ReminderItem, date: Date) {
-  const day = date.getDay();
-
+export function getReminderScheduledWeekdays(reminder: ReminderItem): number[] {
   if (reminder.recurrence === 'weekdays') {
-    return day >= 1 && day <= 5;
+    return [...WEEKDAY_WEEKDAYS];
   }
 
   if (reminder.recurrence === 'weekends') {
-    return day === 0 || day === 6;
+    return [...WEEKEND_WEEKDAYS];
   }
 
-  return true;
+  if (reminder.recurrence === 'custom') {
+    return normalizeReminderCustomWeekdays(reminder.customWeekdays);
+  }
+
+  return [...DAILY_WEEKDAYS];
+}
+
+export function getReminderCustomWeekdaySummary(reminder: ReminderItem) {
+  const weekdays: number[] = getReminderScheduledWeekdays(reminder);
+
+  if (reminder.recurrence !== 'custom' || weekdays.length === 0) {
+    return 'No days selected';
+  }
+
+  return REMINDER_CUSTOM_WEEKDAY_OPTIONS.filter((option) => weekdays.includes(option.value))
+    .map((option) => option.shortLabel)
+    .join(', ');
+}
+
+export function isReminderScheduledOnDate(reminder: ReminderItem, date: Date) {
+  const day = date.getDay();
+  const weekdays = getReminderScheduledWeekdays(reminder);
+  return weekdays.includes(day);
 }
 
 export function isReminderCompleteOnDate(reminder: ReminderItem, date: Date) {

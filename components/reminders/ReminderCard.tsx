@@ -1,6 +1,10 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { ReminderItem, ReminderRecurrence } from '../../context/AppSettingsContext';
-import { getReminderRecurrenceLabel } from '../../data/reminders';
+import {
+  getReminderCustomWeekdaySummary,
+  getReminderRecurrenceLabel,
+  REMINDER_CUSTOM_WEEKDAY_OPTIONS,
+} from '../../data/reminders';
 import { ThemeColors } from '../../data/theme';
 import ReminderToggle from './ReminderToggle';
 
@@ -12,11 +16,12 @@ type ReminderCardProps = {
   onTimePress: () => void;
   onToggle: () => void;
   onRecurrenceChange: (recurrence: ReminderRecurrence) => void;
+  onCustomWeekdayToggle: (weekday: number) => void;
   onCompleteToggle: () => void;
   completedToday: boolean;
 };
 
-const recurrenceOptions: ReminderRecurrence[] = ['daily', 'weekdays', 'weekends'];
+const recurrenceOptions: ReminderRecurrence[] = ['daily', 'weekdays', 'weekends', 'custom'];
 
 export default function ReminderCard({
   reminder,
@@ -26,6 +31,7 @@ export default function ReminderCard({
   onTimePress,
   onToggle,
   onRecurrenceChange,
+  onCustomWeekdayToggle,
   onCompleteToggle,
   completedToday,
 }: ReminderCardProps) {
@@ -124,6 +130,46 @@ export default function ReminderCard({
           );
         })}
       </View>
+      {reminder.recurrence === 'custom' ? (
+        <View style={{ marginTop: -2, marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 8 }}>
+            Pick the days this alarm should go off
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {REMINDER_CUSTOM_WEEKDAY_OPTIONS.map((option) => {
+              const selected = reminder.customWeekdays.includes(option.value);
+
+              return (
+                <Pressable
+                  key={`${reminder.id}-weekday-${option.value}`}
+                  onPress={() => onCustomWeekdayToggle(option.value)}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    backgroundColor: selected ? colors.accent : colors.inputBackground,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.accent : colors.inputBorder,
+                    marginRight: 8,
+                    marginBottom: 8,
+                    minWidth: 54,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: selected ? 'white' : colors.text, fontSize: 12, fontWeight: '700' }}>
+                    {option.shortLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={{ fontSize: 12, color: colors.subtext }}>
+            {reminder.customWeekdays.length > 0
+              ? `Selected: ${getReminderCustomWeekdaySummary(reminder)}`
+              : 'Select at least one day to activate this alarm.'}
+          </Text>
+        </View>
+      ) : null}
 
       <View
         style={{

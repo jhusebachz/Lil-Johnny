@@ -12,7 +12,7 @@ import {
 
 export type ThemeMode = 'light' | 'dark' | 'gangsta-green' | 'silver-black';
 export type NotificationAccess = 'granted' | 'denied' | 'undetermined' | 'unsupported';
-export type ReminderRecurrence = 'daily' | 'weekdays' | 'weekends';
+export type ReminderRecurrence = 'daily' | 'weekdays' | 'weekends' | 'custom';
 
 export type ReminderItem = {
   id: string;
@@ -21,6 +21,7 @@ export type ReminderItem = {
   enabled: boolean;
   notes: string;
   recurrence: ReminderRecurrence;
+  customWeekdays: number[];
   completedDates: string[];
 };
 
@@ -80,6 +81,7 @@ const initialReminders: ReminderItem[] = [
     enabled: true,
     notes: 'Focus on one practice block or one lab objective.',
     recurrence: 'weekdays',
+    customWeekdays: [1, 2, 3, 4, 5],
     completedDates: [],
   },
   {
@@ -89,6 +91,7 @@ const initialReminders: ReminderItem[] = [
     enabled: true,
     notes: 'Use this as the first clean certification study block for the day.',
     recurrence: 'daily',
+    customWeekdays: [0, 1, 2, 3, 4, 5, 6],
     completedDates: [],
   },
   {
@@ -98,6 +101,7 @@ const initialReminders: ReminderItem[] = [
     enabled: false,
     notes: 'Use this only when you actually want a hobbies window later in the day.',
     recurrence: 'weekends',
+    customWeekdays: [0, 6],
     completedDates: [],
   },
 ];
@@ -118,6 +122,10 @@ const defaultSettings: PersistedSettings = {
 };
 
 function mergeReminder(reminder?: Partial<ReminderItem>, fallback?: ReminderItem): ReminderItem {
+  const normalizedCustomWeekdays = [...new Set((reminder?.customWeekdays ?? fallback?.customWeekdays ?? []).filter(
+    (day): day is number => Number.isInteger(day) && day >= 0 && day <= 6
+  ))].sort((left, right) => left - right);
+
   return {
     id: reminder?.id ?? fallback?.id ?? `${Date.now()}`,
     topic: reminder?.topic ?? fallback?.topic ?? 'New Reminder',
@@ -125,6 +133,7 @@ function mergeReminder(reminder?: Partial<ReminderItem>, fallback?: ReminderItem
     enabled: reminder?.enabled ?? fallback?.enabled ?? true,
     notes: reminder?.notes ?? fallback?.notes ?? '',
     recurrence: reminder?.recurrence ?? fallback?.recurrence ?? 'daily',
+    customWeekdays: normalizedCustomWeekdays,
     completedDates: reminder?.completedDates ?? fallback?.completedDates ?? [],
   };
 }
@@ -254,7 +263,34 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
 
   const updateReminder = useCallback((id: string, updates: Partial<ReminderItem>) => {
     setReminders((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      current.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        const nextRecurrence = updates.recurrence ?? item.recurrence;
+        const nextCustomWeekdays =
+          updates.customWeekdays ??
+          (item.customWeekdays.length > 0
+            ? item.customWeekdays
+            : nextRecurrence === 'custom'
+              ? item.recurrence === 'weekdays'
+                ? [1, 2, 3, 4, 5]
+                : item.recurrence === 'weekends'
+                  ? [0, 6]
+                  : [0, 1, 2, 3, 4, 5, 6]
+              : item.customWeekdays);
+
+        return mergeReminder(
+          {
+            ...item,
+            ...updates,
+            recurrence: nextRecurrence,
+            customWeekdays: nextCustomWeekdays,
+          },
+          item
+        );
+      })
     );
   }, []);
 
@@ -266,6 +302,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
       enabled: true,
       notes: '',
       recurrence: 'daily',
+      customWeekdays: [0, 1, 2, 3, 4, 5, 6],
       completedDates: [],
     };
 
