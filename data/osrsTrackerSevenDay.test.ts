@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildTrackerSevenDaySummary,
   buildTrackerSevenDaySummaryFromSnapshotStore,
+  buildTrackerSevenDayTopSkills,
   readTrackerSevenDaySummaryFromMetadata,
 } from './osrsTrackerSevenDay.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
@@ -63,6 +64,7 @@ test('seven-day summary totals and averages are computed from compact day entrie
       label: 'May 17',
       totalXp: 200_000,
       effectiveHours: 2,
+      gainsBySkill: { hunter: 200_000 },
       topSkills: [{ skill: 'Hunter', xp: 200_000 }],
     },
     {
@@ -70,6 +72,7 @@ test('seven-day summary totals and averages are computed from compact day entrie
       label: 'May 16',
       totalXp: 100_000,
       effectiveHours: 1,
+      gainsBySkill: { slayer: 100_000 },
       topSkills: [{ skill: 'Slayer', xp: 100_000 }],
     },
   ]);
@@ -96,6 +99,7 @@ test('seven-day metadata parser accepts valid saved summaries', () => {
         label: 'May 17',
         totalXp: 200_000,
         effectiveHours: 2,
+        gainsBySkill: { hunter: 200_000 },
         topSkills: [{ skill: 'Hunter', xp: 200_000 }],
       },
     ],
@@ -145,6 +149,7 @@ test('seven-day summary prefers tracker-provided metadata when it is available',
         label: 'May 17',
         totalXp: 333_000,
         effectiveHours: 2.6,
+        gainsBySkill: { hunter: 333_000 },
         topSkills: [{ skill: 'Hunter', xp: 333_000 }],
       },
     ],
@@ -155,4 +160,31 @@ test('seven-day summary prefers tracker-provided metadata when it is available',
   assert.equal(summary.totalXp, 555_000);
   assert.equal(summary.totalEffectiveHours, 4.8);
   assert.equal(summary.days[0]?.totalXp, 333_000);
+});
+
+test('seven-day top skills aggregate gains across the full window', () => {
+  const summary = buildTrackerSevenDaySummary([
+    {
+      dateKey: '2026-05-17',
+      label: 'May 17',
+      totalXp: 200_000,
+      effectiveHours: 2,
+      gainsBySkill: { hunter: 140_000, slayer: 60_000 },
+      topSkills: [{ skill: 'hunter', xp: 140_000 }],
+    },
+    {
+      dateKey: '2026-05-16',
+      label: 'May 16',
+      totalXp: 180_000,
+      effectiveHours: 1.8,
+      gainsBySkill: { hunter: 40_000, runecraft: 90_000, slayer: 50_000 },
+      topSkills: [{ skill: 'runecraft', xp: 90_000 }],
+    },
+  ]);
+
+  assert.deepEqual(buildTrackerSevenDayTopSkills(summary), [
+    { skill: 'hunter', xp: 180_000 },
+    { skill: 'slayer', xp: 110_000 },
+    { skill: 'runecraft', xp: 90_000 },
+  ]);
 });

@@ -16,6 +16,7 @@ type SnapshotStoreLike = {
 type RawTrackerSevenDayEntry = {
   dateKey?: unknown;
   effectiveHours?: unknown;
+  gainsBySkill?: unknown;
   label?: unknown;
   topSkills?: unknown;
   totalXp?: unknown;
@@ -74,9 +75,25 @@ function normalizeSevenDayEntry(value: unknown): TrackerSevenDayEntry | null {
     return null;
   }
 
+  const gainsBySkill =
+    raw.gainsBySkill && typeof raw.gainsBySkill === 'object'
+      ? Object.fromEntries(
+          Object.entries(raw.gainsBySkill)
+            .filter(
+              (entry): entry is [SkillName, number] =>
+                typeof entry[0] === 'string' &&
+                typeof entry[1] === 'number' &&
+                Number.isFinite(entry[1]) &&
+                entry[1] >= 0
+            )
+            .map(([skill, xp]) => [skill, xp])
+        )
+      : {};
+
   return {
     dateKey: raw.dateKey,
     effectiveHours: clampNonNegativeNumber(raw.effectiveHours),
+    gainsBySkill,
     label: typeof raw.label === 'string' ? raw.label : formatSnapshotDayLabel(raw.dateKey),
     topSkills: normalizeTopSkills(raw.topSkills).slice(0, 3),
     totalXp: clampNonNegativeNumber(raw.totalXp),
@@ -111,6 +128,30 @@ export function buildTrackerSevenDaySummary(days: TrackerSevenDayEntry[]): Track
     totalEffectiveHours,
     totalXp,
   };
+}
+
+export function buildTrackerSevenDayTopSkills(summary: TrackerSevenDaySummary, limit = 3): TrackerSummaryItem[] {
+  const totals = new Map<string, number>();
+
+  summary.days.forEach((day) => {
+    const gains = Object.entries(day.gainsBySkill ?? {});
+
+    if (gains.length > 0) {
+      gains.forEach(([skill, xp]) => {
+        totals.set(skill, (totals.get(skill) ?? 0) + xp);
+      });
+      return;
+    }
+
+    day.topSkills.forEach((entry) => {
+      totals.set(entry.skill, (totals.get(entry.skill) ?? 0) + entry.xp);
+    });
+  });
+
+  return [...totals.entries()]
+    .map(([skill, xp]) => ({ skill, xp }))
+    .sort((left, right) => right.xp - left.xp)
+    .slice(0, limit);
 }
 
 export function readTrackerSevenDaySummaryFromMetadata(value: unknown) {
@@ -189,6 +230,7 @@ function buildSevenDayEntryFromSnapshot(
   return {
     dateKey,
     effectiveHours,
+    gainsBySkill: gainsBySkill ?? {},
     label: formatSnapshotDayLabel(dateKey),
     topSkills: buildTopSkillsForDay(currentData, previousData, username),
     totalXp,

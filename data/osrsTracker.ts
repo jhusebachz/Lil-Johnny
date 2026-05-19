@@ -377,12 +377,6 @@ export function buildLiveRunescapeTracker(
 
   const baseGoalRemaining = [...skills]
     .filter((skill) => skill.level < getGoalOneTargetLevel(skill.skill))
-    .sort(
-      (left, right) =>
-        xpForLevel(getGoalOneTargetLevel(left.skill)) -
-        left.experience -
-        (xpForLevel(getGoalOneTargetLevel(right.skill)) - right.experience)
-    )
     .map((skill) => ({
       skill: formatOsrsSkillName(skill.skill),
       level: skill.level,
@@ -395,11 +389,29 @@ export function buildLiveRunescapeTracker(
           ? Math.max(xpForLevel(getGoalOneTargetLevel(skill.skill)) - skill.experience, 0) /
             (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
           : null,
-    }));
+    }))
+    .sort((left, right) => {
+      if (left.hoursLeft === null && right.hoursLeft === null) {
+        return right.remainingXp - left.remainingXp;
+      }
+
+      if (left.hoursLeft === null) {
+        return 1;
+      }
+
+      if (right.hoursLeft === null) {
+        return -1;
+      }
+
+      if (right.hoursLeft !== left.hoursLeft) {
+        return right.hoursLeft - left.hoursLeft;
+      }
+
+      return right.remainingXp - left.remainingXp;
+    });
 
   const maxRemainingAll = [...skills]
     .filter((skill) => skill.level < 99)
-    .sort((left, right) => xpForLevel(99) - left.experience - (xpForLevel(99) - right.experience))
     .map((skill) => ({
       skill: formatOsrsSkillName(skill.skill),
       level: skill.level,
@@ -410,8 +422,9 @@ export function buildLiveRunescapeTracker(
         (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
           ? Math.max(xpForLevel(99) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
           : null,
-    }));
-  const maxClosest = maxRemainingAll.slice(0, 5);
+    }))
+    .sort((left, right) => left.remainingXp - right.remainingXp);
+  const maxClosest = maxRemainingAll.filter((item) => !isSlayerTrackedSkill(item.skill.toLowerCase())).slice(0, 5);
 
   const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatOsrsSkillName(skill.skill));
   const totalLevelTarget = 2250;

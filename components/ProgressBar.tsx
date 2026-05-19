@@ -23,34 +23,43 @@ export default function ProgressBar({
   return (
     <View
       style={{
-        backgroundColor: colors.cardBorder,
-        borderRadius: 999,
-        height,
         marginTop: 6,
         marginBottom: 8,
-        overflow: 'hidden',
+        minHeight: height + 6,
+        justifyContent: 'center',
       }}
     >
       <View
         style={{
-          backgroundColor: color ?? colors.accent,
-          width: `${safePct}%`,
-          height,
+          backgroundColor: colors.cardBorder,
           borderRadius: 999,
+          height,
+          overflow: 'hidden',
         }}
-      />
+      >
+        <View
+          style={{
+            backgroundColor: color ?? colors.accent,
+            width: `${safePct}%`,
+            height,
+            borderRadius: 999,
+          }}
+        />
+      </View>
       {safeMarkerPct !== null ? (
         <View
           style={{
             position: 'absolute',
             left: `${safeMarkerPct}%`,
-            marginLeft: -1,
-            top: -2,
-            bottom: -2,
-            width: 2,
+            marginLeft: -1.5,
+            top: 0,
+            bottom: 0,
+            width: 3,
             borderRadius: 999,
-            backgroundColor: colors.text,
-            opacity: 0.9,
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: 'rgba(15, 23, 42, 0.18)',
+            opacity: 0.98,
           }}
         />
       ) : null}

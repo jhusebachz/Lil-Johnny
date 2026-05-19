@@ -76,6 +76,7 @@ export type TrackerFriendSummary = {
 export type TrackerSevenDayEntry = {
   dateKey: string;
   effectiveHours: number;
+  gainsBySkill: Partial<Record<SkillName, number>>;
   label: string;
   topSkills: TrackerSummaryItem[];
   totalXp: number;

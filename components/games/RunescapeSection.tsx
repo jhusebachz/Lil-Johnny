@@ -6,6 +6,7 @@ import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
 import type { LiveRunescapeTracker } from '../../data/osrsTracker';
+import { buildTrackerSevenDayTopSkills } from '../../data/osrsTrackerSevenDay';
 import type { ThemeColors } from '../../data/theme';
 import TrackerGoalCard from './TrackerGoalCard';
 
@@ -34,8 +35,9 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
   const goal2Projection = tracker.goalProjections.runefest;
   const goal3Projection = tracker.goalProjections.maxCape;
   const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
-  const hasWeeklySummary = tracker.currentWeek.daysTracked > 0 || tracker.currentWeek.totalXp > 0;
   const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
+  const runefestRecommendations = tracker.hoursToNextLevel.filter((item) => item.hoursLeft !== null).slice(0, 3);
+  const sevenDayTopSkills = buildTrackerSevenDayTopSkills(tracker.lastSevenDays);
   const topEffectiveHourContributors = tracker.effectiveHours.bySkill
     .slice(0, 3)
     .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
@@ -85,7 +87,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         {hasEffectiveHours ? (
           <View style={{ marginTop: 14 }}>
             <Text style={{ color: colors.heroText, fontSize: 14, fontWeight: '800' }}>
-              OSRS effective hours: {tracker.effectiveHours.totalHours.toFixed(1)}h
+              OSRS effective hours since last report: {tracker.effectiveHours.totalHours.toFixed(1)}h
             </Text>
             {topEffectiveHourContributors ? (
               <Text style={{ color: colors.heroSubtext, marginTop: 4, fontSize: 12 }}>
@@ -95,54 +97,15 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           </View>
         ) : null}
 
-        {hasWeeklySummary ? (
-          <View style={{ marginTop: 14 }}>
-            <Text style={{ color: colors.heroText, fontSize: 14, fontWeight: '800' }}>
-              This week: {formatCompactXp(tracker.currentWeek.totalXp)} xp |{' '}
-              {tracker.currentWeek.totalEffectiveHours.toFixed(1)}h
-            </Text>
-            <Text style={{ color: colors.heroSubtext, marginTop: 4, fontSize: 12 }}>
-              {tracker.currentWeek.activeDays} active day{tracker.currentWeek.activeDays === 1 ? '' : 's'} this week
-            </Text>
-          </View>
-        ) : null}
-
         {hasSevenDaySummary ? (
           <View style={{ marginTop: 14 }}>
             <Text style={{ color: colors.heroText, fontSize: 14, fontWeight: '800' }}>
               Last 7 days: {formatCompactXp(tracker.lastSevenDays.totalXp)} xp |{' '}
               {tracker.lastSevenDays.totalEffectiveHours.toFixed(1)}h
             </Text>
-            <Text style={{ color: colors.heroSubtext, marginTop: 4, fontSize: 12 }}>
-              {tracker.lastSevenDays.activeDays} active day{tracker.lastSevenDays.activeDays === 1 ? '' : 's'} tracked
-            </Text>
           </View>
         ) : null}
       </View>
-
-      {hasWeeklySummary ? (
-        <SectionCard title="This Week" emoji={'\uD83D\uDCC5'} colors={colors}>
-          <StatRow label="Week-to-date XP" value={`${tracker.currentWeek.totalXp.toLocaleString()} xp`} colors={colors} />
-          <StatRow
-            label="Week-to-date hours"
-            value={`${tracker.currentWeek.totalEffectiveHours.toFixed(1)} h`}
-            colors={colors}
-          />
-          <StatRow
-            label="Active days"
-            value={`${tracker.currentWeek.activeDays} / ${tracker.currentWeek.daysTracked}`}
-            colors={colors}
-          />
-          {tracker.currentWeek.topSkills.length > 0 ? (
-            <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 8 }}>
-              Top skills:{' '}
-              {tracker.currentWeek.topSkills
-                .map((skill) => `${formatOsrsSkillName(skill.skill)} ${formatCompactXp(skill.xp)} xp`)
-                .join(' | ')}
-            </Text>
-          ) : null}
-        </SectionCard>
-      ) : null}
 
       {hasSevenDaySummary ? (
         <SectionCard title="Last 7 Days" emoji={'\uD83D\uDCC8'} colors={colors}>
@@ -166,6 +129,16 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
             value={`${Math.round(tracker.lastSevenDays.averageXp).toLocaleString()} xp | ${tracker.lastSevenDays.averageEffectiveHours.toFixed(1)}h`}
             colors={colors}
           />
+          {sevenDayTopSkills.length > 0 ? (
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ color: colors.subtext, fontSize: 12, marginBottom: 4 }}>Top skills</Text>
+              {sevenDayTopSkills.map((skill) => (
+                <Text key={`seven-day-${skill.skill}`} style={{ color: colors.text, fontSize: 12, marginBottom: 3 }}>
+                  {'\u2022'} {formatOsrsSkillName(skill.skill)} {formatCompactXp(skill.xp)} xp
+                </Text>
+              ))}
+            </View>
+          ) : null}
           <View style={{ marginTop: 10 }}>
             {tracker.lastSevenDays.days.map((day) => (
               <View
@@ -186,12 +159,17 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                   {day.totalXp.toLocaleString()} xp | {day.effectiveHours.toFixed(1)}h
                 </Text>
                 {day.topSkills.length > 0 ? (
-                  <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 4 }}>
-                    Top skills:{' '}
-                    {day.topSkills
-                      .map((skill) => `${formatOsrsSkillName(skill.skill)} ${formatCompactXp(skill.xp)} xp`)
-                      .join(' | ')}
-                  </Text>
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={{ color: colors.subtext, fontSize: 12, marginBottom: 3 }}>Top skills</Text>
+                    {day.topSkills.map((skill) => (
+                      <Text
+                        key={`${day.dateKey}-${skill.skill}`}
+                        style={{ color: colors.subtext, fontSize: 12, marginBottom: 2 }}
+                      >
+                        {'\u2022'} {formatOsrsSkillName(skill.skill)} {formatCompactXp(skill.xp)} xp
+                      </Text>
+                    ))}
+                  </View>
                 ) : null}
               </View>
             ))}
@@ -307,7 +285,9 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
             label: 'Levels still needed',
             value: `${tracker.runefestEffectiveLevelsRemaining.toFixed(2)} effective levels`,
           },
-          ...(hasEffectiveHours ? [{ label: 'Effective hours today', value: `${tracker.effectiveHours.totalHours.toFixed(1)} h` }] : []),
+          ...(hasEffectiveHours
+            ? [{ label: 'Effective hours since last report', value: `${tracker.effectiveHours.totalHours.toFixed(1)} h` }]
+            : []),
         ]}
       >
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
@@ -328,6 +308,31 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           Pace check: {goal2Projection.status}
           {goal2Projection.hoursPerDay !== null ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day` : ''}
         </Text>
+        {runefestRecommendations.length > 0 ? (
+          <View style={{ marginTop: 10 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '800',
+                color: colors.text,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginBottom: 6,
+              }}
+            >
+              Fastest next levels
+            </Text>
+            {runefestRecommendations.map((item) => (
+              <Text key={`runefest-${item.skill}`} style={{ fontSize: 12, color: colors.subtext, marginBottom: 4 }}>
+                {'\u2022'} {item.skill} Lv{item.level} to {item.targetLevel}
+                <Text style={{ color: colors.text, fontWeight: '700' }}>
+                  {' '}
+                  {item.hoursLeft!.toFixed(1)}h
+                </Text>
+              </Text>
+            ))}
+          </View>
+        ) : null}
       </TrackerGoalCard>
 
       <TrackerGoalCard
