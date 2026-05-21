@@ -116,7 +116,7 @@ test('effective-hours helper skips skills without configured XP-per-hour assumpt
   assert.deepEqual(summary.skippedSkills, ['unknownskill']);
 });
 
-test('effective-hours helper suppresses passive combat overlap on slayer days', () => {
+test('effective-hours helper suppresses combat skills for efficient-hour totals', () => {
   const summary = calculateOsrsEffectiveHoursFromGains({
     defence: 41_221,
     hitpoints: 54_879,
@@ -132,6 +132,21 @@ test('effective-hours helper suppresses passive combat overlap on slayer days', 
       ['slayer', 1.0582],
       ['herblore', 0.0009],
     ]
+  );
+});
+
+test('effective-hours helper ignores combat gains even without slayer xp', () => {
+  const summary = calculateOsrsEffectiveHoursFromGains({
+    attack: 24_000,
+    ranged: 42_000,
+    hitpoints: 13_000,
+    hunter: 70_000,
+  });
+
+  assert.equal(summary.totalHours, 1);
+  assert.deepEqual(
+    summary.bySkill.map((entry) => [entry.skill, entry.hours]),
+    [['hunter', 1]]
   );
 });
 
