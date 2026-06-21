@@ -83,6 +83,7 @@ export type DiyTask = {
 
 export type LifeTrackerMetadata = {
   appliedMigrations: string[];
+  blissTrendResetDate?: string;
 };
 
 export type LifeTrackerData = {
@@ -109,6 +110,7 @@ const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
 const RESET_SNACKS_SWEETS_MIGRATION = 'reset-snacks-sweets-initial-state-v1';
 const RESET_ALL_AVOIDANCE_GOALS_MIGRATION = 'restart-all-avoidance-goals-v1';
 const RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION = 'restart-all-avoidance-goals-after-japan-v1';
+const RESET_BLISS_TREND_WINDOW_MIGRATION = 'reset-bliss-trend-window-after-japan-v1';
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -375,6 +377,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const shouldApplyFullAvoidanceReset = !appliedMigrations.has(RESET_ALL_AVOIDANCE_GOALS_MIGRATION);
   const shouldApplyJapanAvoidanceReset = !appliedMigrations.has(RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION);
   const shouldApplySnacksReset = !appliedMigrations.has(RESET_SNACKS_SWEETS_MIGRATION);
+  const shouldApplyBlissTrendReset = !appliedMigrations.has(RESET_BLISS_TREND_WINDOW_MIGRATION);
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
     if (fallback.type === 'avoidance' && (shouldApplyFullAvoidanceReset || shouldApplyJapanAvoidanceReset)) {
       return createResetAvoidanceGoal(fallback, todayDateKey);
@@ -448,6 +451,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const fullyAppliedMigrations = shouldApplyJapanAvoidanceReset
     ? [...finalAppliedMigrations, RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION]
     : finalAppliedMigrations;
+  const allAppliedMigrations = shouldApplyBlissTrendReset
+    ? [...fullyAppliedMigrations, RESET_BLISS_TREND_WINDOW_MIGRATION]
+    : fullyAppliedMigrations;
 
   return {
     certifications: defaultLifeTrackerData.certifications.map((fallback) => {
@@ -487,7 +493,10 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     loopRuns: data.loopRuns ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
     metadata: {
-      appliedMigrations: fullyAppliedMigrations,
+      appliedMigrations: allAppliedMigrations,
+      blissTrendResetDate: shouldApplyBlissTrendReset
+        ? todayDateKey
+        : data.metadata?.blissTrendResetDate,
     },
   };
 }

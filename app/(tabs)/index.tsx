@@ -7,6 +7,7 @@ import { usePreferenceSettings, useThemeSettings } from '../../context/AppSettin
 import { useGymExerciseHistoryData } from '../../context/GymDataContext';
 import {
   useLifeTrackerCyberData,
+  useLifeTrackerData,
   useLifeTrackerGoalsData,
   useLifeTrackerHealthData,
   useLifeTrackerHobbiesData,
@@ -100,6 +101,7 @@ export default function Dashboard() {
   const { preferences } = usePreferenceSettings();
   const colors = getThemeColors(theme);
   const { width } = useWindowDimensions();
+  const { lifeData } = useLifeTrackerData();
   const { certifications } = useLifeTrackerCyberData();
   const { diyTasks } = useLifeTrackerHobbiesData();
   const { goals2026 } = useLifeTrackerGoalsData();
@@ -128,6 +130,7 @@ export default function Dashboard() {
     exerciseHistory,
     goals2026,
     loopRuns,
+    metadata: lifeData.metadata,
     profileName: preferences.profileName,
     tracker,
     weightEntries,

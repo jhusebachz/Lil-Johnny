@@ -12,6 +12,7 @@ import {
   CertificationTracker,
   DiyTask,
   GOAL_WEIGHT_LB,
+  LifeTrackerMetadata,
   LoopRunEntry,
   TRACKER_BASELINE_DATE,
   WEIGHT_GOAL_TARGET_DATE,
@@ -71,6 +72,7 @@ type UseDashboardMetricsArgs = {
   exerciseHistory: GymExerciseHistory;
   goals2026: AvoidanceGoal[];
   loopRuns: LoopRunEntry[];
+  metadata?: LifeTrackerMetadata;
   profileName?: string;
   tracker: LiveRunescapeTracker;
   weightEntries: WeightEntry[];
@@ -82,6 +84,7 @@ export function useDashboardMetrics({
   exerciseHistory,
   goals2026,
   loopRuns,
+  metadata,
   profileName,
   tracker,
   weightEntries,
@@ -125,6 +128,7 @@ export function useDashboardMetrics({
   const alcoholStreak = alcoholGoal ? getAvoidanceStreak(alcoholGoal, now) : 0;
   const stretchingStreak = stretchingGoal ? getAvoidanceStreak(stretchingGoal, now) : 0;
   const snacksStreak = snacksGoal ? getAvoidanceStreak(snacksGoal, now) : 0;
+  const blissTrendResetDate = metadata?.blissTrendResetDate ?? null;
   const streaksScore = sanitizeUnitScore(
     avoidanceGoals.length > 0
       ? avoidanceGoals.reduce((total, goal) => total + getAvoidanceConsistencySummary(goal, now).multiplier, 0) /
@@ -168,7 +172,6 @@ export function useDashboardMetrics({
     const weightedScores = Array.from({ length: BLISS_TREND_WEEKS }, (_, index) => {
       const weeksAgo = BLISS_TREND_WEEKS - index - 1;
       const referenceDate = getWeeksAgoDate(now, weeksAgo);
-      const weight = index + 1;
       const referenceWeekKeys = new Set(getCurrentWeekDateKeys(referenceDate));
       const referenceGymVisitCount = getUniqueWeekCount(loggedGymDateKeys, referenceDate);
       const referenceGymPacePct = getScheduledGymPacePct(referenceDate);
@@ -196,17 +199,37 @@ export function useDashboardMetrics({
       );
 
       return {
-        weight,
+        referenceWeekEndDateKey,
         cyber: sanitizeUnitScore(cyberScore),
         health: referenceHealthScore,
         hobbies: referenceHobbiesScore,
         streaks: sanitizeUnitScore(streaksScore),
         total: referenceBlissScore,
       };
-    });
-    const totalWeight = sumWeights(weightedScores.length);
+    })
+      .filter((score) => !blissTrendResetDate || score.referenceWeekEndDateKey >= blissTrendResetDate)
+      .map((score, index) => ({
+        ...score,
+        weight: index + 1,
+      }));
+
+    const scoresForAverage =
+      weightedScores.length > 0
+        ? weightedScores
+        : [
+            {
+              cyber: sanitizeUnitScore(cyberScore),
+              health: 0,
+              hobbies: 0,
+              streaks: sanitizeUnitScore(streaksScore),
+              total: sanitizeUnitScore(cyberScore * 0.3 + sanitizeUnitScore(streaksScore) * 0.25),
+              weight: 1,
+              referenceWeekEndDateKey: todayDateKey,
+            },
+          ];
+    const totalWeight = sumWeights(scoresForAverage.length);
     const weightedAverage = (key: 'cyber' | 'health' | 'hobbies' | 'streaks' | 'total') =>
-      sanitizeUnitScore(weightedScores.reduce((sum, score) => sum + score[key] * score.weight, 0) / totalWeight);
+      sanitizeUnitScore(scoresForAverage.reduce((sum, score) => sum + score[key] * score.weight, 0) / totalWeight);
 
     return {
       total: weightedAverage('total'),
@@ -215,7 +238,19 @@ export function useDashboardMetrics({
       hobbies: weightedAverage('hobbies'),
       streaks: weightedAverage('streaks'),
     };
-  }, [baseGoalOnPace, cyberScore, diyTasks, loggedGymDateKeys, loopRuns, now, runefestOnPace, sortedWeightEntries, streaksScore]);
+  }, [
+    baseGoalOnPace,
+    blissTrendResetDate,
+    cyberScore,
+    diyTasks,
+    loggedGymDateKeys,
+    loopRuns,
+    now,
+    runefestOnPace,
+    sortedWeightEntries,
+    streaksScore,
+    todayDateKey,
+  ]);
   const blissScore = Math.round(blissTrend.total * 100);
   const blissBreakdown = [
     `Cyber: ${Math.round(blissTrend.cyber * 100)}`,
