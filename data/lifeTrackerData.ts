@@ -108,6 +108,7 @@ const DEFAULT_AVOIDANCE_START_DATE = getLocalTodayDateKey();
 const NEWLY_ADDED_AVOIDANCE_GOAL_IDS = new Set(['snacks-sweets']);
 const RESET_SNACKS_SWEETS_MIGRATION = 'reset-snacks-sweets-initial-state-v1';
 const RESET_ALL_AVOIDANCE_GOALS_MIGRATION = 'restart-all-avoidance-goals-v1';
+const RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION = 'restart-all-avoidance-goals-after-japan-v1';
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -123,7 +124,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'Linux+',
       chapterCount: 26,
       chaptersCompleted: 0,
-      startDate: '2026-06-20',
+      startDate: '2026-06-06',
       examDate: '2026-09-15',
       studyGuide: 'Sybex Linux+ Study Guide (XK0-006, 6th Edition)',
     },
@@ -132,7 +133,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'PenTest+',
       chapterCount: 12,
       chaptersCompleted: 0,
-      startDate: '2026-10-15',
+      startDate: '2026-10-01',
       examDate: '2026-12-15',
       studyGuide: 'Sybex PenTest+ Study Guide (PT0-003, 3rd Edition)',
     },
@@ -141,7 +142,7 @@ export const defaultLifeTrackerData: LifeTrackerData = {
       name: 'Cloud+',
       chapterCount: 10,
       chaptersCompleted: 0,
-      startDate: '2027-01-15',
+      startDate: '2027-01-01',
       examDate: '2027-03-15',
       studyGuide: 'Sybex Cloud+ Study Guide (CV0-004, 4th Edition)',
     },
@@ -372,9 +373,10 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const todayDateKey = getTodayDateKey();
   const appliedMigrations = new Set(data.metadata?.appliedMigrations ?? []);
   const shouldApplyFullAvoidanceReset = !appliedMigrations.has(RESET_ALL_AVOIDANCE_GOALS_MIGRATION);
+  const shouldApplyJapanAvoidanceReset = !appliedMigrations.has(RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION);
   const shouldApplySnacksReset = !appliedMigrations.has(RESET_SNACKS_SWEETS_MIGRATION);
   const normalizedGoals2026 = defaultLifeTrackerData.goals2026.map((fallback) => {
-    if (fallback.type === 'avoidance' && shouldApplyFullAvoidanceReset) {
+    if (fallback.type === 'avoidance' && (shouldApplyFullAvoidanceReset || shouldApplyJapanAvoidanceReset)) {
       return createResetAvoidanceGoal(fallback, todayDateKey);
     }
 
@@ -443,6 +445,9 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
   const finalAppliedMigrations = shouldApplyFullAvoidanceReset
     ? [...normalizedAppliedMigrations, RESET_ALL_AVOIDANCE_GOALS_MIGRATION]
     : normalizedAppliedMigrations;
+  const fullyAppliedMigrations = shouldApplyJapanAvoidanceReset
+    ? [...finalAppliedMigrations, RESET_ALL_AVOIDANCE_GOALS_JAPAN_MIGRATION]
+    : finalAppliedMigrations;
 
   return {
     certifications: defaultLifeTrackerData.certifications.map((fallback) => {
@@ -482,7 +487,7 @@ function normalizeLifeTrackerData(data: Partial<LifeTrackerData>): LifeTrackerDa
     loopRuns: data.loopRuns ?? [],
     diyTasks: data.diyTasks?.length ? data.diyTasks : defaultLifeTrackerData.diyTasks,
     metadata: {
-      appliedMigrations: finalAppliedMigrations,
+      appliedMigrations: fullyAppliedMigrations,
     },
   };
 }
