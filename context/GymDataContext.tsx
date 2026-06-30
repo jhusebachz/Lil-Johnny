@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useEffect, useMemo, useState } from 'react';
 
 import {
   GymExerciseHistory,
@@ -7,6 +7,7 @@ import {
   readPersistedGymData,
   writePersistedGymData,
 } from '../data/gymData';
+import { useRequiredContext } from './useRequiredContext';
 
 type GymDataContextValue = {
   hydrated: boolean;
@@ -34,16 +35,6 @@ const GymDataContext = createContext<GymDataContextValue | undefined>(undefined)
 const GymHydrationContext = createContext<GymHydrationContextValue | undefined>(undefined);
 const GymExerciseHistoryContext = createContext<GymExerciseHistoryContextValue | undefined>(undefined);
 const GymExerciseLogsContext = createContext<GymExerciseLogsContextValue | undefined>(undefined);
-
-function useRequiredContext<T>(context: React.Context<T | undefined>, errorMessage: string) {
-  const value = useContext(context);
-
-  if (!value) {
-    throw new Error(errorMessage);
-  }
-
-  return value;
-}
 
 export function GymDataProvider({ children }: { children: React.ReactNode }) {
   const [exerciseLogs, setExerciseLogs] = useState<PersistedGymData['exerciseLogs']>({});

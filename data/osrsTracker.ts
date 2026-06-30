@@ -1,4 +1,12 @@
 import { formatOsrsSkillName, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
+import {
+  buildBaseGoalRemaining,
+  buildDerivedTopSkills,
+  buildFriendSummaries,
+  buildHoursToNextLevel,
+  buildMaxClosest,
+  buildMaxRemainingAll,
+} from './osrsTrackerBuilders.ts';
 import { fetchRawRunescapeData } from './osrsTrackerFetch.ts';
 import {
   createEmptyTrackerWeekSummary,
@@ -11,21 +19,17 @@ import {
   GOAL_ONE_DEADLINE,
   GOAL_ONE_LABEL,
   GOAL_PROGRESS_BASELINE,
-  GOAL_TRAINING_PLANS,
   buildGoalProjection,
   buildRuneFestProjection,
   buildTargetProgress,
   daysUntil,
   describeGoalStatus,
   getEffectiveLevelsRemaining,
-  getGoalOneTargetLevel,
-  getNextLevel,
   getPacePct,
   isSlayerTrackedSkill,
-  percentToTarget,
   xpForLevel,
 } from './osrsTrackerGoals.ts';
-import { getPlayerEntries, getPlayerStats, getSkillDelta, getTrackerMetadata } from './osrsTrackerParsers.ts';
+import { getPlayerStats, getSkillDelta, getTrackerMetadata } from './osrsTrackerParsers.ts';
 import {
   buildTrackerSevenDaySummaryFromSnapshotStore,
   createEmptySevenDaySummary,
@@ -301,61 +305,13 @@ export function buildLiveRunescapeTracker(
     }));
   const effectiveHours = getEffectiveHours(currentData, previousData, username, skills);
 
-  const derivedTopSkills = [...skills]
-    .map((skill) => ({
-      skill: formatOsrsSkillName(skill.skill),
-      xp: hasDelta ? getSkillDelta(player, previousPlayer, skill.skill) : skill.experience,
-      level: skill.level,
-    }))
-    .filter((skill) => !hasDelta || skill.xp > 0)
-    .sort((left, right) => right.xp - left.xp)
-    .slice(0, 5)
-    .map(({ skill, xp }) => ({ skill, xp }));
+  const derivedTopSkills = buildDerivedTopSkills(player, previousPlayer, hasDelta);
   const topSkills =
     dailySummary?.topSkills.map(({ skill, xp }) => ({
       skill: formatOsrsSkillName(skill),
       xp,
     })) ?? derivedTopSkills;
-
-  const derivedFriends = getPlayerEntries(currentData)
-    .filter(([name]) => name !== username)
-    .map(([name, stats]) => {
-      const previousFriend = previousData ? getPlayerStats(previousData, name) : null;
-      const overallXp = hasDelta
-        ? Math.max(stats.overall.experience - (previousFriend?.overall.experience ?? stats.overall.experience), 0)
-        : stats.overall.experience;
-      const yourValue = hasDelta
-        ? Math.max(player.overall.experience - (previousPlayer?.overall.experience ?? player.overall.experience), 0)
-        : player.overall.experience;
-
-      return {
-        name,
-        overallXp,
-        diff: yourValue - overallXp,
-        topSkills: SKILL_ORDER.filter((skill) => stats[skill] && stats[skill].experience >= 0)
-          .map((skill) => ({
-            skill,
-            xp: hasDelta ? getSkillDelta(stats, previousFriend, skill) : stats[skill].experience,
-            level: stats[skill].level,
-          }))
-          .filter((skill) => !hasDelta || skill.xp > 0)
-          .sort((left, right) => right.xp - left.xp)
-          .slice(0, 3)
-          .map((skill) => ({
-            skill: formatOsrsSkillName(skill.skill),
-            xp: skill.xp,
-            level: skill.level,
-          })),
-      };
-    })
-    .sort((left, right) => {
-      const leftIndex = FRIEND_ORDER.indexOf(left.name as (typeof FRIEND_ORDER)[number]);
-      const rightIndex = FRIEND_ORDER.indexOf(right.name as (typeof FRIEND_ORDER)[number]);
-      const safeLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
-      const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
-
-      return safeLeftIndex - safeRightIndex;
-    });
+  const derivedFriends = buildFriendSummaries(currentData, previousData, username, player, previousPlayer, hasDelta);
   const friends =
     dailySummary?.friends
       .map((friend) => ({
@@ -375,120 +331,15 @@ export function buildLiveRunescapeTracker(
         return safeLeftIndex - safeRightIndex;
       }) ?? derivedFriends;
 
-  const baseGoalRemaining = [...skills]
-    .filter((skill) => skill.level < getGoalOneTargetLevel(skill.skill))
-    .map((skill) => ({
-      skill: formatOsrsSkillName(skill.skill),
-      level: skill.level,
-      targetLevel: getGoalOneTargetLevel(skill.skill),
-      pct: percentToTarget(skill.experience, getGoalOneTargetLevel(skill.skill)),
-      remainingXp: Math.max(xpForLevel(getGoalOneTargetLevel(skill.skill)) - skill.experience, 0),
-      xpPerHour: GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0,
-      hoursLeft:
-        (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
-          ? Math.max(xpForLevel(getGoalOneTargetLevel(skill.skill)) - skill.experience, 0) /
-            (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
-          : null,
-    }))
-    .sort((left, right) => {
-      if (left.hoursLeft === null && right.hoursLeft === null) {
-        return left.remainingXp - right.remainingXp;
-      }
-
-      if (left.hoursLeft === null) {
-        return 1;
-      }
-
-      if (right.hoursLeft === null) {
-        return -1;
-      }
-
-      if (left.hoursLeft !== right.hoursLeft) {
-        return left.hoursLeft - right.hoursLeft;
-      }
-
-      return left.remainingXp - right.remainingXp;
-    });
-
-  const maxRemainingAll = [...skills]
-    .filter((skill) => skill.level < 99)
-    .map((skill) => ({
-      skill: formatOsrsSkillName(skill.skill),
-      level: skill.level,
-      pct: percentToTarget(skill.experience, 99),
-      remainingXp: Math.max(xpForLevel(99) - skill.experience, 0),
-      xpPerHour: GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0,
-      hoursLeft:
-        (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 0) > 0
-          ? Math.max(xpForLevel(99) - skill.experience, 0) / (GOAL_TRAINING_PLANS[skill.skill]?.xpPerHour ?? 1)
-          : null,
-    }))
-    .sort((left, right) => {
-      if (left.hoursLeft === null && right.hoursLeft === null) {
-        return left.remainingXp - right.remainingXp;
-      }
-
-      if (left.hoursLeft === null) {
-        return 1;
-      }
-
-      if (right.hoursLeft === null) {
-        return -1;
-      }
-
-      if (left.hoursLeft !== right.hoursLeft) {
-        return left.hoursLeft - right.hoursLeft;
-      }
-
-      return left.remainingXp - right.remainingXp;
-    });
-  const maxClosest = maxRemainingAll.filter((item) => !isSlayerTrackedSkill(item.skill.toLowerCase())).slice(0, 5);
+  const baseGoalRemaining = buildBaseGoalRemaining(skills);
+  const maxRemainingAll = buildMaxRemainingAll(skills);
+  const maxClosest = buildMaxClosest(maxRemainingAll);
 
   const maxedSkills = skills.filter((skill) => skill.level >= 99).map((skill) => formatOsrsSkillName(skill.skill));
   const totalLevelTarget = 2250;
   const totalLevelsNeeded = Math.max(totalLevelTarget - player.overall.level, 0);
 
-  const hoursToNextLevel = [...skills]
-    .map((skill) => {
-      const trainingPlan = GOAL_TRAINING_PLANS[skill.skill];
-      const targetLevel = getNextLevel(skill.level);
-
-      if (!trainingPlan || !targetLevel) {
-        return null;
-      }
-
-      const remainingXp = Math.max(xpForLevel(targetLevel) - skill.experience, 0);
-
-      if (remainingXp <= 0) {
-        return null;
-      }
-
-      return {
-        skill: formatOsrsSkillName(skill.skill),
-        level: skill.level,
-        targetLevel,
-        remainingXp,
-        xpPerHour: trainingPlan.xpPerHour,
-        hoursLeft: trainingPlan.xpPerHour > 0 ? remainingXp / trainingPlan.xpPerHour : null,
-        mode: trainingPlan.mode,
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .sort((left, right) => {
-      if (left.hoursLeft === null && right.hoursLeft === null) {
-        return left.remainingXp - right.remainingXp;
-      }
-
-      if (left.hoursLeft === null) {
-        return 1;
-      }
-
-      if (right.hoursLeft === null) {
-        return -1;
-      }
-
-      return left.hoursLeft - right.hoursLeft;
-    });
+  const hoursToNextLevel = buildHoursToNextLevel(skills);
 
   const milestoneAlerts = [...skills]
     .map((skill) => {

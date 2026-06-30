@@ -54,10 +54,6 @@ export function useRunescapeTracker(refreshToken = 0) {
     };
   }, []);
 
-  useEffect(() => {
-    void loadTracker();
-  }, [loadTracker, refreshToken]);
-
   useFocusEffect(
     useCallback(() => {
       void loadTracker();

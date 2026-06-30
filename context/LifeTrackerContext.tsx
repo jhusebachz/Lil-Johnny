@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   CertificationTracker,
@@ -14,6 +14,7 @@ import {
   readPersistedLifeTrackerData,
   writePersistedLifeTrackerData,
 } from '../data/lifeTrackerData';
+import { useRequiredContext } from './useRequiredContext';
 
 type LifeTrackerContextValue = {
   hydrated: boolean;
@@ -60,16 +61,6 @@ const LifeTrackerHobbiesContext = createContext<LifeTrackerHobbiesContextValue |
 
 function resolveStateUpdate<T>(updater: React.SetStateAction<T>, current: T) {
   return typeof updater === 'function' ? (updater as (value: T) => T)(current) : updater;
-}
-
-function useRequiredContext<T>(context: React.Context<T | undefined>, errorMessage: string) {
-  const value = useContext(context);
-
-  if (!value) {
-    throw new Error(errorMessage);
-  }
-
-  return value;
 }
 
 export function LifeTrackerProvider({ children }: { children: React.ReactNode }) {
