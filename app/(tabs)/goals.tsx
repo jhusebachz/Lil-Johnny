@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import RunescapeSection from '../../components/games/RunescapeSection';
@@ -159,6 +159,69 @@ function DiyAddCard({
   );
 }
 
+function CompletedDiyTasksSection({
+  colors,
+  completedTasks,
+  expanded,
+  onToggleExpanded,
+  onToggleTask,
+}: {
+  colors: ReturnType<typeof getThemeColors>;
+  completedTasks: DiyTask[];
+  expanded: boolean;
+  onToggleExpanded: () => Promise<void>;
+  onToggleTask: (taskId: string) => Promise<void>;
+}) {
+  if (completedTasks.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <SectionCard title="Completed DIY Tasks" emoji={'\u2705'} colors={colors}>
+        <Pressable
+          onPress={() => {
+            void onToggleExpanded();
+          }}
+          style={{
+            borderWidth: 1,
+            borderColor: colors.cardBorder,
+            borderRadius: 12,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
+            backgroundColor: colors.inputBackground,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800' }}>
+                {expanded ? 'Hide completed tasks' : 'Show completed tasks'}
+              </Text>
+              <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 4 }}>
+                {completedTasks.length} completed task{completedTasks.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+            <Text style={{ color: colors.accent, fontSize: 18, fontWeight: '900' }}>{expanded ? '-' : '+'}</Text>
+          </View>
+        </Pressable>
+      </SectionCard>
+
+      {expanded
+        ? completedTasks.map((task) => (
+            <DiyTaskCard
+              key={task.id}
+              task={task}
+              colors={colors}
+              onToggle={async () => {
+                await onToggleTask(task.id);
+              }}
+            />
+          ))
+        : null}
+    </>
+  );
+}
+
 export default function Goals() {
   const { theme } = useThemeSettings();
   const { triggerHaptic } = usePreferenceSettings();
@@ -168,6 +231,7 @@ export default function Goals() {
   const { diyTasks, setDiyTasks } = useLifeTrackerHobbiesData();
   const [draftDiyTitle, setDraftDiyTitle] = useState('');
   const [draftDiyNote, setDraftDiyNote] = useState('');
+  const [completedDiyExpanded, setCompletedDiyExpanded] = useState(false);
   const { refreshing, triggerRefresh } = useTimedRefresh();
   const { tracker, trackerError, trackerLoading } = useRunescapeTracker(runescapeRefreshToken);
 
@@ -211,8 +275,10 @@ export default function Goals() {
     setDraftDiyNote('');
   };
 
-  const openDiyCount = diyTasks.filter((task) => !task.completed).length;
-  const completedDiyCount = diyTasks.length - openDiyCount;
+  const openDiyTasks = useMemo(() => diyTasks.filter((task) => !task.completed), [diyTasks]);
+  const completedDiyTasks = useMemo(() => diyTasks.filter((task) => task.completed), [diyTasks]);
+  const openDiyCount = openDiyTasks.length;
+  const completedDiyCount = completedDiyTasks.length;
   const hobbiesViewOptions: { label: string; value: HobbiesView }[] = [
     { label: 'DIY To-Do', value: 'diy' },
     { label: 'OSRS', value: 'osrs' },
@@ -295,7 +361,7 @@ export default function Goals() {
               addDiyTask={addDiyTask}
             />
 
-            {diyTasks.map((task) => (
+            {openDiyTasks.map((task) => (
               <DiyTaskCard
                 key={task.id}
                 task={task}
@@ -305,6 +371,17 @@ export default function Goals() {
                 }}
               />
             ))}
+
+            <CompletedDiyTasksSection
+              colors={colors}
+              completedTasks={completedDiyTasks}
+              expanded={completedDiyExpanded}
+              onToggleExpanded={async () => {
+                await triggerHaptic();
+                setCompletedDiyExpanded((current) => !current);
+              }}
+              onToggleTask={toggleDiyTask}
+            />
           </>
         ) : null}
     </AppScreenShell>
