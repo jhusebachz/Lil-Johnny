@@ -27,6 +27,7 @@ import {
   getRelativeDateKey,
   recordAvoidanceFailure,
   getTodayDateKey,
+  resetAvoidanceGoalHistory,
 } from '../../data/lifeTrackerData';
 import {
   formatUpcomingReminder,
@@ -168,6 +169,12 @@ export default function Reminders() {
                         await updateGoal(goal.id, (currentGoal) => ({
                           ...currentGoal,
                           ...recordAvoidanceFailure(currentGoal, getTodayDateKey()),
+                        }));
+                      }}
+                      onResetStreak={async () => {
+                        await updateGoal(goal.id, (currentGoal) => ({
+                          ...currentGoal,
+                          ...resetAvoidanceGoalHistory(),
                         }));
                       }}
                     />

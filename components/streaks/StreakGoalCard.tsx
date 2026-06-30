@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
 import { YearGoal } from '../../data/lifeTrackerData';
@@ -16,6 +17,7 @@ export default function StreakGoalCard({
   blissImpactText,
   onMarkFailureToday,
   onMarkFailureYesterday,
+  onResetStreak,
 }: {
   goal: YearGoal;
   colors: ReturnType<typeof getThemeColors>;
@@ -29,9 +31,11 @@ export default function StreakGoalCard({
   blissImpactText: string;
   onMarkFailureToday: () => Promise<void>;
   onMarkFailureYesterday: () => Promise<void>;
+  onResetStreak: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
   const isCompact = width < 430;
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View
@@ -46,13 +50,80 @@ export default function StreakGoalCard({
     >
       <View
         style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 10,
+        }}
+      >
+        <Text style={{ flex: 1, fontSize: 17, color: colors.text, fontWeight: '800', paddingTop: 4 }}>
+          {goal.title}
+        </Text>
+
+        <View style={{ alignItems: 'flex-end' }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${goal.title} streak actions`}
+            onPress={() => {
+              setMenuOpen((current) => !current);
+            }}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: colors.cardBorder,
+              backgroundColor: colors.card,
+              gap: 3,
+            }}
+          >
+            {[0, 1, 2].map((bar) => (
+              <View
+                key={bar}
+                style={{
+                  width: 15,
+                  height: 2,
+                  borderRadius: 999,
+                  backgroundColor: colors.text,
+                }}
+              />
+            ))}
+          </Pressable>
+
+          {menuOpen ? (
+            <Pressable
+              onPress={async () => {
+                setMenuOpen(false);
+                await onResetStreak();
+              }}
+              style={{
+                marginTop: 8,
+                borderRadius: 12,
+                backgroundColor: colors.danger,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                minWidth: 158,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 12, fontWeight: '900', textAlign: 'center' }}>
+                Reset streak history
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      <View
+        style={{
           flexDirection: isCompact ? 'column' : 'row',
           alignItems: isCompact ? 'stretch' : 'center',
           justifyContent: 'space-between',
         }}
       >
         <View style={{ flex: isCompact ? 0 : 1, paddingRight: isCompact ? 0 : 14, marginBottom: isCompact ? 12 : 0 }}>
-          <Text style={{ fontSize: 17, color: colors.text, fontWeight: '800', marginBottom: 6 }}>{goal.title}</Text>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700', marginBottom: 4 }}>
             Good Days: <Text style={{ fontWeight: '800' }}>{goodDays}</Text> / {windowDays}
           </Text>
@@ -69,11 +140,13 @@ export default function StreakGoalCard({
             Bliss Impact: <Text style={{ color: colors.text, fontWeight: '800' }}>{blissImpactText}</Text>
           </Text>
           <Text style={{ fontSize: 13, color: colors.subtext }}>
-            Tracking window: <Text style={{ color: colors.text, fontWeight: '700' }}>{trackedDays}</Text> day{trackedDays === 1 ? '' : 's'} logged
+            Tracking window: <Text style={{ color: colors.text, fontWeight: '700' }}>{trackedDays}</Text> day
+            {trackedDays === 1 ? '' : 's'} logged
           </Text>
           <Text style={{ fontSize: 13, color: colors.subtext, marginTop: 4 }}>
             Current streak: <Text style={{ color: colors.text, fontWeight: '800' }}>{streak}</Text>{' '}
-            {streak === 1 ? 'day' : 'days'} | All-time high: <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
+            {streak === 1 ? 'day' : 'days'} | All-time high:{' '}
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{bestStreak}</Text>{' '}
             {bestStreak === 1 ? 'day' : 'days'}
           </Text>
         </View>

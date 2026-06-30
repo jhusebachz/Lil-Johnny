@@ -8,6 +8,7 @@ import {
   getAvoidanceStreak,
   getTodayDateKey as getLocalTodayDateKey,
   recordAvoidanceFailure,
+  resetAvoidanceGoalHistory,
 } from './avoidanceGoalMath';
 
 export type CertificationTracker = {
@@ -249,6 +250,7 @@ export {
   getAvoidanceConsistencySummary,
   getAvoidanceStreak,
   recordAvoidanceFailure,
+  resetAvoidanceGoalHistory,
 };
 
 export function getCurrentWeekDateKeys(now = new Date()) {

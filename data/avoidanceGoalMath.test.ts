@@ -7,6 +7,7 @@ import {
   getAvoidanceBestStreak,
   getAvoidanceStreak,
   recordAvoidanceFailure,
+  resetAvoidanceGoalHistory,
 } from './avoidanceGoalMath.ts';
 
 function getDateKeyDaysAgo(daysAgo: number, now: Date) {
@@ -167,6 +168,28 @@ test('recording a streak break for today preserves the completed good-day histor
   assert.equal(getAvoidanceBestStreak(updatedGoal, now), 10);
   assert.equal(summary.goodDays, 10);
   assert.equal(updatedGoal.lastFailureDate, '2026-05-11');
+});
+
+test('resetting a streak clears history, all-time best, current streak, and good days', () => {
+  const now = new Date('2026-05-11T20:30:00-04:00');
+  const goal = buildGoal({ now, trackedDays: 30, failureDaysAgo: [4, 12] });
+  const dirtyGoal = {
+    ...goal,
+    bestStreakDays: 18,
+  };
+  const resetGoal = {
+    ...dirtyGoal,
+    ...resetAvoidanceGoalHistory(now),
+  };
+  const summary = getAvoidanceConsistencySummary(resetGoal, now);
+
+  assert.equal(resetGoal.startedAt, '2026-05-11');
+  assert.deepEqual(resetGoal.failureDates, []);
+  assert.equal(resetGoal.lastFailureDate, null);
+  assert.equal(getAvoidanceStreak(resetGoal, now), 0);
+  assert.equal(getAvoidanceBestStreak(resetGoal, now), 0);
+  assert.equal(summary.goodDays, 0);
+  assert.equal(summary.trackedDays, 0);
 });
 
 test('legacy malformed failure history is ignored instead of crashing streak calculations', () => {

@@ -226,6 +226,15 @@ export function recordAvoidanceFailure(goal: AvoidanceGoalLike, failureDate: str
   );
 }
 
+export function resetAvoidanceGoalHistory(now = new Date()): AvoidanceGoalDerivedState & { startedAt: string } {
+  return {
+    startedAt: getTodayDateKey(now),
+    failureDates: [],
+    lastFailureDate: null,
+    bestStreakDays: 0,
+  };
+}
+
 export function getAvoidanceBestStreak(goal: AvoidanceGoalLike, now = new Date()) {
   return deriveAvoidanceGoalState(goal, now).bestStreakDays;
 }
