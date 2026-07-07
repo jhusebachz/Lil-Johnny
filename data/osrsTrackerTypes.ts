@@ -1,6 +1,6 @@
 import type { ResolvedOsrsEffectiveHoursSummary } from './osrsEffectiveHours.ts';
 
-export const FRIEND_ORDER = ['gwahpy', 'beefmissle13', 'kingxdabber', 'hedith'] as const;
+export const FRIEND_ORDER = ['gwahpy', 'beefmissle13', 'kingxdabber', 'hedith', 'TooClose42'] as const;
 
 export const SKILL_ORDER = [
   'attack',
