@@ -7,6 +7,7 @@ import type {
 
 type RawDailyPlayerSummary = {
   diff?: unknown;
+  effectiveHours?: unknown;
   topSkills?: unknown;
   totalXp?: unknown;
 };
@@ -78,6 +79,7 @@ function normalizeDailyPlayerSummary(value: unknown) {
 
   return {
     diff: typeof raw.diff === 'number' && Number.isFinite(raw.diff) ? raw.diff : 0,
+    effectiveHours: clampNonNegativeNumber(raw.effectiveHours),
     topSkills: normalizeTopSkillsWithLevel(raw.topSkills),
     totalXp: clampNonNegativeNumber(raw.totalXp),
   };
@@ -121,6 +123,7 @@ export function readTrackerDailySummary(metadata: RunescapeTrackerMetadata | nul
           name,
           overallXp: summary.totalXp,
           diff: summary.diff,
+          effectiveHours: summary.effectiveHours,
           topSkills: summary.topSkills,
         } satisfies TrackerFriendSummary;
       })

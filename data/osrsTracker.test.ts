@@ -247,6 +247,7 @@ test('tracker metadata helpers preserve latest report timestamps and summaries f
         gwahpy: {
           totalXp: 60_000,
           diff: 40_000,
+          effectiveHours: 0.9,
           topSkills: [{ skill: 'hunter', xp: 60_000, level: GOAL_PROGRESS_BASELINE.hunter.level }],
         },
       },
@@ -264,6 +265,7 @@ test('tracker metadata helpers preserve latest report timestamps and summaries f
   assert.equal(dailySummary?.totalXp, 100_000);
   assert.equal(dailySummary?.friends[0]?.name, 'gwahpy');
   assert.equal(dailySummary?.friends[0]?.overallXp, 60_000);
+  assert.equal(dailySummary?.friends[0]?.effectiveHours, 0.9);
 });
 
 test('OSRS tracker parser accepts published tracker players without metric or ehp fields', () => {

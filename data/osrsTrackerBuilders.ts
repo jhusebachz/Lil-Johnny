@@ -1,4 +1,4 @@
-import { formatOsrsSkillName } from './osrsEffectiveHours.ts';
+import { calculateOsrsEffectiveHoursFromGains, formatOsrsSkillName } from './osrsEffectiveHours.ts';
 import {
   GOAL_TRAINING_PLANS,
   getGoalOneTargetLevel,
@@ -131,11 +131,21 @@ export function buildFriendSummaries(
         const overallXp = hasDelta
           ? Math.max(stats.overall.experience - (previousFriend?.overall.experience ?? stats.overall.experience), 0)
           : stats.overall.experience;
+        const gainsBySkill = hasDelta
+          ? Object.fromEntries(
+              SKILL_ORDER.filter((skill) => stats[skill] && stats[skill].experience >= 0).map((skill) => [
+                skill,
+                getSkillDelta(stats, previousFriend, skill),
+              ])
+            )
+          : null;
+        const effectiveHours = gainsBySkill ? calculateOsrsEffectiveHoursFromGains(gainsBySkill).totalHours : 0;
 
         return {
           name,
           overallXp,
           diff: yourValue - overallXp,
+          effectiveHours,
           topSkills: buildDeltaTopSkillsWithLevels(stats, previousFriend, hasDelta, 3),
         };
       })

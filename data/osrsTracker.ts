@@ -316,6 +316,7 @@ export function buildLiveRunescapeTracker(
     dailySummary?.friends
       .map((friend) => ({
         ...friend,
+        effectiveHours: friend.effectiveHours ?? 0,
         topSkills: friend.topSkills.map((entry) => ({
           skill: formatOsrsSkillName(entry.skill),
           xp: entry.xp,

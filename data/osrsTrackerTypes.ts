@@ -70,6 +70,7 @@ export type TrackerFriendSummary = {
   name: string;
   overallXp: number;
   diff: number;
+  effectiveHours: number;
   topSkills: TrackerSummaryItemWithLevel[];
 };
 

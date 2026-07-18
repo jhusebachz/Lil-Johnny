@@ -173,6 +173,11 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                 <Pill text={`Trailing by ${Math.abs(friend.diff).toLocaleString()} xp`} color={colors.danger} />
               )}
               {even && <Pill text="Dead even" color={colors.warning} />}
+              {tracker.mode === 'delta' && friend.effectiveHours > 0 ? (
+                <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
+                  Hours played: {friend.effectiveHours.toFixed(1)}h
+                </Text>
+              ) : null}
 
               {friend.topSkills.length > 0 ? (
                 <>
