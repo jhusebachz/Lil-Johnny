@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -51,7 +51,7 @@ export default function Reminders() {
     requestNotificationAccess,
     triggerHaptic,
   } = usePreferenceSettings();
-  const colors = getThemeColors(theme);
+  const colors = useMemo(() => getThemeColors(theme), [theme]);
   const nextReminderEntry = getNextReminder(reminders);
   const enabledReminderCount = reminders.filter((reminder) => reminder.enabled).length;
   const [selectedView, setSelectedView] = useState<StreaksView>('streaks');
@@ -84,11 +84,30 @@ export default function Reminders() {
     [goals2026]
   );
 
-  const openReminderTimePicker = async (reminderId: string, time: string) => {
-    await triggerHaptic();
-    setDraftReminderTime(time);
-    setExpandedReminderId(reminderId);
-  };
+  const openReminderTimePicker = useCallback(
+    async (reminderId: string, time: string) => {
+      await triggerHaptic();
+      setDraftReminderTime(time);
+      setExpandedReminderId(reminderId);
+    },
+    [triggerHaptic]
+  );
+
+  const updateReminderWithHaptic = useCallback(
+    async (reminderId: string, updates: Parameters<typeof updateReminder>[1]) => {
+      await triggerHaptic();
+      updateReminder(reminderId, updates);
+    },
+    [triggerHaptic, updateReminder]
+  );
+
+  const completeReminderWithHaptic = useCallback(
+    async (reminderId: string) => {
+      await triggerHaptic();
+      toggleReminderCompletion(reminderId);
+    },
+    [toggleReminderCompletion, triggerHaptic]
+  );
 
   const closeReminderTimePicker = () => {
     if (expandedReminder && draftReminderTime && expandedReminder.time !== draftReminderTime) {
@@ -244,30 +263,10 @@ export default function Reminders() {
                     key={reminder.id}
                     reminder={reminder}
                     colors={colors}
-                    onTopicChange={(text) => updateReminder(reminder.id, { topic: text })}
-                    onNotesChange={(text) => updateReminder(reminder.id, { notes: text })}
-                    onTimePress={async () => {
-                      await openReminderTimePicker(reminder.id, reminder.time);
-                    }}
-                    onToggle={async () => {
-                      await triggerHaptic();
-                      updateReminder(reminder.id, { enabled: !reminder.enabled });
-                    }}
-                    onRecurrenceChange={async (recurrence) => {
-                      await triggerHaptic();
-                      updateReminder(reminder.id, { recurrence });
-                    }}
-                    onCustomWeekdayToggle={async (weekday) => {
-                      await triggerHaptic();
-                      const nextWeekdays = reminder.customWeekdays.includes(weekday)
-                        ? reminder.customWeekdays.filter((day) => day !== weekday)
-                        : [...reminder.customWeekdays, weekday];
-                      updateReminder(reminder.id, { customWeekdays: nextWeekdays });
-                    }}
-                    onCompleteToggle={async () => {
-                      await triggerHaptic();
-                      toggleReminderCompletion(reminder.id);
-                    }}
+                    onChange={updateReminder}
+                    onAction={updateReminderWithHaptic}
+                    onTimePress={openReminderTimePicker}
+                    onCompleteToggle={completeReminderWithHaptic}
                     completedToday={isReminderCompleteOnDate(reminder, new Date())}
                   />
                 ))}

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { ReminderItem, ReminderRecurrence } from '../../context/AppSettingsContext';
 import {
@@ -11,27 +12,21 @@ import ReminderToggle from './ReminderToggle';
 type ReminderCardProps = {
   reminder: ReminderItem;
   colors: ThemeColors;
-  onTopicChange: (text: string) => void;
-  onNotesChange: (text: string) => void;
-  onTimePress: () => void;
-  onToggle: () => void;
-  onRecurrenceChange: (recurrence: ReminderRecurrence) => void;
-  onCustomWeekdayToggle: (weekday: number) => void;
-  onCompleteToggle: () => void;
+  onChange: (id: string, updates: Partial<ReminderItem>) => void;
+  onAction: (id: string, updates: Partial<ReminderItem>) => void;
+  onTimePress: (id: string, time: string) => void;
+  onCompleteToggle: (id: string) => void;
   completedToday: boolean;
 };
 
 const recurrenceOptions: ReminderRecurrence[] = ['daily', 'weekdays', 'weekends', 'custom'];
 
-export default function ReminderCard({
+function ReminderCard({
   reminder,
   colors,
-  onTopicChange,
-  onNotesChange,
+  onChange,
+  onAction,
   onTimePress,
-  onToggle,
-  onRecurrenceChange,
-  onCustomWeekdayToggle,
   onCompleteToggle,
   completedToday,
 }: ReminderCardProps) {
@@ -49,7 +44,7 @@ export default function ReminderCard({
       <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Topic</Text>
       <TextInput
         value={reminder.topic}
-        onChangeText={onTopicChange}
+        onChangeText={(text) => onChange(reminder.id, { topic: text })}
         placeholder="Reminder topic"
         placeholderTextColor={colors.subtext}
         style={{
@@ -67,7 +62,7 @@ export default function ReminderCard({
 
       <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Time</Text>
       <Pressable
-        onPress={onTimePress}
+        onPress={() => onTimePress(reminder.id, reminder.time)}
         style={{
           backgroundColor: colors.inputBackground,
           borderWidth: 1,
@@ -84,7 +79,7 @@ export default function ReminderCard({
       <Text style={{ fontSize: 13, color: colors.subtext, marginBottom: 6 }}>Notes</Text>
       <TextInput
         value={reminder.notes}
-        onChangeText={onNotesChange}
+        onChangeText={(text) => onChange(reminder.id, { notes: text })}
         placeholder="Optional reminder notes"
         placeholderTextColor={colors.subtext}
         multiline
@@ -111,7 +106,7 @@ export default function ReminderCard({
           return (
             <Pressable
               key={`${reminder.id}-${option}`}
-              onPress={() => onRecurrenceChange(option)}
+              onPress={() => onAction(reminder.id, { recurrence: option })}
               style={{
                 paddingVertical: 8,
                 paddingHorizontal: 10,
@@ -138,11 +133,14 @@ export default function ReminderCard({
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {REMINDER_CUSTOM_WEEKDAY_OPTIONS.map((option) => {
               const selected = reminder.customWeekdays.includes(option.value);
+              const nextWeekdays = selected
+                ? reminder.customWeekdays.filter((day) => day !== option.value)
+                : [...reminder.customWeekdays, option.value];
 
               return (
                 <Pressable
                   key={`${reminder.id}-weekday-${option.value}`}
-                  onPress={() => onCustomWeekdayToggle(option.value)}
+                  onPress={() => onAction(reminder.id, { customWeekdays: nextWeekdays })}
                   style={{
                     paddingVertical: 8,
                     paddingHorizontal: 10,
@@ -184,11 +182,15 @@ export default function ReminderCard({
             {reminder.enabled ? 'Enabled' : 'Disabled'}
           </Text>
           <View style={{ marginLeft: 10 }}>
-            <ReminderToggle enabled={reminder.enabled} onPress={onToggle} colors={colors} />
+            <ReminderToggle
+              enabled={reminder.enabled}
+              onPress={() => onAction(reminder.id, { enabled: !reminder.enabled })}
+              colors={colors}
+            />
           </View>
         </View>
         <Pressable
-          onPress={onCompleteToggle}
+          onPress={() => onCompleteToggle(reminder.id)}
           style={{
             paddingVertical: 8,
             paddingHorizontal: 12,
@@ -206,3 +208,5 @@ export default function ReminderCard({
     </View>
   );
 }
+
+export default memo(ReminderCard);
