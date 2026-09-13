@@ -56,6 +56,7 @@ const TRACKER_TIME_ZONE = 'America/New_York';
 const SNAPSHOT_HOUR = 4;
 const SNAPSHOT_MINUTE = 45;
 const PRIMARY_USERNAME = 'jhusebachz';
+const MAX_CAPE_DEADLINE = '2027-12-31';
 
 export type {
   GoalProjection,
@@ -226,14 +227,14 @@ function fallbackTracker(): LiveRunescapeTracker {
         pacePct: 0,
       },
       runefest: {
-        label: 'RuneFest 2250',
+        label: 'Total Level 2250',
         daysLeft: 0,
         hoursLeft: null,
         hoursPerDay: null,
-        status: 'Off track',
+        status: 'On track',
         unestimatedSkills: [],
-        progressPct: 0,
-        pacePct: 0,
+        progressPct: 100,
+        pacePct: 100,
       },
       maxCape: {
         label: 'Max Cape',
@@ -384,7 +385,7 @@ export function buildLiveRunescapeTracker(
   const runefestProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'runefest');
   const maxCapeProgressPct = buildTargetProgress(GOAL_PROGRESS_BASELINE, player, 'maxCape');
   const runefestProjection = buildGoalProjection(
-    'RuneFest 2250',
+    'Total Level 2250',
     runefestDaysLeft,
     runefestProjectionPlan.hoursLeft,
     runefestProjectionPlan.unestimatedSkills,
@@ -407,16 +408,15 @@ export function buildLiveRunescapeTracker(
     runefest: runefestProjection,
     maxCape: buildGoalProjection(
       'Max Cape',
-      daysUntil('2027-03-15'),
+      daysUntil(MAX_CAPE_DEADLINE),
       maxHours,
       maxUnestimated,
       maxCapeProgressPct,
-      getPacePct('2027-03-15')
+      getPacePct(MAX_CAPE_DEADLINE)
     ),
   };
   const coachingParts = [
     `${goalProjections.baseGoal.label} ${describeGoalStatus(goalProjections.baseGoal.status)}${goalProjections.baseGoal.hoursPerDay !== null ? ` at ${goalProjections.baseGoal.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
-    `${goalProjections.runefest.label} ${describeGoalStatus(goalProjections.runefest.status)}${goalProjections.runefest.hoursPerDay !== null ? ` at ${goalProjections.runefest.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
     `${goalProjections.maxCape.label} ${describeGoalStatus(goalProjections.maxCape.status)}${goalProjections.maxCape.hoursPerDay !== null ? ` at ${goalProjections.maxCape.hoursPerDay.toFixed(2)} hours/day` : ''}.`,
   ];
 
