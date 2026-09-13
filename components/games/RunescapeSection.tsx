@@ -29,9 +29,13 @@ function formatCompactXp(value: number) {
   return value.toLocaleString();
 }
 
+function clampPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
 export default function RunescapeSection({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
   const goal1Projection = tracker.goalProjections.baseGoal;
-  const goal2Projection = tracker.goalProjections.maxCape;
+  const goal3Projection = tracker.goalProjections.maxCape;
   const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
   const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
   const sevenDayTopSkills = buildTrackerSevenDayTopSkills(tracker.lastSevenDays);
@@ -39,6 +43,20 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
     .slice(0, 3)
     .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
     .join(' | ');
+
+  const all95Remaining = tracker.hoursToNextLevel.filter((item) => item.level < 95);
+  const all95Completed = 24 - all95Remaining.length;
+  const all90Remaining = tracker.hoursToNextLevel.filter((item) => item.level < 90);
+  const all90Completed = 24 - all90Remaining.length;
+  const hunterLevel = tracker.maxedSkills.includes('Hunter')
+    ? 99
+    : tracker.hoursToNextLevel.find((item) => item.skill === 'Hunter')?.level ?? 0;
+  const all95Pct = clampPct((all95Completed / 24) * 100);
+  const all90Pct = clampPct((all90Completed / 24) * 100);
+  const total2300Pct = clampPct(((tracker.totalLevel - 2250) / 50) * 100);
+  const hunter99Pct = clampPct((hunterLevel / 99) * 100);
+  const eight99Pct = clampPct((tracker.maxedSkills.length / 8) * 100);
+  const ten99Pct = clampPct((tracker.maxedSkills.length / 10) * 100);
 
   return (
     <>
@@ -239,12 +257,44 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
         ))}
       </TrackerGoalCard>
 
+      <SectionCard title="Goal 2 - All Skills 95+ by June 30, 2027" emoji={'\uD83D\uDCCB'} colors={colors}>
+        <StatRow label="Deadline" value="2027-06-30" colors={colors} />
+        <StatRow label="Skills at 95+" value={`${all95Completed}/24`} colors={colors} />
+        <ProgressBar pct={all95Pct} color={colors.accent} colors={colors} />
+
+        {all95Remaining.length > 0 ? (
+          <View style={{ marginTop: 10 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '800',
+                color: colors.text,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginBottom: 6,
+              }}
+            >
+              Still below 95
+            </Text>
+            {all95Remaining.map((item) => (
+              <Text key={`all95-${item.skill}`} style={{ fontSize: 12, color: colors.subtext, marginBottom: 4 }}>
+                {'\u2022'} <Text style={{ color: colors.text, fontWeight: '700' }}>{item.skill}</Text> Lv{item.level} / 95
+              </Text>
+            ))}
+          </View>
+        ) : (
+          <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800', marginTop: 8 }}>
+            All skills are 95+.
+          </Text>
+        )}
+      </SectionCard>
+
       <TrackerGoalCard
-        title="Goal 2 - Max Cape by End of 2027"
+        title="Goal 3 - Max Cape by End of 2027"
         emoji={'\uD83C\uDFC6'}
         colors={colors}
-        deadlineLabel={`2027-12-31 - Year-end target (${goal2Projection.daysLeft} days left)`}
-        projection={goal2Projection}
+        deadlineLabel={`2027-12-31 - Year-end target (${goal3Projection.daysLeft} days left)`}
+        projection={goal3Projection}
         paceColor="#ec4899"
         statRows={[{ label: 'Skills maxed', value: `${tracker.maxedSkills.length}/24` }]}
       >
@@ -282,6 +332,39 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
           </View>
         ))}
       </TrackerGoalCard>
+
+      <SectionCard title="Progress Milestones" emoji={'\uD83C\uDFC1'} colors={colors}>
+        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800' }}>All skills 90+</Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>{all90Completed}/24 skills complete</Text>
+        <ProgressBar pct={all90Pct} color={colors.accent} colors={colors} />
+        {all90Remaining.length > 0 ? (
+          <Text style={{ fontSize: 12, color: colors.subtext, marginBottom: 10 }}>
+            Remaining: {all90Remaining.map((item) => `${item.skill} ${item.level}`).join(' | ')}
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 12, color: colors.success, marginBottom: 10 }}>Complete</Text>
+        )}
+
+        <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 10 }} />
+        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800' }}>2300 Total Level</Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>{tracker.totalLevel} / 2300</Text>
+        <ProgressBar pct={total2300Pct} color={colors.accent} colors={colors} />
+
+        <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 10 }} />
+        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800' }}>99 Hunter</Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>Hunter Lv{hunterLevel} / 99</Text>
+        <ProgressBar pct={hunter99Pct} color={colors.accent} colors={colors} />
+
+        <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 10 }} />
+        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800' }}>8 Skills at 99</Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>{tracker.maxedSkills.length} / 8</Text>
+        <ProgressBar pct={eight99Pct} color={colors.accent} colors={colors} />
+
+        <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 10 }} />
+        <Text style={{ fontSize: 13, color: colors.text, fontWeight: '800' }}>10 Skills at 99</Text>
+        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>{tracker.maxedSkills.length} / 10</Text>
+        <ProgressBar pct={ten99Pct} color={colors.accent} colors={colors} />
+      </SectionCard>
 
       <SectionCard title="Hours Left Until Next Level" emoji={'\u23F3'} colors={colors}>
         {tracker.hoursToNextLevel.length > 0 ? (
