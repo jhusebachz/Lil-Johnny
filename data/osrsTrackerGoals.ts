@@ -10,7 +10,7 @@ import type {
 } from './osrsTrackerTypes.ts';
 
 const GOAL_PROGRESS_START = '2026-03-25';
-export const GOAL_ONE_DEADLINE = '2026-10-03';
+export const GOAL_ONE_DEADLINE = '2026-12-31';
 export const GOAL_ONE_LABEL = 'Base 92s (Runecrafting 90)';
 
 type PassiveCombatRatios = Partial<Record<SkillName, number>>;
