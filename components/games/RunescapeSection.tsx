@@ -30,13 +30,10 @@ function formatCompactXp(value: number) {
 }
 
 export default function RunescapeSection({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
-  const totalLevelTarget = 2250;
   const goal1Projection = tracker.goalProjections.baseGoal;
-  const goal2Projection = tracker.goalProjections.runefest;
-  const goal3Projection = tracker.goalProjections.maxCape;
+  const goal2Projection = tracker.goalProjections.maxCape;
   const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
   const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
-  const runefestRecommendations = tracker.hoursToNextLevel.filter((item) => item.hoursLeft !== null).slice(0, 3);
   const sevenDayTopSkills = buildTrackerSevenDayTopSkills(tracker.lastSevenDays);
   const topEffectiveHourContributors = tracker.effectiveHours.bySkill
     .slice(0, 3)
@@ -199,10 +196,10 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
       </SectionCard>
 
       <TrackerGoalCard
-        title="Goal 1 - Base 92s (Runecrafting 90) by RuneFest"
+        title="Goal 1 - Base 92s (Runecrafting 90) by Year End"
         emoji={'\uD83C\uDFAF'}
         colors={colors}
-        deadlineLabel={`2026-10-03 - RuneFest (${goal1Projection.daysLeft} days left)`}
+        deadlineLabel={`2026-12-31 - Year-end target (${goal1Projection.daysLeft} days left)`}
         projection={goal1Projection}
         paceColor={colors.accent}
         statRows={[{ label: 'Skills at target+', value: `${24 - tracker.baseGoalRemaining.length}/24` }]}
@@ -243,74 +240,11 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
       </TrackerGoalCard>
 
       <TrackerGoalCard
-        title="Goal 2 - Total Level 2250 by RuneFest"
-        emoji={'\u26F5'}
+        title="Goal 2 - Max Cape by End of 2027"
+        emoji={'\uD83C\uDFC6'}
         colors={colors}
-        deadlineLabel={`2026-10-03 - RuneFest (${goal2Projection.daysLeft} days left)`}
+        deadlineLabel={`2027-12-31 - Year-end target (${goal2Projection.daysLeft} days left)`}
         projection={goal2Projection}
-        paceColor={colors.accent}
-        statRows={[
-          { label: 'Current total level', value: `${tracker.totalLevel} / ${totalLevelTarget}` },
-          {
-            label: 'Levels still needed',
-            value: `${tracker.runefestEffectiveLevelsRemaining.toFixed(2)} effective levels`,
-          },
-          ...(hasEffectiveHours
-            ? [{ label: 'Effective hours since last report', value: `${tracker.effectiveHours.totalHours.toFixed(1)} h` }]
-            : []),
-        ]}
-      >
-        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
-          Need{' '}
-          <Text style={{ fontWeight: '700', color: colors.text }}>
-            {goal2Projection.hoursPerDay !== null ? `${goal2Projection.hoursPerDay.toFixed(2)} hours/day` : 'a manual estimate'}
-          </Text>{' '}
-          of estimated training to hit 2250 in time
-        </Text>
-        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
-          That currently works out to about{' '}
-          <Text style={{ fontWeight: '700', color: colors.text }}>
-            {tracker.runefestEffectiveLevelsPerDayNeeded.toFixed(2)}
-          </Text>{' '}
-          effective levels/day.
-        </Text>
-        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 4 }}>
-          Pace check: {goal2Projection.status}
-          {goal2Projection.hoursPerDay !== null ? ` at ${goal2Projection.hoursPerDay.toFixed(2)} hours/day` : ''}
-        </Text>
-        {runefestRecommendations.length > 0 ? (
-          <View style={{ marginTop: 10 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '800',
-                color: colors.text,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                marginBottom: 6,
-              }}
-            >
-              Fastest next levels
-            </Text>
-            {runefestRecommendations.map((item) => (
-              <Text key={`runefest-${item.skill}`} style={{ fontSize: 12, color: colors.subtext, marginBottom: 4 }}>
-                {'\u2022'} {item.skill} Lv{item.level} to {item.targetLevel}
-                <Text style={{ color: colors.text, fontWeight: '700' }}>
-                  {' '}
-                  {item.hoursLeft!.toFixed(1)}h
-                </Text>
-              </Text>
-            ))}
-          </View>
-        ) : null}
-      </TrackerGoalCard>
-
-      <TrackerGoalCard
-        title="Goal 3 - Max Cape by 33rd Birthday"
-        emoji={'\uD83C\uDF82'}
-        colors={colors}
-        deadlineLabel={`2027-03-15 - 33rd birthday (${goal3Projection.daysLeft} days left)`}
-        projection={goal3Projection}
         paceColor="#ec4899"
         statRows={[{ label: 'Skills maxed', value: `${tracker.maxedSkills.length}/24` }]}
       >
