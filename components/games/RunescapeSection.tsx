@@ -422,7 +422,7 @@ export default function RunescapeSection({ colors, tracker, trackerError, tracke
                 {item.remainingXp.toLocaleString()} xp left to the next milestone
               </Text>
             </View>
-          ))}
+          ))
         ) : (
           <Text style={{ fontSize: 13, color: colors.subtext }}>
             No tracked milestone alerts are inside the short-push window right now.
