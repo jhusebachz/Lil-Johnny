@@ -187,7 +187,12 @@ export function readTrackerBossProgression(
             typeof (entry as TrackerBossTarget).kc === 'number' &&
             typeof (entry as TrackerBossTarget).targetKc === 'number'
         )
-        .map((entry) => ({ name: entry.name, kc: Math.max(entry.kc, 0), targetKc: Math.max(entry.targetKc, 1) }))
+        .map((entry) => ({
+          name: entry.name,
+          kc: Math.max(entry.kc, 0),
+          targetKc: Math.max(entry.targetKc, 1),
+          tier: typeof entry.tier === 'string' ? entry.tier : undefined,
+        }))
     : [];
 
   return {
