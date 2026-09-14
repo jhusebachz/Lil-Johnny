@@ -1,7 +1,11 @@
 import type {
+  TrackerBossProgression,
+  TrackerBossTarget,
   TrackerSummaryItem,
   TrackerSummaryItemWithLevel,
   TrackerFriendSummary,
+  TrackerRaidGain,
+  TrackerWeeklyRaidGoal,
   RunescapeTrackerMetadata,
 } from './osrsTrackerTypes.ts';
 
@@ -15,6 +19,7 @@ type RawDailyPlayerSummary = {
 type RawCurrentWeekSummary = {
   activeDays?: unknown;
   daysTracked?: unknown;
+  raidGoal?: unknown;
   topSkills?: unknown;
   totalEffectiveHours?: unknown;
   totalXp?: unknown;
@@ -158,5 +163,73 @@ export function readTrackerCurrentWeekSummary(metadata: RunescapeTrackerMetadata
     totalEffectiveHours: clampNonNegativeNumber(raw.totalEffectiveHours),
     totalXp: clampNonNegativeNumber(raw.totalXp),
     weekStartDateKey: typeof raw.weekStartDateKey === 'string' ? raw.weekStartDateKey : null,
+  };
+}
+
+export function readTrackerBossProgression(
+  metadata: RunescapeTrackerMetadata | null,
+  username: string
+): TrackerBossProgression {
+  const value = metadata?.bossProgression?.[username];
+
+  if (!value || typeof value !== 'object') {
+    return { triedCount: 0, totalTracked: 0, untriedCount: 0, nextUntried: [] };
+  }
+
+  const raw = value as Record<string, unknown>;
+  const nextUntried = Array.isArray(raw.nextUntried)
+    ? raw.nextUntried
+        .filter(
+          (entry): entry is TrackerBossTarget =>
+            Boolean(entry) &&
+            typeof entry === 'object' &&
+            typeof (entry as TrackerBossTarget).name === 'string' &&
+            typeof (entry as TrackerBossTarget).kc === 'number' &&
+            typeof (entry as TrackerBossTarget).targetKc === 'number'
+        )
+        .map((entry) => ({ name: entry.name, kc: Math.max(entry.kc, 0), targetKc: Math.max(entry.targetKc, 1) }))
+    : [];
+
+  return {
+    triedCount: clampNonNegativeNumber(raw.triedCount),
+    totalTracked: clampNonNegativeNumber(raw.totalTracked),
+    untriedCount: clampNonNegativeNumber(raw.untriedCount),
+    nextUntried,
+  };
+}
+
+export function readTrackerWeeklyRaidGoal(
+  metadata: RunescapeTrackerMetadata | null,
+  username: string
+): TrackerWeeklyRaidGoal {
+  const weekValue = metadata?.currentWeek?.[username];
+  if (!weekValue || typeof weekValue !== 'object') {
+    return { target: 1, completed: 0, weekStartDateKey: null, gainsByRaid: [] };
+  }
+
+  const raidValue = (weekValue as RawCurrentWeekSummary).raidGoal;
+  if (!raidValue || typeof raidValue !== 'object') {
+    return { target: 1, completed: 0, weekStartDateKey: null, gainsByRaid: [] };
+  }
+
+  const raw = raidValue as Record<string, unknown>;
+  const gainsByRaid: TrackerRaidGain[] = Array.isArray(raw.gainsByRaid)
+    ? raw.gainsByRaid
+        .filter(
+          (entry): entry is TrackerRaidGain =>
+            Boolean(entry) &&
+            typeof entry === 'object' &&
+            typeof (entry as TrackerRaidGain).name === 'string' &&
+            typeof (entry as TrackerRaidGain).gained === 'number' &&
+            Number.isFinite((entry as TrackerRaidGain).gained)
+        )
+        .map((entry) => ({ name: entry.name, gained: Math.max(entry.gained, 0) }))
+    : [];
+
+  return {
+    target: Math.max(clampNonNegativeNumber(raw.target), 1),
+    completed: clampNonNegativeNumber(raw.completed),
+    weekStartDateKey: typeof raw.weekStartDateKey === 'string' ? raw.weekStartDateKey : null,
+    gainsByRaid,
   };
 }
