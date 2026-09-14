@@ -1,4 +1,5 @@
 import { calculateOsrsEffectiveHoursFromGains, formatOsrsSkillName } from './osrsEffectiveHours.ts';
+import { getDiaryTargetLevel } from './osrsDiaryGoals.ts';
 import {
   GOAL_TRAINING_PLANS,
   getGoalOneTargetLevel,
@@ -156,6 +157,13 @@ export function buildBaseGoalRemaining(skills: TrackerSkillEntry[]) {
   return skills
     .filter((skill) => skill.level < getGoalOneTargetLevel(skill.skill))
     .map((skill) => buildGoalItem(skill, getGoalOneTargetLevel(skill.skill)))
+    .sort(compareHoursThenXp);
+}
+
+export function buildDiaryGoalRemaining(skills: TrackerSkillEntry[]) {
+  return skills
+    .filter((skill) => skill.level < getDiaryTargetLevel(skill.skill))
+    .map((skill) => buildGoalItem(skill, getDiaryTargetLevel(skill.skill)))
     .sort(compareHoursThenXp);
 }
 
