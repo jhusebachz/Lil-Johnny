@@ -165,9 +165,9 @@ export type LiveRunescapeTracker = {
   friends: TrackerFriendSummary[];
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];
-  diaryGoalRemaining: TrackerGoal[];
-  bossProgression: TrackerBossProgression;
-  weeklyRaidGoal: TrackerWeeklyRaidGoal;
+  diaryGoalRemaining?: TrackerGoal[];
+  bossProgression?: TrackerBossProgression;
+  weeklyRaidGoal?: TrackerWeeklyRaidGoal;
   maxClosest: TrackerGoal[];
   maxedSkills: string[];
   hoursToNextLevel: {
