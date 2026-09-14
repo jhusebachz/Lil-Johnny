@@ -97,6 +97,7 @@ export type TrackerBossTarget = {
   name: string;
   kc: number;
   targetKc: number;
+  tier?: string;
 };
 
 export type TrackerBossProgression = {
