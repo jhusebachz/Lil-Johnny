@@ -93,7 +93,34 @@ export type TrackerSevenDaySummary = {
   totalXp: number;
 };
 
+export type TrackerBossTarget = {
+  name: string;
+  kc: number;
+  targetKc: number;
+};
+
+export type TrackerBossProgression = {
+  triedCount: number;
+  totalTracked: number;
+  untriedCount: number;
+  nextUntried: TrackerBossTarget[];
+};
+
+export type TrackerRaidGain = {
+  name: string;
+  gained: number;
+};
+
+export type TrackerWeeklyRaidGoal = {
+  target: number;
+  completed: number;
+  weekStartDateKey: string | null;
+  gainsByRaid: TrackerRaidGain[];
+};
+
 export type RunescapeTrackerMetadata = {
+  bossProgression?: Record<string, unknown>;
+  bosses?: Record<string, unknown>;
   currentWeek?: Record<string, unknown>;
   dailySummary?: Record<string, unknown>;
   effectiveHours?: Record<string, unknown>;
@@ -138,6 +165,9 @@ export type LiveRunescapeTracker = {
   friends: TrackerFriendSummary[];
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];
+  diaryGoalRemaining: TrackerGoal[];
+  bossProgression: TrackerBossProgression;
+  weeklyRaidGoal: TrackerWeeklyRaidGoal;
   maxClosest: TrackerGoal[];
   maxedSkills: string[];
   hoursToNextLevel: {
