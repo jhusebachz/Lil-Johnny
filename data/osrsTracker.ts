@@ -10,10 +10,13 @@ import {
 import { fetchRawRunescapeData } from './osrsTrackerFetch.ts';
 import {
   createEmptyTrackerWeekSummary,
+  readTrackerBossProgression,
   readTrackerCurrentWeekSummary,
+  readTrackerDailyBossActivity,
   readTrackerDailySummary,
   readTrackerGeneratedAt,
   readTrackerReportDateKey,
+  readTrackerWeeklyRaidGoal,
 } from './osrsTrackerMetadata.ts';
 import {
   GOAL_ONE_DEADLINE,
@@ -193,7 +196,9 @@ function shouldUpdateStoredTodaySnapshot(existingSnapshot: OsrsApiResponse | und
 
 function fallbackTracker(): LiveRunescapeTracker {
   return {
+    bossProgression: readTrackerBossProgression(null, PRIMARY_USERNAME),
     currentWeek: createEmptyTrackerWeekSummary(),
+    dailyBossActivity: readTrackerDailyBossActivity(null),
     generatedAt: null,
     generatedAtLabel: 'No tracker timestamp yet',
     mode: 'snapshot',
@@ -208,6 +213,7 @@ function fallbackTracker(): LiveRunescapeTracker {
       source: 'unavailable',
     },
     topSkills: [],
+    weeklyRaidGoal: readTrackerWeeklyRaidGoal(null, PRIMARY_USERNAME),
     friends: [],
     lastSevenDays: createEmptySevenDaySummary(),
     baseGoalRemaining: [],
@@ -290,7 +296,10 @@ export function buildLiveRunescapeTracker(
   const generatedAt = readTrackerGeneratedAt(metadata);
   const reportDateKey = readTrackerReportDateKey(metadata);
   const currentWeek = readTrackerCurrentWeekSummary(metadata, username) ?? createEmptyTrackerWeekSummary();
+  const bossProgression = readTrackerBossProgression(metadata, username);
+  const dailyBossActivity = readTrackerDailyBossActivity(metadata);
   const dailySummary = readTrackerDailySummary(metadata, username);
+  const weeklyRaidGoal = readTrackerWeeklyRaidGoal(metadata, username);
 
   if (!player) {
     return fallbackTracker();
@@ -421,7 +430,9 @@ export function buildLiveRunescapeTracker(
   ];
 
   return {
+    bossProgression,
     currentWeek,
+    dailyBossActivity,
     generatedAt,
     generatedAtLabel: formatGeneratedAtLabel(generatedAt),
     mode: hasDelta ? 'delta' : 'snapshot',
@@ -435,6 +446,7 @@ export function buildLiveRunescapeTracker(
     totalLevel: player.overall.level,
     effectiveHours,
     topSkills,
+    weeklyRaidGoal,
     friends,
     lastSevenDays,
     baseGoalRemaining,
