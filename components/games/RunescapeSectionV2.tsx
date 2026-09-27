@@ -9,14 +9,10 @@ import TrackerGoalCard from './TrackerGoalCard';
 import { DIARY_SKILL_TARGETS } from '../../data/osrsDiaryGoals';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
 import { fetchRawRunescapeData } from '../../data/osrsTrackerFetch';
-import {
-  readTrackerBossProgression,
-  readTrackerWeeklyRaidGoal,
-} from '../../data/osrsTrackerMetadata';
-import { getPlayerStats, getTrackerMetadata } from '../../data/osrsTrackerParsers';
+import { getPlayerStats } from '../../data/osrsTrackerParsers';
 import { GOAL_TRAINING_PLANS, xpForLevel } from '../../data/osrsTrackerGoals';
 import { buildTrackerSevenDayTopSkills } from '../../data/osrsTrackerSevenDay';
-import { SKILL_ORDER } from '../../data/osrsTrackerTypes';
+import { BOSS_TIER_ORDER, SKILL_ORDER } from '../../data/osrsTrackerTypes';
 import type {
   LiveRunescapeTracker,
   TrackerBossProgression,
@@ -42,8 +38,6 @@ type DiaryRemainingItem = {
 type GoalExtras = {
   diaryRemaining: DiaryRemainingItem[];
   diaryCompleted: number;
-  bossProgression: TrackerBossProgression;
-  weeklyRaidGoal: TrackerWeeklyRaidGoal;
   loaded: boolean;
 };
 
@@ -51,7 +45,14 @@ const EMPTY_BOSS_PROGRESS: TrackerBossProgression = {
   triedCount: 0,
   totalTracked: 0,
   untriedCount: 0,
-  nextUntried: [],
+  remainingByTier: {
+    Easy: [],
+    Medium: [],
+    Hard: [],
+    Elite: [],
+    Master: [],
+    Grandmaster: [],
+  },
 };
 
 const EMPTY_RAID_GOAL: TrackerWeeklyRaidGoal = {
@@ -81,8 +82,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
   const [extras, setExtras] = useState<GoalExtras>({
     diaryRemaining: [],
     diaryCompleted: 0,
-    bossProgression: EMPTY_BOSS_PROGRESS,
-    weeklyRaidGoal: EMPTY_RAID_GOAL,
     loaded: false,
   });
 
@@ -93,7 +92,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
       try {
         const data = await fetchRawRunescapeData();
         const player = getPlayerStats(data, 'jhusebachz');
-        const metadata = getTrackerMetadata(data);
         const diaryRemaining: DiaryRemainingItem[] = [];
 
         if (player) {
@@ -129,8 +127,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
           setExtras({
             diaryRemaining,
             diaryCompleted: player ? SKILL_ORDER.length - diaryRemaining.length : 0,
-            bossProgression: readTrackerBossProgression(metadata, 'jhusebachz'),
-            weeklyRaidGoal: readTrackerWeeklyRaidGoal(metadata, 'jhusebachz'),
             loaded: true,
           });
         }
@@ -156,32 +152,32 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
     .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
     .join(' | ');
   const diaryPct = clampPct((extras.diaryCompleted / SKILL_ORDER.length) * 100);
-  const bossPct = extras.bossProgression.totalTracked > 0
-    ? clampPct((extras.bossProgression.triedCount / extras.bossProgression.totalTracked) * 100)
+  const bossProgression = tracker.bossProgression ?? EMPTY_BOSS_PROGRESS;
+  const dailyBossActivity = tracker.dailyBossActivity ?? { topPlayers: [] };
+  const weeklyRaidGoal = tracker.weeklyRaidGoal ?? EMPTY_RAID_GOAL;
+  const bossPct = bossProgression.totalTracked > 0
+    ? clampPct((bossProgression.triedCount / bossProgression.totalTracked) * 100)
     : 0;
   const raidPct = clampPct(
-    (extras.weeklyRaidGoal.completed / Math.max(extras.weeklyRaidGoal.target, 1)) * 100
+    (weeklyRaidGoal.completed / Math.max(weeklyRaidGoal.target, 1)) * 100
   );
-  const nextBoss = extras.bossProgression.nextUntried[0]?.name ?? null;
 
   const coachingText = useMemo(() => {
     const baseText = `${24 - tracker.baseGoalRemaining.length}/24 Base-92 targets complete.`;
     const diaryText = extras.loaded
       ? `${extras.diaryCompleted}/24 diary skill requirements complete.`
       : 'Diary requirements are loading.';
-    const bossText = extras.bossProgression.totalTracked > 0
-      ? nextBoss
-        ? `Next new boss: ${nextBoss} for 1 KC.`
-        : 'The first-KC boss queue is complete.'
+    const bossText = bossProgression.totalTracked > 0
+      ? `Boss checklist: ${bossProgression.triedCount}/${bossProgression.totalTracked} complete; ${bossProgression.untriedCount} remaining.`
       : 'Boss KC data will populate on the next daily HiScores snapshot.';
-    const raidText = extras.weeklyRaidGoal.weekStartDateKey
-      ? extras.weeklyRaidGoal.completed >= extras.weeklyRaidGoal.target
+    const raidText = weeklyRaidGoal.weekStartDateKey
+      ? weeklyRaidGoal.completed >= weeklyRaidGoal.target
         ? 'Weekly raid goal is complete.'
         : 'Weekly raid goal still needs one CoX, ToA, or ToB completion.'
       : 'Weekly raid tracking will begin with the next daily snapshot.';
 
     return `${baseText} ${diaryText} ${bossText} ${raidText}`;
-  }, [extras, nextBoss, tracker.baseGoalRemaining.length]);
+  }, [bossProgression, extras, tracker.baseGoalRemaining.length, weeklyRaidGoal]);
 
   return (
     <>
@@ -298,6 +294,37 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         })}
       </SectionCard>
 
+      {dailyBossActivity.topPlayers.length > 0 ? (
+        <SectionCard title="Boss Kills Since Last Update" emoji={'\u2694\uFE0F'} colors={colors}>
+          {dailyBossActivity.topPlayers.map((player, index) => (
+            <View
+              key={`boss-activity-${player.name}`}
+              style={{
+                marginBottom: index === dailyBossActivity.topPlayers.length - 1 ? 0 : 14,
+                paddingBottom: index === dailyBossActivity.topPlayers.length - 1 ? 0 : 14,
+                borderBottomWidth: index === dailyBossActivity.topPlayers.length - 1 ? 0 : 1,
+                borderBottomColor: colors.cardBorder,
+              }}
+            >
+              <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800' }}>
+                {index + 1}. {player.name}
+                <Text style={{ color: colors.subtext, fontWeight: '500' }}>
+                  {' '} - {player.totalBossKcGained.toLocaleString()} KC
+                </Text>
+              </Text>
+              {player.bossGains.map((boss) => (
+                <Text
+                  key={`boss-activity-${player.name}-${boss.name}`}
+                  style={{ fontSize: 12, color: colors.subtext, marginTop: 5, paddingLeft: 12 }}
+                >
+                  {'\u2022'} {boss.name} +{boss.gained.toLocaleString()}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </SectionCard>
+      ) : null}
+
       <TrackerGoalCard
         title="Goal 1 - Base 92s (Runecrafting 90) by Year End"
         emoji={'\uD83C\uDFAF'}
@@ -349,27 +376,52 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Boss Progression - Get 1 KC" emoji={'\uD83D\uDC80'} colors={colors}>
-        {extras.bossProgression.totalTracked > 0 ? (
+      <SectionCard title="Boss Completion Checklist - Get 1 KC" emoji={'\uD83D\uDC80'} colors={colors}>
+        {bossProgression.totalTracked > 0 ? (
           <>
             <StatRow
-              label="Bosses / encounters tried"
-              value={`${extras.bossProgression.triedCount}/${extras.bossProgression.totalTracked}`}
+              label="Bosses / encounters completed once"
+              value={`${bossProgression.triedCount} / ${bossProgression.totalTracked}`}
               colors={colors}
             />
-            <StatRow label="Still needing first KC" value={`${extras.bossProgression.untriedCount}`} colors={colors} />
+            <StatRow label="Remaining" value={`${bossProgression.untriedCount}`} colors={colors} />
             <ProgressBar pct={bossPct} color={colors.danger} colors={colors} />
             <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8, marginBottom: 8 }}>
-              Queue is intentionally ordered from more approachable encounters toward harder ones.
+              Every unfinished encounter stays visible in the curated Wiki ladder order, regardless of access requirements.
             </Text>
-            {extras.bossProgression.nextUntried.map((boss, index) => (
-              <View key={`boss-${boss.name}`} style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, color: colors.text }}>
-                  <Text style={{ fontWeight: '800' }}>{index === 0 ? 'NEXT' : `#${index + 1}`}: {boss.name}</Text>
-                  <Text style={{ color: colors.subtext }}> - goal: 1 KC</Text>
-                </Text>
-              </View>
-            ))}
+            {BOSS_TIER_ORDER.map((tier) => {
+              const bosses = bossProgression.remainingByTier[tier];
+              if (bosses.length === 0) {
+                return null;
+              }
+
+              return (
+                <View key={`boss-tier-${tier}`} style={{ marginTop: 12 }}>
+                  <Text
+                    style={{
+                      color: colors.accent,
+                      fontSize: 12,
+                      fontWeight: '900',
+                      letterSpacing: 0.7,
+                      marginBottom: 7,
+                    }}
+                  >
+                    {tier.toUpperCase()}
+                  </Text>
+                  {bosses.map((boss) => (
+                    <Text key={`boss-${boss.name}`} style={{ fontSize: 13, color: colors.text, marginBottom: 7 }}>
+                      {'\u2022'} <Text style={{ fontWeight: '800' }}>{boss.name}</Text>
+                      <Text style={{ color: colors.subtext }}> - {boss.kc} KC</Text>
+                    </Text>
+                  ))}
+                </View>
+              );
+            })}
+            {bossProgression.untriedCount === 0 ? (
+              <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800', marginTop: 10 }}>
+                Every tracked boss or encounter has at least 1 KC.
+              </Text>
+            ) : null}
           </>
         ) : (
           <Text style={{ fontSize: 13, color: colors.subtext }}>
@@ -381,21 +433,21 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
       <SectionCard title="Weekly Raid Goal - 1 Completion" emoji={'\uD83C\uDFF0'} colors={colors}>
         <StatRow
           label="This week"
-          value={`${Math.min(extras.weeklyRaidGoal.completed, extras.weeklyRaidGoal.target)}/${extras.weeklyRaidGoal.target}`}
+          value={`${Math.min(weeklyRaidGoal.completed, weeklyRaidGoal.target)}/${weeklyRaidGoal.target}`}
           colors={colors}
         />
-        {extras.weeklyRaidGoal.weekStartDateKey ? (
-          <StatRow label="Week started" value={extras.weeklyRaidGoal.weekStartDateKey} colors={colors} />
+        {weeklyRaidGoal.weekStartDateKey ? (
+          <StatRow label="Week started" value={weeklyRaidGoal.weekStartDateKey} colors={colors} />
         ) : null}
         <ProgressBar pct={raidPct} color={colors.warning} colors={colors} />
         <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>
           Counts Chambers of Xeric (regular or CM), Tombs of Amascut (regular or expert), or Theatre of Blood (regular or hard mode).
         </Text>
-        {extras.weeklyRaidGoal.completed >= extras.weeklyRaidGoal.target ? (
+        {weeklyRaidGoal.completed >= weeklyRaidGoal.target ? (
           <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800', marginTop: 8 }}>
             Weekly raid goal complete.
           </Text>
-        ) : extras.weeklyRaidGoal.weekStartDateKey ? (
+        ) : weeklyRaidGoal.weekStartDateKey ? (
           <Text style={{ fontSize: 13, color: colors.warning, fontWeight: '800', marginTop: 8 }}>
             One raid completion still needed this week.
           </Text>
@@ -404,7 +456,7 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
             Weekly raid tracking will establish its baseline on the next daily snapshot.
           </Text>
         )}
-        {extras.weeklyRaidGoal.gainsByRaid.map((raid) => (
+        {weeklyRaidGoal.gainsByRaid.map((raid) => (
           <Text key={`raid-${raid.name}`} style={{ fontSize: 12, color: colors.text, marginTop: 5 }}>
             {'\u2022'} {raid.name}: +{raid.gained}
           </Text>

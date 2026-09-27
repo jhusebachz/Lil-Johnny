@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import { calculateOsrsEffectiveHoursFromGains, resolveOsrsEffectiveHours } from './osrsEffectiveHours.ts';
 import {
+  readTrackerBossProgression,
   readTrackerCurrentWeekSummary,
+  readTrackerDailyBossActivity,
   readTrackerDailySummary,
   readTrackerGeneratedAt,
   readTrackerReportDateKey,
@@ -290,4 +292,79 @@ test('OSRS tracker parser accepts published tracker players without metric or eh
   assert.ok(player);
   assert.equal(player?.overall.level, 2216);
   assert.equal(player?.runecraft.experience, 3_644_872);
+});
+
+test('boss progression parser preserves the full tiered remaining checklist without truncation', () => {
+  const easyBosses = Array.from({ length: 10 }, (_, index) => ({
+    name: `Easy Boss ${index + 1}`,
+    kc: 0,
+    targetKc: 1,
+    tier: 'Easy',
+  }));
+  const progression = readTrackerBossProgression(
+    {
+      bossProgression: {
+        jhusebachz: {
+          triedCount: 34,
+          totalTracked: 61,
+          untriedCount: 27,
+          remainingByTier: {
+            Easy: easyBosses,
+            Medium: [{ name: 'Sarachnis', kc: 0, targetKc: 1, tier: 'Medium' }],
+            Hard: [{ name: 'Chaos Elemental', kc: 0, targetKc: 1, tier: 'Hard' }],
+            Elite: [],
+            Master: [],
+            Grandmaster: [],
+          },
+        },
+      },
+    },
+    'jhusebachz'
+  );
+
+  assert.equal(progression.triedCount, 34);
+  assert.equal(progression.untriedCount, 27);
+  assert.equal(progression.remainingByTier.Easy.length, 10);
+  assert.equal(progression.remainingByTier.Easy[9]?.name, 'Easy Boss 10');
+  assert.equal(progression.remainingByTier.Medium[0]?.name, 'Sarachnis');
+  assert.equal(progression.remainingByTier.Hard[0]?.name, 'Chaos Elemental');
+});
+
+test('daily boss activity parser exposes the tracker-ranked top three player totals and breakdowns', () => {
+  const activity = readTrackerDailyBossActivity({
+    dailyBossActivity: {
+      topPlayers: [
+        {
+          name: 'jhusebachz',
+          totalBossKcGained: 8,
+          bossGains: { Vorkath: 5, 'Phantom Muspah': 3 },
+        },
+        { name: '3Sixteen', totalBossKcGained: 4, bossGains: { Zulrah: 4 } },
+        { name: 'beefmissle13', totalBossKcGained: 1, bossGains: { Sarachnis: 1 } },
+        { name: 'kingxdabber', totalBossKcGained: 1, bossGains: { Vorkath: 1 } },
+      ],
+    },
+  });
+
+  assert.deepEqual(
+    activity.topPlayers.map((player) => [player.name, player.totalBossKcGained]),
+    [
+      ['jhusebachz', 8],
+      ['3Sixteen', 4],
+      ['beefmissle13', 1],
+    ]
+  );
+  assert.deepEqual(activity.topPlayers[0]?.bossGains, [
+    { name: 'Vorkath', gained: 5 },
+    { name: 'Phantom Muspah', gained: 3 },
+  ]);
+});
+
+test('daily boss activity parser stays empty when nobody gained boss KC', () => {
+  assert.deepEqual(
+    readTrackerDailyBossActivity({
+      dailyBossActivity: { byPlayer: {}, topPlayers: [] },
+    }),
+    { topPlayers: [] }
+  );
 });

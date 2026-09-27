@@ -2,6 +2,8 @@ import type { ResolvedOsrsEffectiveHoursSummary } from './osrsEffectiveHours.ts'
 
 export const FRIEND_ORDER = ['3Sixteen', 'beefmissle13', 'kingxdabber', 'hedith', 'TooClose42'] as const;
 
+export const BOSS_TIER_ORDER = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster'] as const;
+
 export const SKILL_ORDER = [
   'attack',
   'defence',
@@ -97,14 +99,31 @@ export type TrackerBossTarget = {
   name: string;
   kc: number;
   targetKc: number;
-  tier?: string;
+  tier: TrackerBossTier;
 };
+
+export type TrackerBossTier = (typeof BOSS_TIER_ORDER)[number];
 
 export type TrackerBossProgression = {
   triedCount: number;
   totalTracked: number;
   untriedCount: number;
-  nextUntried: TrackerBossTarget[];
+  remainingByTier: Record<TrackerBossTier, TrackerBossTarget[]>;
+};
+
+export type TrackerBossGain = {
+  name: string;
+  gained: number;
+};
+
+export type TrackerBossActivityPlayer = {
+  name: string;
+  totalBossKcGained: number;
+  bossGains: TrackerBossGain[];
+};
+
+export type TrackerDailyBossActivity = {
+  topPlayers: TrackerBossActivityPlayer[];
 };
 
 export type TrackerRaidGain = {
@@ -123,6 +142,7 @@ export type RunescapeTrackerMetadata = {
   bossProgression?: Record<string, unknown>;
   bosses?: Record<string, unknown>;
   currentWeek?: Record<string, unknown>;
+  dailyBossActivity?: Record<string, unknown>;
   dailySummary?: Record<string, unknown>;
   effectiveHours?: Record<string, unknown>;
   generatedAt?: string;
@@ -168,6 +188,7 @@ export type LiveRunescapeTracker = {
   baseGoalRemaining: TrackerGoal[];
   diaryGoalRemaining?: TrackerGoal[];
   bossProgression?: TrackerBossProgression;
+  dailyBossActivity?: TrackerDailyBossActivity;
   weeklyRaidGoal?: TrackerWeeklyRaidGoal;
   maxClosest: TrackerGoal[];
   maxedSkills: string[];

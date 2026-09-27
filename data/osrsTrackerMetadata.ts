@@ -1,6 +1,9 @@
 import type {
+  TrackerBossActivityPlayer,
   TrackerBossProgression,
   TrackerBossTarget,
+  TrackerBossTier,
+  TrackerDailyBossActivity,
   TrackerSummaryItem,
   TrackerSummaryItemWithLevel,
   TrackerFriendSummary,
@@ -8,6 +11,7 @@ import type {
   TrackerWeeklyRaidGoal,
   RunescapeTrackerMetadata,
 } from './osrsTrackerTypes.ts';
+import { BOSS_TIER_ORDER } from './osrsTrackerTypes.ts';
 
 type RawDailyPlayerSummary = {
   diff?: unknown;
@@ -170,37 +174,129 @@ export function readTrackerBossProgression(
   metadata: RunescapeTrackerMetadata | null,
   username: string
 ): TrackerBossProgression {
+  const emptyRemainingByTier = Object.fromEntries(
+    BOSS_TIER_ORDER.map((tier) => [tier, [] as TrackerBossTarget[]])
+  ) as Record<TrackerBossTier, TrackerBossTarget[]>;
   const value = metadata?.bossProgression?.[username];
 
   if (!value || typeof value !== 'object') {
-    return { triedCount: 0, totalTracked: 0, untriedCount: 0, nextUntried: [] };
+    return { triedCount: 0, totalTracked: 0, untriedCount: 0, remainingByTier: emptyRemainingByTier };
   }
 
   const raw = value as Record<string, unknown>;
-  const nextUntried = Array.isArray(raw.nextUntried)
-    ? raw.nextUntried
-        .filter(
-          (entry): entry is TrackerBossTarget =>
-            Boolean(entry) &&
-            typeof entry === 'object' &&
-            typeof (entry as TrackerBossTarget).name === 'string' &&
-            typeof (entry as TrackerBossTarget).kc === 'number' &&
-            typeof (entry as TrackerBossTarget).targetKc === 'number'
-        )
-        .map((entry) => ({
-          name: entry.name,
-          kc: Math.max(entry.kc, 0),
-          targetKc: Math.max(entry.targetKc, 1),
-          tier: typeof entry.tier === 'string' ? entry.tier : undefined,
-        }))
-    : [];
+  const rawRemainingByTier = raw.remainingByTier;
+  const remainingByTier = Object.fromEntries(
+    BOSS_TIER_ORDER.map((tier) => {
+      const entries =
+        rawRemainingByTier && typeof rawRemainingByTier === 'object'
+          ? (rawRemainingByTier as Record<string, unknown>)[tier]
+          : undefined;
+      const normalized = Array.isArray(entries)
+        ? entries
+            .filter(
+              (entry): entry is Record<string, unknown> =>
+                Boolean(entry) &&
+                typeof entry === 'object' &&
+                typeof (entry as Record<string, unknown>).name === 'string' &&
+                typeof (entry as Record<string, unknown>).kc === 'number' &&
+                typeof (entry as Record<string, unknown>).targetKc === 'number'
+            )
+            .map((entry) => ({
+              name: entry.name as string,
+              kc: Math.max(entry.kc as number, 0),
+              targetKc: Math.max(entry.targetKc as number, 1),
+              tier,
+            }))
+        : [];
+
+      return [tier, normalized];
+    })
+  ) as Record<TrackerBossTier, TrackerBossTarget[]>;
+
+  // Keep older snapshots readable until the first tracker run publishes the
+  // full remainingByTier schema. New snapshots never use this queue field.
+  if (
+    (!rawRemainingByTier || typeof rawRemainingByTier !== 'object') &&
+    Array.isArray(raw.nextUntried)
+  ) {
+    for (const entry of raw.nextUntried) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+
+      const candidate = entry as Record<string, unknown>;
+      const tier = BOSS_TIER_ORDER.find((name) => name === candidate.tier);
+      if (
+        !tier ||
+        typeof candidate.name !== 'string' ||
+        typeof candidate.kc !== 'number' ||
+        typeof candidate.targetKc !== 'number'
+      ) {
+        continue;
+      }
+
+      remainingByTier[tier].push({
+        name: candidate.name,
+        kc: Math.max(candidate.kc, 0),
+        targetKc: Math.max(candidate.targetKc, 1),
+        tier,
+      });
+    }
+  }
 
   return {
     triedCount: clampNonNegativeNumber(raw.triedCount),
     totalTracked: clampNonNegativeNumber(raw.totalTracked),
     untriedCount: clampNonNegativeNumber(raw.untriedCount),
-    nextUntried,
+    remainingByTier,
   };
+}
+
+export function readTrackerDailyBossActivity(
+  metadata: RunescapeTrackerMetadata | null
+): TrackerDailyBossActivity {
+  const value = metadata?.dailyBossActivity;
+  const rawTopPlayers = value?.topPlayers;
+
+  if (!Array.isArray(rawTopPlayers)) {
+    return { topPlayers: [] };
+  }
+
+  const topPlayers = rawTopPlayers
+    .map((entry): TrackerBossActivityPlayer | null => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+
+      const raw = entry as Record<string, unknown>;
+      if (
+        typeof raw.name !== 'string' ||
+        typeof raw.totalBossKcGained !== 'number' ||
+        !Number.isFinite(raw.totalBossKcGained) ||
+        raw.totalBossKcGained <= 0
+      ) {
+        return null;
+      }
+
+      const bossGains = raw.bossGains && typeof raw.bossGains === 'object'
+        ? Object.entries(raw.bossGains as Record<string, unknown>)
+            .filter(
+              (entry): entry is [string, number] =>
+                typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] > 0
+            )
+            .map(([name, gained]) => ({ name, gained }))
+        : [];
+
+      return {
+        name: raw.name,
+        totalBossKcGained: raw.totalBossKcGained,
+        bossGains,
+      };
+    })
+    .filter((entry): entry is TrackerBossActivityPlayer => entry !== null)
+    .slice(0, 3);
+
+  return { topPlayers };
 }
 
 export function readTrackerWeeklyRaidGoal(
