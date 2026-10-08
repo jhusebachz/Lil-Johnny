@@ -133,10 +133,15 @@ Important current rules:
 
 - `Top gains` should only show if there were actual gains
 - friend order should use:
-  - `gwahpy`
+  - `3Sixteen` (formerly `gwahpy`)
   - `beefmissle13`
   - `kingxdabber`
   - `hedith`
+  - `TooClose42`
+  - `HB_Reborn`
+  - `Dummyhead38`
+  - `RebelMontana`
+  - `Kriid`
 - RuneFest pace should not assume Slayer-trained combat stats become free 99s
 - no `manual lane` wording anywhere
 

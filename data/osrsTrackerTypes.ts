@@ -1,6 +1,16 @@
 import type { ResolvedOsrsEffectiveHoursSummary } from './osrsEffectiveHours.ts';
 
-export const FRIEND_ORDER = ['3Sixteen', 'beefmissle13', 'kingxdabber', 'hedith', 'TooClose42'] as const;
+export const FRIEND_ORDER = [
+  '3Sixteen',
+  'beefmissle13',
+  'kingxdabber',
+  'hedith',
+  'TooClose42',
+  'HB_Reborn',
+  'Dummyhead38',
+  'RebelMontana',
+  'Kriid',
+] as const;
 
 export const BOSS_TIER_ORDER = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster'] as const;
 
