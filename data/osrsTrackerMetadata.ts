@@ -11,7 +11,7 @@ import type {
   TrackerWeeklyRaidGoal,
   RunescapeTrackerMetadata,
 } from './osrsTrackerTypes.ts';
-import { BOSS_TIER_ORDER } from './osrsTrackerTypes.ts';
+import { BOSS_TIER_ORDER, OWN_ACCOUNTS } from './osrsTrackerTypes.ts';
 
 type RawDailyPlayerSummary = {
   diff?: unknown;
@@ -120,7 +120,7 @@ export function readTrackerDailySummary(metadata: RunescapeTrackerMetadata | nul
     totalXp: primary.totalXp,
     topSkills: primary.topSkills,
     friends: Object.entries(byPlayer)
-      .filter(([name]) => name !== username)
+      .filter(([name]) => name !== username && !OWN_ACCOUNTS.some((account) => account.name === name))
       .map(([name, value]) => {
         const summary = normalizeDailyPlayerSummary(value);
 

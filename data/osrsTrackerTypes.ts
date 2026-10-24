@@ -12,6 +12,8 @@ export const FRIEND_ORDER = [
   'Kriid',
 ] as const;
 
+export const OWN_ACCOUNTS = [{ name: 'JorbisBTW', accountType: 'Ironman' }] as const;
+
 export const BOSS_TIER_ORDER = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster'] as const;
 
 export const SKILL_ORDER = [
@@ -84,6 +86,16 @@ export type TrackerFriendSummary = {
   diff: number;
   effectiveHours: number;
   topSkills: TrackerSummaryItemWithLevel[];
+};
+
+export type TrackerOwnAccountSummary = {
+  name: string;
+  accountType: string;
+  available: boolean;
+  totalLevel: number;
+  totalXp: number;
+  gainedXp: number | null;
+  topSkills: TrackerSummaryItem[];
 };
 
 export type TrackerSevenDayEntry = {
@@ -194,6 +206,7 @@ export type LiveRunescapeTracker = {
   effectiveHours: ResolvedOsrsEffectiveHoursSummary;
   topSkills: TrackerSummaryItem[];
   friends: TrackerFriendSummary[];
+  ownAccounts: TrackerOwnAccountSummary[];
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];
   diaryGoalRemaining?: TrackerGoal[];

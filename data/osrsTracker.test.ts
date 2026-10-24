@@ -17,6 +17,7 @@ import {
   xpForLevel,
 } from './osrsTrackerGoals.ts';
 import { getPlayerStats } from './osrsTrackerParsers.ts';
+import { buildFriendSummaries, buildOwnAccountSummaries } from './osrsTrackerBuilders.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
 
@@ -53,6 +54,56 @@ function buildPlayerFromBaseline(
     ...skills,
   };
 }
+
+test('Ironman account starts with totals and a baseline rather than lifetime XP gains', () => {
+  const ironman = buildPlayerFromBaseline({}, { level: 52, experience: 3495 });
+  const [account] = buildOwnAccountSummaries({ JorbisBTW: ironman });
+
+  assert.equal(account.name, 'JorbisBTW');
+  assert.equal(account.accountType, 'Ironman');
+  assert.equal(account.available, true);
+  assert.equal(account.totalLevel, 52);
+  assert.equal(account.totalXp, 3495);
+  assert.equal(account.gainedXp, null);
+  assert.deepEqual(account.topSkills, []);
+});
+
+test('Ironman progress prefers published daily gains over the latest local snapshot delta', () => {
+  const previous = buildPlayerFromBaseline({}, { experience: 3495 });
+  const current = buildPlayerFromBaseline({}, { experience: 3995 });
+  const [account] = buildOwnAccountSummaries({
+    JorbisBTW: current,
+    _meta: {
+      dailySummary: { byPlayer: {
+        JorbisBTW: { totalXp: 1500, topSkills: [{ skill: 'attack', xp: 1500, level: 10 }] },
+      } },
+    },
+  }, { JorbisBTW: previous });
+
+  assert.equal(account.gainedXp, 1500);
+  assert.deepEqual(account.topSkills, [{ skill: 'Attack', xp: 1500 }]);
+  assert.equal(buildOwnAccountSummaries({ JorbisBTW: current }, { JorbisBTW: previous })[0].gainedXp, 500);
+});
+
+test('Ironman account stays visible when the feed has no account stats', () => {
+  const [account] = buildOwnAccountSummaries({});
+  assert.equal(account.available, false);
+  assert.equal(account.gainedXp, null);
+});
+
+test('Ironman account is excluded from both raw and published friend comparisons', () => {
+  const player = buildPlayerFromBaseline();
+  const data = { jhusebachz: player, JorbisBTW: player, '3Sixteen': player };
+  const friends = buildFriendSummaries(data, undefined, 'jhusebachz', player, null, false);
+  assert.deepEqual(friends.map((friend) => friend.name), ['3Sixteen']);
+
+  const summary = readTrackerDailySummary({ dailySummary: { byPlayer: {
+    jhusebachz: { totalXp: 200 },
+    JorbisBTW: { totalXp: 100 },
+    '3Sixteen': { totalXp: 50, diff: 150 },
+  } } }, 'jhusebachz');
+  assert.deepEqual(summary?.friends.map((friend) => friend.name), ['3Sixteen']);
+});
 
 test('tracker effective-hours fallback derives hours from XP deltas when metadata is absent', () => {
   const summary = resolveOsrsEffectiveHours(null, {

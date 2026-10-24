@@ -8,8 +8,9 @@ import {
   percentToTarget,
   xpForLevel,
 } from './osrsTrackerGoals.ts';
-import { getPlayerEntries, getPlayerStats, getSkillDelta } from './osrsTrackerParsers.ts';
-import { FRIEND_ORDER, SKILL_ORDER } from './osrsTrackerTypes.ts';
+import { getPlayerEntries, getPlayerStats, getSkillDelta, getTrackerMetadata } from './osrsTrackerParsers.ts';
+import { readTrackerDailySummary } from './osrsTrackerMetadata.ts';
+import { FRIEND_ORDER, OWN_ACCOUNTS, SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type {
   LiveRunescapeTracker,
   OsrsApiResponse,
@@ -18,6 +19,7 @@ import type {
   SkillName,
   TrackerFriendSummary,
   TrackerGoal,
+  TrackerOwnAccountSummary,
   TrackerSummaryItem,
   TrackerSummaryItemWithLevel,
 } from './osrsTrackerTypes.ts';
@@ -126,7 +128,7 @@ export function buildFriendSummaries(
 
   return sortFriendsByConfiguredOrder(
     getPlayerEntries(currentData)
-      .filter(([name]) => name !== username)
+      .filter(([name]) => name !== username && !OWN_ACCOUNTS.some((account) => account.name === name))
       .map(([name, stats]) => {
         const previousFriend = previousData ? getPlayerStats(previousData, name) : null;
         const overallXp = hasDelta
@@ -151,6 +153,33 @@ export function buildFriendSummaries(
         };
       })
   );
+}
+
+export function buildOwnAccountSummaries(
+  currentData: OsrsApiResponse,
+  previousData?: OsrsApiResponse
+): TrackerOwnAccountSummary[] {
+  return OWN_ACCOUNTS.map((account) => {
+    const player = getPlayerStats(currentData, account.name);
+    const previousPlayer = previousData ? getPlayerStats(previousData, account.name) : null;
+    const dailySummary = readTrackerDailySummary(getTrackerMetadata(currentData), account.name);
+
+    return {
+      ...account,
+      available: Boolean(player),
+      totalLevel: player?.overall.level ?? 0,
+      totalXp: player?.overall.experience ?? 0,
+      gainedXp: player
+        ? dailySummary?.totalXp ?? (previousPlayer
+          ? Math.max(player.overall.experience - previousPlayer.overall.experience, 0)
+          : null)
+        : null,
+      topSkills: player
+        ? dailySummary?.topSkills.map(({ skill, xp }) => ({ skill: formatOsrsSkillName(skill), xp }))
+          ?? (previousPlayer ? buildDerivedTopSkills(player, previousPlayer, true, 3) : [])
+        : [],
+    };
+  });
 }
 
 export function buildBaseGoalRemaining(skills: TrackerSkillEntry[]) {

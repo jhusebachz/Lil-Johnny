@@ -6,6 +6,7 @@ import {
   buildHoursToNextLevel,
   buildMaxClosest,
   buildMaxRemainingAll,
+  buildOwnAccountSummaries,
 } from './osrsTrackerBuilders.ts';
 import { fetchRawRunescapeData } from './osrsTrackerFetch.ts';
 import {
@@ -215,6 +216,7 @@ function fallbackTracker(): LiveRunescapeTracker {
     topSkills: [],
     weeklyRaidGoal: readTrackerWeeklyRaidGoal(null, PRIMARY_USERNAME),
     friends: [],
+    ownAccounts: buildOwnAccountSummaries({}),
     lastSevenDays: createEmptySevenDaySummary(),
     baseGoalRemaining: [],
     maxClosest: [],
@@ -448,6 +450,7 @@ export function buildLiveRunescapeTracker(
     topSkills,
     weeklyRaidGoal,
     friends,
+    ownAccounts: buildOwnAccountSummaries(currentData, previousData),
     lastSevenDays,
     baseGoalRemaining,
     maxClosest,
