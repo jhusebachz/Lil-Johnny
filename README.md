@@ -25,7 +25,7 @@ Lil Johnny is a personal tracker app built with Expo and React Native. It keeps 
 - Loop runs are tracked by time with a sub-9 target
 - The Health tab keeps workout logging up front, with the stretching guide tucked at the bottom so it stays available without crowding the logger
 - OSRS tracker uses live tracker snapshots, goal pace bars, and a more realistic Slayer-to-combat projection model for long-term pacing, including the RuneFest `Base 92s (RC 90)` goal
-- JorbisBTW has a separate Ironman progress card with total level, total XP, daily XP, and top gains; the main account keeps its existing goals.
+- JorbisBTW and IronXDabber have a side-by-side Ironman comparison: total level and XP, levels and XP gained since the previous paired report, and each account's top five skill gains ranked by XP (including levels gained). Both accounts use the same comparison interval. A failed lookup preserves their shared baseline until both accounts can be fetched again; main-account goals remain separate.
 - DIY tasks are tracked as their own cards with explicit completion buttons, and recent completions now contribute to the hobbies Bliss score
 - Avoidance streaks and reminder alarms share one tab, while streak timing follows local midnight
 - Life-tracker data now lives in a shared app-level context so Health, Cyber, Hobbies, Dashboard, and Streaks stop overwriting each other across tabs

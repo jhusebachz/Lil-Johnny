@@ -10,7 +10,7 @@ import {
 } from './osrsTrackerGoals.ts';
 import { getPlayerEntries, getPlayerStats, getSkillDelta, getTrackerMetadata } from './osrsTrackerParsers.ts';
 import { readTrackerDailySummary } from './osrsTrackerMetadata.ts';
-import { FRIEND_ORDER, OWN_ACCOUNTS, SKILL_ORDER } from './osrsTrackerTypes.ts';
+import { FRIEND_ORDER, IRONMAN_ACCOUNTS, OWN_ACCOUNTS, SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type {
   LiveRunescapeTracker,
   OsrsApiResponse,
@@ -128,7 +128,7 @@ export function buildFriendSummaries(
 
   return sortFriendsByConfiguredOrder(
     getPlayerEntries(currentData)
-      .filter(([name]) => name !== username && !OWN_ACCOUNTS.some((account) => account.name === name))
+      .filter(([name]) => name !== username && !IRONMAN_ACCOUNTS.some((account) => account.name === name))
       .map(([name, stats]) => {
         const previousFriend = previousData ? getPlayerStats(previousData, name) : null;
         const overallXp = hasDelta

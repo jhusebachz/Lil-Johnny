@@ -18,6 +18,7 @@ import {
 } from './osrsTrackerGoals.ts';
 import { getPlayerStats } from './osrsTrackerParsers.ts';
 import { buildFriendSummaries, buildOwnAccountSummaries } from './osrsTrackerBuilders.ts';
+import { buildIronmanComparison, ironmanComparisonLeads, ironmanComparisonPeriod } from './osrsIronmanComparison.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
 
@@ -91,18 +92,96 @@ test('Ironman account stays visible when the feed has no account stats', () => {
   assert.equal(account.gainedXp, null);
 });
 
-test('Ironman account is excluded from both raw and published friend comparisons', () => {
+test('both Ironmen are excluded from the main-account friend comparisons', () => {
   const player = buildPlayerFromBaseline();
-  const data = { jhusebachz: player, JorbisBTW: player, '3Sixteen': player };
+  const data = { jhusebachz: player, JorbisBTW: player, IronXDabber: player, '3Sixteen': player };
   const friends = buildFriendSummaries(data, undefined, 'jhusebachz', player, null, false);
   assert.deepEqual(friends.map((friend) => friend.name), ['3Sixteen']);
 
   const summary = readTrackerDailySummary({ dailySummary: { byPlayer: {
     jhusebachz: { totalXp: 200 },
     JorbisBTW: { totalXp: 100 },
+    IronXDabber: { totalXp: 500 },
     '3Sixteen': { totalXp: 50, diff: 150 },
   } } }, 'jhusebachz');
   assert.deepEqual(summary?.friends.map((friend) => friend.name), ['3Sixteen']);
+});
+
+function publishedIronmanComparison() {
+  return {
+    status: 'comparison', periodStart: '2026-10-28T08:30:00Z', periodEnd: '2026-10-29T08:30:00Z',
+    accounts: [
+      { name: 'JorbisBTW', available: true, totalLevel: 100, totalXp: 5000, gainedLevels: 10, gainedXp: 2000,
+        topSkills: [
+          { skill: 'attack', xp: 100, level: 5, levelsGained: 1 },
+          { skill: 'fishing', xp: 600, level: 10, levelsGained: 3 },
+          { skill: 'cooking', xp: 500, level: 9, levelsGained: 2 },
+          { skill: 'mining', xp: 400, level: 8, levelsGained: 2 },
+          { skill: 'smithing', xp: 300, level: 7, levelsGained: 1 },
+          { skill: 'strength', xp: 200, level: 6, levelsGained: 1 },
+        ] },
+      { name: 'IronXDabber', available: true, totalLevel: 80, totalXp: 4000, gainedLevels: 5, gainedXp: 1000,
+        topSkills: [{ skill: 'magic', xp: 1000, level: 10, levelsGained: 4 }] },
+    ],
+  };
+}
+
+test('Ironman comparison uses the published shared interval and top five positive XP gains', () => {
+  const comparison = buildIronmanComparison({ _meta: {
+    ironmanComparison: publishedIronmanComparison(),
+    dailySummary: { byPlayer: { JorbisBTW: { totalXp: 999999 } } },
+  } });
+  assert.equal(comparison.status, 'comparison');
+  assert.deepEqual(comparison.accounts.map((account) => account.name), ['JorbisBTW', 'IronXDabber']);
+  assert.equal(comparison.accounts[0].gainedLevels, 10);
+  assert.equal(comparison.accounts[0].gainedXp, 2000);
+  assert.deepEqual(comparison.accounts[0].topSkills.map((skill) => skill.skill), ['Fishing', 'Cooking', 'Mining', 'Smithing', 'Strength']);
+  assert.equal(comparison.accounts[0].topSkills[0].levelsGained, 3);
+  assert.deepEqual(ironmanComparisonLeads(comparison), ['JorbisBTW gained 1,000 more XP.', 'JorbisBTW gained 5 more total levels.']);
+  assert.match(ironmanComparisonPeriod(comparison), /Oct 28.*Oct 29.*ET/);
+});
+
+test('older feeds show both Ironmen and do not invent friend or lifetime progress', () => {
+  const comparison = buildIronmanComparison({ JorbisBTW: buildPlayerFromBaseline() });
+  assert.equal(comparison.status, 'unavailable');
+  assert.equal(comparison.accounts[0].available, true);
+  assert.equal(comparison.accounts[1].available, false);
+  assert.ok(comparison.accounts.every((account) => account.gainedXp === null && account.gainedLevels === null));
+  assert.deepEqual(ironmanComparisonLeads(comparison), []);
+});
+
+test('first shared baseline displays totals with progress pending for both accounts', () => {
+  const raw = { ...publishedIronmanComparison(), status: 'baseline', periodStart: null };
+  const comparison = buildIronmanComparison({ _meta: { ironmanComparison: raw } });
+  assert.equal(comparison.status, 'baseline');
+  assert.equal(comparison.accounts[1].totalLevel, 80);
+  assert.ok(comparison.accounts.every((account) => account.gainedXp === null && account.topSkills.length === 0));
+  assert.match(ironmanComparisonPeriod(comparison), /Baseline established/);
+});
+
+test('failed lookups and invalid intervals suppress all progress comparisons', () => {
+  const failed = publishedIronmanComparison();
+  failed.accounts[1].available = false;
+  const failedResult = buildIronmanComparison({ _meta: { ironmanComparison: failed } });
+  assert.equal(failedResult.status, 'unavailable');
+  assert.deepEqual(ironmanComparisonLeads(failedResult), []);
+  assert.equal(failedResult.accounts[0].gainedXp, null);
+
+  for (const periodStart of ['bad-date', '2026-10-30T08:30:00Z']) {
+    const raw = { ...publishedIronmanComparison(), periodStart };
+    assert.equal(buildIronmanComparison({ _meta: { ironmanComparison: raw } }).status, 'baseline');
+  }
+});
+
+test('Ironman comparison shows ties and either account can lead independently on XP and levels', () => {
+  const raw = publishedIronmanComparison();
+  raw.accounts[1].gainedXp = 3000;
+  let comparison = buildIronmanComparison({ _meta: { ironmanComparison: raw } });
+  assert.deepEqual(ironmanComparisonLeads(comparison), ['IronXDabber gained 1,000 more XP.', 'JorbisBTW gained 5 more total levels.']);
+  raw.accounts[0].gainedXp = 3000;
+  raw.accounts[0].gainedLevels = 5;
+  comparison = buildIronmanComparison({ _meta: { ironmanComparison: raw } });
+  assert.deepEqual(ironmanComparisonLeads(comparison), ['XP gained: tied.', 'total levels gained: tied.']);
 });
 
 test('tracker effective-hours fallback derives hours from XP deltas when metadata is absent', () => {

@@ -6,6 +6,7 @@ import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
 import TrackerGoalCard from './TrackerGoalCard';
+import IronmanComparisonCard from './IronmanComparisonCard';
 import { DIARY_SKILL_TARGETS } from '../../data/osrsDiaryGoals';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
 import { fetchRawRunescapeData } from '../../data/osrsTrackerFetch';
@@ -241,30 +242,7 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         ) : null}
       </View>
 
-      {tracker.ownAccounts.map((account) => (
-        <SectionCard key={account.name} title={`${account.name} - ${account.accountType}`} emoji={'\u2692'} colors={colors}>
-          {account.available ? (
-            <>
-              <StatRow label="Total level" value={account.totalLevel.toLocaleString()} colors={colors} />
-              <StatRow label="Total account XP" value={account.totalXp.toLocaleString()} colors={colors} />
-              <StatRow
-                label="XP gained today"
-                value={account.gainedXp === null ? 'Baseline established' : account.gainedXp.toLocaleString()}
-                colors={colors}
-              />
-              {account.topSkills.map((skill) => (
-                <Text key={`${account.name}-${skill.skill}`} style={{ color: colors.text, fontSize: 13, marginTop: 6 }}>
-                  {skill.skill}: +{skill.xp.toLocaleString()} xp
-                </Text>
-              ))}
-            </>
-          ) : (
-            <Text style={{ color: colors.subtext, fontSize: 13 }}>
-              Waiting for a successful HiScores lookup in the daily tracker.
-            </Text>
-          )}
-        </SectionCard>
-      ))}
+      <IronmanComparisonCard comparison={tracker.ironmanComparison} colors={colors} />
 
       {hasSevenDaySummary ? (
         <SectionCard title="Last 7 Days" emoji={'\uD83D\uDCC8'} colors={colors}>

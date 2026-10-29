@@ -13,6 +13,7 @@ export const FRIEND_ORDER = [
 ] as const;
 
 export const OWN_ACCOUNTS = [{ name: 'JorbisBTW', accountType: 'Ironman' }] as const;
+export const IRONMAN_ACCOUNTS = [...OWN_ACCOUNTS, { name: 'IronXDabber', accountType: 'Ironman' }] as const;
 
 export const BOSS_TIER_ORDER = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster'] as const;
 
@@ -98,6 +99,18 @@ export type TrackerOwnAccountSummary = {
   topSkills: TrackerSummaryItem[];
 };
 
+export type TrackerIronmanAccount = Omit<TrackerOwnAccountSummary, 'topSkills'> & {
+  gainedLevels: number | null;
+  topSkills: (TrackerSummaryItemWithLevel & { levelsGained: number })[];
+};
+
+export type TrackerIronmanComparison = {
+  status: 'comparison' | 'baseline' | 'unavailable';
+  periodStart: string | null;
+  periodEnd: string | null;
+  accounts: TrackerIronmanAccount[];
+};
+
 export type TrackerSevenDayEntry = {
   dateKey: string;
   effectiveHours: number;
@@ -161,6 +174,7 @@ export type TrackerWeeklyRaidGoal = {
 };
 
 export type RunescapeTrackerMetadata = {
+  ironmanComparison?: unknown;
   bossProgression?: Record<string, unknown>;
   bosses?: Record<string, unknown>;
   currentWeek?: Record<string, unknown>;
@@ -207,6 +221,7 @@ export type LiveRunescapeTracker = {
   topSkills: TrackerSummaryItem[];
   friends: TrackerFriendSummary[];
   ownAccounts: TrackerOwnAccountSummary[];
+  ironmanComparison: TrackerIronmanComparison;
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];
   diaryGoalRemaining?: TrackerGoal[];
