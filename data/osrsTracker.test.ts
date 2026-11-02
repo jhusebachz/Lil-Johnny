@@ -19,6 +19,7 @@ import {
 import { getPlayerStats } from './osrsTrackerParsers.ts';
 import { buildFriendSummaries, buildOwnAccountSummaries } from './osrsTrackerBuilders.ts';
 import { buildIronmanComparison, ironmanComparisonLeads, ironmanComparisonPeriod } from './osrsIronmanComparison.ts';
+import { buildAccountStats } from './osrsAccountStats.ts';
 import { SKILL_ORDER } from './osrsTrackerTypes.ts';
 import type { OsrsPlayerStats, OsrsSkillStat, SkillName } from './osrsTrackerTypes.ts';
 
@@ -55,6 +56,38 @@ function buildPlayerFromBaseline(
     ...skills,
   };
 }
+
+test('account stats show absolute levels and XP from the report snapshot for exactly the two owned accounts', () => {
+  const primary = buildPlayerFromBaseline({ attack: { level: 92, experience: 7_000_000 } });
+  const ironman = buildPlayerFromBaseline({ attack: { level: 5, experience: 500 } }, { level: 393, experience: 153_600 });
+  const accounts = buildAccountStats({
+    jhusebachz: primary, JorbisBTW: ironman, IronXDabber: primary,
+    _meta: { dailySummary: { byPlayer: { JorbisBTW: { totalXp: 5 } } } },
+  });
+  assert.deepEqual(accounts.map((account) => account.name), ['jhusebachz', 'JorbisBTW']);
+  assert.equal(accounts[1].totalLevel, 393);
+  assert.equal(accounts[1].totalXp, 153_600);
+  assert.deepEqual(accounts[1].skills[0], { skill: 'attack', level: 5, xp: 500 });
+  assert.equal(accounts[0].skills[0].xp, 7_000_000);
+  assert.deepEqual(accounts[0].skills.map((stat) => stat.skill), [...SKILL_ORDER]);
+});
+
+test('account stats mark absent accounts and missing or unranked skills as unavailable', () => {
+  const primary = buildPlayerFromBaseline({ attack: { level: -1, experience: -1 } });
+  const { sailing: _sailing, ...withoutSailing } = primary;
+  const accounts = buildAccountStats({ jhusebachz: withoutSailing });
+  assert.equal(accounts[0].available, true);
+  assert.deepEqual(accounts[0].skills[0], { skill: 'attack', level: null, xp: null });
+  assert.deepEqual(accounts[0].skills.at(-1), { skill: 'sailing', level: null, xp: null });
+  assert.equal(accounts[1].available, false);
+  assert.equal(accounts[1].totalXp, null);
+  assert.ok(accounts[1].skills.every((stat) => stat.level === null && stat.xp === null));
+});
+
+test('account stats preserve level-one skills with zero XP', () => {
+  const ironman = buildPlayerFromBaseline({ attack: { level: 1, experience: 0 } });
+  assert.deepEqual(buildAccountStats({ JorbisBTW: ironman })[1].skills[0], { skill: 'attack', level: 1, xp: 0 });
+});
 
 test('Ironman account starts with totals and a baseline rather than lifetime XP gains', () => {
   const ironman = buildPlayerFromBaseline({}, { level: 52, experience: 3495 });

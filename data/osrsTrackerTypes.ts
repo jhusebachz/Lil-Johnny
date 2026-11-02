@@ -1,4 +1,5 @@
 import type { ResolvedOsrsEffectiveHoursSummary } from './osrsEffectiveHours.ts';
+import type { TrackerAccountStats } from './osrsAccountStats.ts';
 
 export const FRIEND_ORDER = [
   '3Sixteen',
@@ -222,6 +223,7 @@ export type LiveRunescapeTracker = {
   friends: TrackerFriendSummary[];
   ownAccounts: TrackerOwnAccountSummary[];
   ironmanComparison: TrackerIronmanComparison;
+  accountStats: TrackerAccountStats[];
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];
   diaryGoalRemaining?: TrackerGoal[];

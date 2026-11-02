@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 
 import Pill from '../Pill';
@@ -7,13 +7,10 @@ import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
 import TrackerGoalCard from './TrackerGoalCard';
 import IronmanComparisonCard from './IronmanComparisonCard';
-import { DIARY_SKILL_TARGETS } from '../../data/osrsDiaryGoals';
+import AccountStatsCard from './AccountStatsCard';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
-import { fetchRawRunescapeData } from '../../data/osrsTrackerFetch';
-import { getPlayerStats } from '../../data/osrsTrackerParsers';
-import { GOAL_TRAINING_PLANS, xpForLevel } from '../../data/osrsTrackerGoals';
 import { buildTrackerSevenDayTopSkills } from '../../data/osrsTrackerSevenDay';
-import { BOSS_TIER_ORDER, SKILL_ORDER } from '../../data/osrsTrackerTypes';
+import { BOSS_TIER_ORDER } from '../../data/osrsTrackerTypes';
 import type {
   LiveRunescapeTracker,
   TrackerBossProgression,
@@ -26,20 +23,6 @@ type RunescapeSectionProps = {
   tracker: LiveRunescapeTracker;
   trackerError: string | null;
   trackerLoading: boolean;
-};
-
-type DiaryRemainingItem = {
-  skill: string;
-  level: number;
-  targetLevel: number;
-  remainingXp: number;
-  hoursLeft: number | null;
-};
-
-type GoalExtras = {
-  diaryRemaining: DiaryRemainingItem[];
-  diaryCompleted: number;
-  loaded: boolean;
 };
 
 const EMPTY_BOSS_PROGRESS: TrackerBossProgression = {
@@ -80,70 +63,6 @@ function clampPct(value: number) {
 }
 
 export default function RunescapeSectionV2({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
-  const [extras, setExtras] = useState<GoalExtras>({
-    diaryRemaining: [],
-    diaryCompleted: 0,
-    loaded: false,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadGoalExtras() {
-      try {
-        const data = await fetchRawRunescapeData();
-        const player = getPlayerStats(data, 'jhusebachz');
-        const diaryRemaining: DiaryRemainingItem[] = [];
-
-        if (player) {
-          SKILL_ORDER.forEach((skill) => {
-            const stat = player[skill];
-            const targetLevel = DIARY_SKILL_TARGETS[skill];
-            if (!stat || stat.level >= targetLevel) {
-              return;
-            }
-
-            const remainingXp = Math.max(xpForLevel(targetLevel) - stat.experience, 0);
-            const xpPerHour = GOAL_TRAINING_PLANS[skill]?.xpPerHour ?? 0;
-            diaryRemaining.push({
-              skill: formatOsrsSkillName(skill),
-              level: stat.level,
-              targetLevel,
-              remainingXp,
-              hoursLeft: xpPerHour > 0 ? remainingXp / xpPerHour : null,
-            });
-          });
-
-          diaryRemaining.sort((left, right) => {
-            if (left.hoursLeft === null && right.hoursLeft === null) {
-              return left.remainingXp - right.remainingXp;
-            }
-            if (left.hoursLeft === null) return 1;
-            if (right.hoursLeft === null) return -1;
-            return left.hoursLeft - right.hoursLeft;
-          });
-        }
-
-        if (!cancelled) {
-          setExtras({
-            diaryRemaining,
-            diaryCompleted: player ? SKILL_ORDER.length - diaryRemaining.length : 0,
-            loaded: true,
-          });
-        }
-      } catch {
-        if (!cancelled) {
-          setExtras((previous) => ({ ...previous, loaded: true }));
-        }
-      }
-    }
-
-    void loadGoalExtras();
-    return () => {
-      cancelled = true;
-    };
-  }, [tracker.generatedAt]);
-
   const goal1Projection = tracker.goalProjections.baseGoal;
   const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
   const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
@@ -152,7 +71,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
     .slice(0, 3)
     .map((entry) => `${formatOsrsSkillName(entry.skill)} ${entry.hours.toFixed(1)}h`)
     .join(' | ');
-  const diaryPct = clampPct((extras.diaryCompleted / SKILL_ORDER.length) * 100);
   const bossProgression = tracker.bossProgression ?? EMPTY_BOSS_PROGRESS;
   const dailyBossActivity = tracker.dailyBossActivity ?? { topPlayers: [] };
   const weeklyRaidGoal = tracker.weeklyRaidGoal ?? EMPTY_RAID_GOAL;
@@ -165,9 +83,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
 
   const coachingText = useMemo(() => {
     const baseText = `${24 - tracker.baseGoalRemaining.length}/24 Base-92 targets complete.`;
-    const diaryText = extras.loaded
-      ? `${extras.diaryCompleted}/24 diary skill requirements complete.`
-      : 'Diary requirements are loading.';
     const bossText = bossProgression.totalTracked > 0
       ? `Boss checklist: ${bossProgression.triedCount}/${bossProgression.totalTracked} complete; ${bossProgression.untriedCount} remaining.`
       : 'Boss KC data will populate on the next daily HiScores snapshot.';
@@ -177,8 +92,8 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         : 'Weekly raid goal still needs one CoX, ToA, or ToB completion.'
       : 'Weekly raid tracking will begin with the next daily snapshot.';
 
-    return `${baseText} ${diaryText} ${bossText} ${raidText}`;
-  }, [bossProgression, extras, tracker.baseGoalRemaining.length, weeklyRaidGoal]);
+    return `${baseText} ${bossText} ${raidText}`;
+  }, [bossProgression, tracker.baseGoalRemaining.length, weeklyRaidGoal]);
 
   return (
     <>
@@ -354,31 +269,6 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         ))}
       </TrackerGoalCard>
 
-      <SectionCard title="Goal 2 - Achievement Diary Skill Requirements" emoji={'\uD83D\uDCD6'} colors={colors}>
-        <StatRow label="Skill requirements met" value={`${extras.diaryCompleted}/24`} colors={colors} />
-        <StatRow label="Still needed" value={`${extras.diaryRemaining.length}`} colors={colors} />
-        <ProgressBar pct={diaryPct} color={colors.accent} colors={colors} />
-        <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8, marginBottom: 8 }}>
-          Tracks the highest skill levels needed to complete every Elite Achievement Diary.
-        </Text>
-        {extras.diaryRemaining.map((item) => (
-          <View key={`diary-${item.skill}`} style={{ marginBottom: 9 }}>
-            <Text style={{ fontSize: 12, color: colors.text }}>
-              <Text style={{ fontWeight: '800' }}>{item.skill}</Text> Lv{item.level} / {item.targetLevel}
-              <Text style={{ color: colors.subtext }}>
-                {' '} - {item.remainingXp.toLocaleString()} xp left
-                {item.hoursLeft !== null ? ` | ${item.hoursLeft.toFixed(1)}h` : ''}
-              </Text>
-            </Text>
-          </View>
-        ))}
-        {extras.loaded && extras.diaryRemaining.length === 0 && extras.diaryCompleted === 24 ? (
-          <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800', marginTop: 8 }}>
-            All diary skill requirements complete.
-          </Text>
-        ) : null}
-      </SectionCard>
-
       <SectionCard title="Boss Completion Checklist - Get 1 KC" emoji={'\uD83D\uDC80'} colors={colors}>
         {bossProgression.totalTracked > 0 ? (
           <>
@@ -491,6 +381,7 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
       <SectionCard title="Coaching Insight" emoji={'\uD83E\uDDE0'} colors={colors}>
         <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{coachingText}</Text>
       </SectionCard>
+      <AccountStatsCard accounts={tracker.accountStats} generatedAtLabel={tracker.generatedAtLabel} colors={colors} />
     </>
   );
 }
