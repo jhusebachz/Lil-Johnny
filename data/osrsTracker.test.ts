@@ -125,11 +125,11 @@ test('Ironman account stays visible when the feed has no account stats', () => {
   assert.equal(account.gainedXp, null);
 });
 
-test('both Ironmen are excluded from the main-account friend comparisons', () => {
+test('JorbisBTW is separate and IronXDabber appears with friends', () => {
   const player = buildPlayerFromBaseline();
   const data = { jhusebachz: player, JorbisBTW: player, IronXDabber: player, '3Sixteen': player };
   const friends = buildFriendSummaries(data, undefined, 'jhusebachz', player, null, false);
-  assert.deepEqual(friends.map((friend) => friend.name), ['3Sixteen']);
+  assert.deepEqual(friends.map((friend) => friend.name), ['3Sixteen', 'IronXDabber']);
 
   const summary = readTrackerDailySummary({ dailySummary: { byPlayer: {
     jhusebachz: { totalXp: 200 },
@@ -137,7 +137,7 @@ test('both Ironmen are excluded from the main-account friend comparisons', () =>
     IronXDabber: { totalXp: 500 },
     '3Sixteen': { totalXp: 50, diff: 150 },
   } } }, 'jhusebachz');
-  assert.deepEqual(summary?.friends.map((friend) => friend.name), ['3Sixteen']);
+  assert.deepEqual(summary?.friends.map((friend) => friend.name), ['IronXDabber', '3Sixteen']);
 });
 
 function publishedIronmanComparison() {

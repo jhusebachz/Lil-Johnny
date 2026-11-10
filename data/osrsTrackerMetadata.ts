@@ -11,7 +11,7 @@ import type {
   TrackerWeeklyRaidGoal,
   RunescapeTrackerMetadata,
 } from './osrsTrackerTypes.ts';
-import { BOSS_TIER_ORDER, IRONMAN_ACCOUNTS } from './osrsTrackerTypes.ts';
+import { BOSS_TIER_ORDER, OWN_ACCOUNTS } from './osrsTrackerTypes.ts';
 
 type RawDailyPlayerSummary = {
   diff?: unknown;
@@ -120,7 +120,7 @@ export function readTrackerDailySummary(metadata: RunescapeTrackerMetadata | nul
     totalXp: primary.totalXp,
     topSkills: primary.topSkills,
     friends: Object.entries(byPlayer)
-      .filter(([name]) => name !== username && !IRONMAN_ACCOUNTS.some((account) => account.name === name))
+      .filter(([name]) => name !== username && !OWN_ACCOUNTS.some((account) => account.name === name))
       .map(([name, value]) => {
         const summary = normalizeDailyPlayerSummary(value);
 
@@ -131,7 +131,10 @@ export function readTrackerDailySummary(metadata: RunescapeTrackerMetadata | nul
         return {
           name,
           overallXp: summary.totalXp,
-          diff: summary.diff,
+          diff: typeof (value as RawDailyPlayerSummary).diff === 'number' &&
+            Number.isFinite((value as RawDailyPlayerSummary).diff)
+            ? summary.diff
+            : primary.totalXp - summary.totalXp,
           effectiveHours: summary.effectiveHours,
           topSkills: summary.topSkills,
         } satisfies TrackerFriendSummary;

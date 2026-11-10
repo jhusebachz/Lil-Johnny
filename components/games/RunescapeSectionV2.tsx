@@ -5,10 +5,9 @@ import Pill from '../Pill';
 import ProgressBar from '../ProgressBar';
 import SectionCard from '../SectionCard';
 import StatRow from '../StatRow';
-import TrackerGoalCard from './TrackerGoalCard';
-import IronmanComparisonCard from './IronmanComparisonCard';
 import AccountStatsCard from './AccountStatsCard';
 import { formatOsrsSkillName } from '../../data/osrsEffectiveHours';
+import { xpForLevel } from '../../data/osrsTrackerGoals';
 import { buildTrackerSevenDayTopSkills } from '../../data/osrsTrackerSevenDay';
 import { BOSS_TIER_ORDER } from '../../data/osrsTrackerTypes';
 import type {
@@ -63,7 +62,8 @@ function clampPct(value: number) {
 }
 
 export default function RunescapeSectionV2({ colors, tracker, trackerError, trackerLoading }: RunescapeSectionProps) {
-  const goal1Projection = tracker.goalProjections.baseGoal;
+  const maxPace = tracker.maxCapePace;
+  const ironman = tracker.ironmanMilestone;
   const hasEffectiveHours = tracker.effectiveHours.source !== 'unavailable';
   const hasSevenDaySummary = tracker.lastSevenDays.daysTracked > 0;
   const sevenDayTopSkills = buildTrackerSevenDayTopSkills(tracker.lastSevenDays);
@@ -82,6 +82,9 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
   );
 
   const coachingText = useMemo(() => {
+    const maxText = maxPace
+      ? `Max Cape: ${maxPace.maxedSkills}/${maxPace.totalSkills} skills at 99; ${Math.abs(maxPace.hoursAhead).toFixed(1)} cumulative timed hours ${maxPace.hoursAhead >= 0 ? 'ahead' : 'behind'} the December 2027 plan. Combat levels have no timed target.`
+      : 'Max Cape pacing will appear with the next complete snapshot.';
     const baseText = `${24 - tracker.baseGoalRemaining.length}/24 Base-92 targets complete.`;
     const bossText = bossProgression.totalTracked > 0
       ? `Boss checklist: ${bossProgression.triedCount}/${bossProgression.totalTracked} complete; ${bossProgression.untriedCount} remaining.`
@@ -92,8 +95,8 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         : 'Weekly raid goal still needs one CoX, ToA, or ToB completion.'
       : 'Weekly raid tracking will begin with the next daily snapshot.';
 
-    return `${baseText} ${bossText} ${raidText}`;
-  }, [bossProgression, tracker.baseGoalRemaining.length, weeklyRaidGoal]);
+    return `${maxText} ${baseText} ${bossText} ${raidText}`;
+  }, [maxPace, bossProgression, tracker.baseGoalRemaining.length, weeklyRaidGoal]);
 
   return (
     <>
@@ -157,7 +160,76 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         ) : null}
       </View>
 
-      <IronmanComparisonCard comparison={tracker.ironmanComparison} colors={colors} />
+      <SectionCard title="Road to Max Cape - December 31, 2027" emoji={'\uD83C\uDFC6'} colors={colors}>
+        {maxPace ? (
+          <>
+            <StatRow label="Skills at 99" value={`${maxPace.maxedSkills}/${maxPace.totalSkills}`} colors={colors} />
+            <StatRow label="Total level" value={`${maxPace.totalLevel.toLocaleString()}/${maxPace.totalSkills * 99}`} colors={colors} />
+            <StatRow label="XP progress to all 99s" value={`${maxPace.xpProgressPct.toFixed(1)}%`} colors={colors} />
+            <ProgressBar pct={maxPace.xpProgressPct} color={colors.accent} colors={colors} />
+            <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 12 }} />
+            <StatRow label="Timed work completed" value={`${maxPace.completedTimedHours.toFixed(1)}h`} colors={colors} />
+            <StatRow label="Expected by this date" value={`${maxPace.expectedTimedHours.toFixed(1)}h`} colors={colors} />
+            <StatRow label="Timed work remaining" value={`${maxPace.remainingTimedHours.toFixed(1)}h`} colors={colors} />
+            <Text style={{ color: maxPace.hoursAhead >= 0 ? colors.success : colors.danger, fontWeight: '800', fontSize: 17, marginTop: 10 }}>
+              {Math.abs(maxPace.hoursAhead).toFixed(1)} cumulative hours {maxPace.hoursAhead >= 0 ? 'ahead' : 'behind'}
+            </Text>
+            <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 4 }}>
+              Hours are measured from November 10, 2026 using your configured XP/hour rates, against the December 31, 2027 deadline.
+            </Text>
+            {maxPace.timedSkills.length > 0 ? (
+              <View style={{ marginTop: 14 }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 8 }}>TIMED SKILLS (LONGEST FIRST)</Text>
+                {maxPace.timedSkills.map((item) => (
+                  <View key={`timed-${item.skill}`} style={{ marginBottom: 10 }}>
+                    <Text style={{ fontSize: 13, color: colors.text, marginBottom: 3 }}>
+                      {formatOsrsSkillName(item.skill)} Lv{item.level}: {item.hoursLeft.toFixed(1)}h remaining
+                    </Text>
+                    <ProgressBar pct={100 * (1 - item.remainingXp / xpForLevel(99))} color={colors.accent} colors={colors} />
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 10 }}>
+              Combat: {maxPace.untimedCombat.length > 0
+                ? maxPace.untimedCombat.map((item) => `${formatOsrsSkillName(item.skill)} ${item.level}`).join(' | ')
+                : 'All combat skills maxed'}. Tracked toward 99 without individual time estimates because Slayer trains them too.
+            </Text>
+          </>
+        ) : <Text style={{ color: colors.subtext }}>Max Cape pacing will appear after a complete HiScores snapshot.</Text>}
+      </SectionCard>
+
+      <SectionCard title="Ironman Milestones - JorbisBTW" emoji={'\uD83D\uDEE1\uFE0F'} colors={colors}>
+        {ironman ? (
+          <>
+            <StatRow label="Total level" value={ironman.totalLevel.toLocaleString()} colors={colors} />
+            <StatRow label="Current milestone" value={`Base ${ironman.targetLevel}`} colors={colors} />
+            <StatRow label="Skills at target" value={`${ironman.completed}/${ironman.totalSkills}`} colors={colors} />
+            {ironman.levelsGainedSincePrevious !== null ? (
+              <StatRow label="Levels since previous report" value={`+${ironman.levelsGainedSincePrevious}`} colors={colors} />
+            ) : null}
+            <ProgressBar pct={100 * ironman.completed / ironman.totalSkills} color={colors.success} colors={colors} />
+            {ironman.nextTier ? (
+              <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 9 }}>
+                Next tier preview: Base {ironman.nextTier.level}, {ironman.nextTier.completed}/{ironman.totalSkills} skills already there.
+              </Text>
+            ) : null}
+            {ironman.remaining.length > 0 ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ fontSize: 12, color: colors.text, fontWeight: '800', marginBottom: 7 }}>STILL NEEDED FOR BASE {ironman.targetLevel}</Text>
+                {ironman.remaining.map((item) => (
+                  <Text key={`iron-${item.skill}`} style={{ color: colors.text, fontSize: 13, marginBottom: 5 }}>
+                    {'\u2022'} {formatOsrsSkillName(item.skill)}: Lv{item.level}/{ironman.targetLevel}
+                  </Text>
+                ))}
+              </View>
+            ) : <Text style={{ color: colors.success, marginTop: 8 }}>All skills maxed!</Text>}
+            <Text style={{ color: colors.subtext, fontSize: 12, marginTop: 12 }}>
+              Milestones advance automatically through Base 30, 40, 50, 60, 70, 80, 90, and 99. No hourly pace or deadline.
+            </Text>
+          </>
+        ) : <Text style={{ color: colors.subtext }}>Ironman milestones will appear after a complete HiScores snapshot.</Text>}
+      </SectionCard>
 
       {hasSevenDaySummary ? (
         <SectionCard title="Last 7 Days" emoji={'\uD83D\uDCC8'} colors={colors}>
@@ -243,31 +315,19 @@ export default function RunescapeSectionV2({ colors, tracker, trackerError, trac
         </SectionCard>
       ) : null}
 
-      <TrackerGoalCard
-        title="Goal 1 - Base 92s (Runecrafting 90) by Year End"
-        emoji={'\uD83C\uDFAF'}
-        colors={colors}
-        deadlineLabel={`2026-12-31 - Year-end target (${goal1Projection.daysLeft} days left)`}
-        projection={goal1Projection}
-        paceColor={colors.accent}
-        statRows={[{ label: 'Skills at target+', value: `${24 - tracker.baseGoalRemaining.length}/24` }]}
-      >
-        <Text style={{ marginTop: 10, marginBottom: 8, fontSize: 12, fontWeight: '800', color: colors.text }}>
-          STILL NEEDED
-        </Text>
-        {tracker.baseGoalRemaining.map((item) => (
-          <View key={item.skill} style={{ marginBottom: 10 }}>
-            <Text style={{ fontSize: 12, color: colors.text }}>
-              <Text style={{ fontWeight: '700' }}>{item.skill}</Text> Lv{item.level} / {item.targetLevel}
-              <Text style={{ color: colors.subtext }}>
-                {' '} - {item.remainingXp.toLocaleString()} xp left
-                {item.hoursLeft != null ? ` | ${item.hoursLeft.toFixed(1)}h` : ''}
+      {tracker.baseGoalRemaining.length > 0 ? (
+        <SectionCard title="Finish Base 92s (Runecrafting 90)" emoji={'\uD83C\uDFAF'} colors={colors}>
+          <StatRow label="Skills at goal" value={`${24 - tracker.baseGoalRemaining.length}/24`} colors={colors} />
+          {tracker.baseGoalRemaining.map((item) => (
+            <View key={item.skill} style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 12, color: colors.text }}>
+                {item.skill} Lv{item.level}/{item.targetLevel}: {item.remainingXp.toLocaleString()} XP remaining
               </Text>
-            </Text>
-            <ProgressBar pct={item.pct} color={colors.accent} colors={colors} />
-          </View>
-        ))}
-      </TrackerGoalCard>
+              <ProgressBar pct={item.pct} color={colors.accent} colors={colors} />
+            </View>
+          ))}
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Boss Completion Checklist - Get 1 KC" emoji={'\uD83D\uDC80'} colors={colors}>
         {bossProgression.totalTracked > 0 ? (

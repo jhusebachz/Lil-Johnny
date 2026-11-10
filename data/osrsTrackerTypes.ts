@@ -11,6 +11,7 @@ export const FRIEND_ORDER = [
   'Dummyhead38',
   'RebelMontana',
   'Kriid',
+  'IronXDabber',
 ] as const;
 
 export const OWN_ACCOUNTS = [{ name: 'JorbisBTW', accountType: 'Ironman' }] as const;
@@ -112,6 +113,40 @@ export type TrackerIronmanComparison = {
   accounts: TrackerIronmanAccount[];
 };
 
+export type TrackerMaxCapePace = {
+  available: boolean;
+  startDate: string;
+  deadline: string;
+  daysLeft: number;
+  maxedSkills: number;
+  totalSkills: number;
+  totalLevel: number;
+  xpProgressPct: number;
+  startingTimedHours: number;
+  completedTimedHours: number;
+  expectedTimedHours: number;
+  remainingTimedHours: number;
+  hoursAhead: number;
+  timedProgressPct: number;
+  timedSkills: { skill: SkillName; level: number; remainingXp: number; hoursLeft: number; xpPerHour: number }[];
+  untimedCombat: { skill: SkillName; level: number; remainingXp: number }[];
+  unestimatedSkills: SkillName[];
+};
+
+export type TrackerIronmanMilestone = {
+  available: boolean;
+  account: string;
+  totalLevel: number;
+  levelsGainedSincePrevious: number | null;
+  targetLevel: number;
+  completed: number;
+  totalSkills: number;
+  remaining: { skill: SkillName; level: number }[];
+  stages: { level: number; completed: number }[];
+  nextTier: { level: number; completed: number } | null;
+  maxed: boolean;
+};
+
 export type TrackerSevenDayEntry = {
   dateKey: string;
   effectiveHours: number;
@@ -176,6 +211,8 @@ export type TrackerWeeklyRaidGoal = {
 
 export type RunescapeTrackerMetadata = {
   ironmanComparison?: unknown;
+  ironmanMilestone?: unknown;
+  maxCapePace?: unknown;
   bossProgression?: Record<string, unknown>;
   bosses?: Record<string, unknown>;
   currentWeek?: Record<string, unknown>;
@@ -223,6 +260,8 @@ export type LiveRunescapeTracker = {
   friends: TrackerFriendSummary[];
   ownAccounts: TrackerOwnAccountSummary[];
   ironmanComparison: TrackerIronmanComparison;
+  ironmanMilestone: TrackerIronmanMilestone | null;
+  maxCapePace: TrackerMaxCapePace | null;
   accountStats: TrackerAccountStats[];
   lastSevenDays: TrackerSevenDaySummary;
   baseGoalRemaining: TrackerGoal[];

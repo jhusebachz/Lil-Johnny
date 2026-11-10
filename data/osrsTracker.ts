@@ -10,6 +10,7 @@ import {
 } from './osrsTrackerBuilders.ts';
 import { fetchRawRunescapeData } from './osrsTrackerFetch.ts';
 import { buildIronmanComparison } from './osrsIronmanComparison.ts';
+import { buildIronmanMilestone, buildMaxCapePace } from './osrsProgression.ts';
 import { buildAccountStats } from './osrsAccountStats.ts';
 import {
   createEmptyTrackerWeekSummary,
@@ -220,6 +221,8 @@ function fallbackTracker(): LiveRunescapeTracker {
     friends: [],
     ownAccounts: buildOwnAccountSummaries({}),
     ironmanComparison: buildIronmanComparison({}),
+    ironmanMilestone: null,
+    maxCapePace: null,
     accountStats: buildAccountStats({}),
     lastSevenDays: createEmptySevenDaySummary(),
     baseGoalRemaining: [],
@@ -456,6 +459,8 @@ export function buildLiveRunescapeTracker(
     friends,
     ownAccounts: buildOwnAccountSummaries(currentData, previousData),
     ironmanComparison: buildIronmanComparison(currentData),
+    ironmanMilestone: buildIronmanMilestone(currentData, previousData),
+    maxCapePace: buildMaxCapePace(currentData, username),
     accountStats: buildAccountStats(currentData),
     lastSevenDays,
     baseGoalRemaining,

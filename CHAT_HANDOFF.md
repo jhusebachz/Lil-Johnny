@@ -142,7 +142,10 @@ Important current rules:
   - `Dummyhead38`
   - `RebelMontana`
   - `Kriid`
-- RuneFest pace should not assume Slayer-trained combat stats become free 99s
+  - `IronXDabber` (regular friend comparison, no separate rivalry card)
+- Max Cape goal: December 31, 2027; display cumulative estimated training hours ahead/behind the November 10, 2026 baseline
+- Combat skill levels still count toward 99s, but have no hourly pace estimate because Slayer trains them simultaneously
+- JorbisBTW: automatic Base 30/40/50/60/70/80/90/99 ladder with no deadline or XP/hour target; show overall levels and skills left
 - no `manual lane` wording anywhere
 
 If OSRS pace logic changes in the app, also update:
